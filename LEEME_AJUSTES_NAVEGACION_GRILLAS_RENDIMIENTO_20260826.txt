@@ -1,0 +1,27 @@
+CLEAR · AJUSTES DE NAVEGACIÓN, GRILLAS, REPORTES Y RENDIMIENTO
+Fecha: 26/08/2026
+
+INSTALACIÓN
+1. Copiar la carpeta clear sobre la instalación actual, conservando la estructura.
+2. Ejecutar en SQL Server Management Studio:
+   SQL/CLEAR_OPTIMIZAR_COMENTARIOS_REPORTES_20260826.sql
+3. Recargar el navegador con Ctrl+F5.
+
+CAMBIOS PRINCIPALES
+- Las alarmas de pozo ya no redirigen a la pantalla principal por falta de permiso.
+- Botón Inicio visible en el menú lateral y en la barra superior.
+- REPORTES aparece como módulo independiente fuera de Novedades semanales.
+- El constructor de reportes continúa abriendo como ventana emergente.
+- Selección masiva de filas para reportes, incluida en Top 20 y demás grillas compatibles.
+- Reconocidas y Reconocidas por usuario pueden incorporarse al reporte.
+- Botón Columnas común: permite mostrar u ocultar columnas en todas las tablas .grid.
+- Los filtros de combo se aplican aunque la grilla use el atributo form externo.
+- Cierre diario: tipos Combinado, Barras, Líneas y Dona; escala y colores configurables.
+- Etiquetas del gráfico separadas para evitar solapamientos.
+
+RENDIMIENTO
+- Los permisos se cargan una sola vez por petición, en vez de repetir consultas por cada opción del menú.
+- Las validaciones de tablas de seguridad y reportes son de sólo lectura cuando los objetos ya existen.
+- Se incorpora un índice acotado para la lectura de comentarios centralizados.
+
+El script SQL es idempotente: puede ejecutarse nuevamente sin duplicar el índice.

@@ -1,0 +1,21 @@
+{
+  "runtime": "PHP 7.4.33 WASM; simulated SQL adapter",
+  "checks": [
+    "GET catalogue requirements",
+    "GET catalogue audits",
+    "POST valid assignment stores",
+    "POST invalid CSRF rejected",
+    "POST missing CSRF rejected",
+    "POST empty multipart rejected",
+    "POST wrong chief supervisor rejected",
+    "POST invalid type rejected",
+    "POST new contact guarded",
+    "POST readonly cannot add contact",
+    "POST readonly cannot create record",
+    "POST excessive request rejected",
+    "POST upload too large rejected",
+    "POST unknown action rejected",
+    "DELETE not allowed",
+    "invalid module rejected"
+  ]
+}

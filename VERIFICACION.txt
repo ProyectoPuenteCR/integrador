@@ -1,0 +1,23 @@
+PRUEBAS LOCALES
+- Análisis sintáctico PHP 7.4 y JavaScript.
+- PHP 7.4.33: ejecución real de funciones y render de la página con adaptadores
+  simulados de SQL/sesión. Casos de listado pendiente, reglas, TAG, jefatura,
+  faltantes, permisos, límites, token y vencimiento.
+- Flujo del guardado: transacción, parámetros, lotes de 50, rollback ante fallos,
+  rechazo de semanas previas y de capturas más antiguas. SQL simulado, NO ejecutado
+  contra SQL Server; el SQL debe comprobarse en tu ambiente.
+- DOM con los scripts existentes: ocho columnas, cinco gráficos, clic de estado,
+  filtros conjuntos, movimiento/ordenamiento, selección visible y reporte, CSV.
+  Chart.js se simuló en estas pruebas de interacción.
+- Evolución: huecos null en semanas sin registros y cero solo en semanas con
+  captura pero sin coincidencias. Exportación distingue Sin datos.
+
+NO VERIFICADO EN PRODUCCIÓN
+Sin conexión a IIS, SQL Server, RTQP o SMTP reales. La ejecución de Chromium
+no estuvo disponible en el entorno, por lo que no se afirma una comprobación
+visual de navegador ni de impresión. El HTML de vista previa se generó desde
+la plantilla PHP y usa Chart.js real para abrirlo en Chrome/Edge.
+Los datos de prueba están solo en ese HTML, fuera de ARCHIVOS_WEB.
+
+REFERENCIA SQL
+https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-getapplock-transact-sql

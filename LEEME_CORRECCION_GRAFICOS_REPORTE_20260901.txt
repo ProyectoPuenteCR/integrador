@@ -1,0 +1,26 @@
+CORRECCION CLEAR - GRAFICOS EN EL REPORTE OPERATIVO
+Fecha: 01/09/2026
+Este hotfix se aplica sobre el parche de reportes y Telemetria entregado anteriormente.
+
+CORRECCION
+- Los elementos seleccionados como grafico vuelven a mostrarse como graficos dentro del reporte.
+- Los valores permanecen visibles sobre las barras, lineas o sectores del grafico.
+- Las filas de Telemetria y los demas registros tabulares continúan agrupados en grillas horizontales.
+- La columna Comentario se conserva en las grillas y debajo de cada grafico.
+- Al enviar por correo se captura el grafico y se incorpora como imagen; si no es posible, se incluyen sus valores como respaldo.
+- Excel mantiene los datos de los graficos en formato tabular para poder filtrarlos y analizarlos.
+
+INSTALACION
+1. Copiar la carpeta clear de este parche sobre la carpeta clear instalada.
+2. Reemplazar solamente los archivos incluidos.
+3. Reciclar el pool de IIS o limpiar la cache de PHP si corresponde.
+4. Abrir el navegador y actualizar con Ctrl+F5.
+
+PRUEBA
+1. Abrir Ver reporte y comprobar que los graficos actuales aparecen con sus valores.
+2. Si un grafico seleccionado anteriormente no conserva su estilo original, desmarcarlo y volver a marcarlo una vez.
+3. Agregar una fila de Telemetria y comprobar que aparece como grilla con Comentario.
+4. Probar PDF, Excel y correo.
+
+BASE DE DATOS
+- No requiere scripts SQL nuevos.
