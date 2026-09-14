@@ -13,7 +13,9 @@ ALCANCE
 - Telemetria TECCS.
 
 CAMBIO IMPLEMENTADO
-- Se leen los datos desde dbo.VW_CLEAR_ZAFIRO_TELEMETRIA.
+- Se prioriza dbo.VW_CLEAR_ZAFIRO_TELEMETRIA en la base actual.
+- Si CLEAR usa otra base, se intenta LCMDB.dbo.VW_CLEAR_ZAFIRO_TELEMETRIA.
+- Como respaldo se consulta LCMDB.dbo.CLEAR_API_Q158_POZOS, que contiene la caché mostrada en SQL Server.
 - Se agregan "Estado Zafiro" y "Método Zafiro" inmediatamente después de la columna de estado operativo de cada pantalla.
 - Las dos columnas participan en filtros múltiples, filtro de encabezado, búsqueda general, selector/orden de columnas, Excel y reportes.
 - Los nombres de columnas de la vista se detectan por metadatos para tolerar alias con espacios, guiones bajos o los nombres largos provenientes de Zafiro.
