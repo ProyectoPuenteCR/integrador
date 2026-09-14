@@ -75,13 +75,25 @@ function tg_zafiro_column_key($value){
   return (string)preg_replace('/[^A-Z0-9]/','',$text);
 }
 function tg_zafiro_well_keys($value){
-  $text=strtoupper(trim((string)$value));
+  $text=strtr(strtoupper(trim((string)$value)),['Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ü'=>'U','Ñ'=>'N']);
   if($text==='')return [];
   $text=(string)preg_replace('/\s+/u','',$text);
   if($text==='')return [];
+
   $keys=[$text];
   $withoutPrefix=(string)preg_replace('/^YPF[._-]?SC[._-]?/i','',$text);
   if($withoutPrefix!==''&&$withoutPrefix!==$text)$keys[]=$withoutPrefix;
+
+  /*
+   * Zafiro puede publicar BB.A-35, BB A-35 o BB-A-35. La clave compacta
+   * permite cruzar esas variantes sin alterar el valor mostrado en pantalla.
+   */
+  foreach(array_values($keys) as $wellKey){
+    $compact=(string)preg_replace('/[^A-Z0-9]/','',$wellKey);
+    if($compact!==''&&!in_array($compact,$keys,true))$keys[]=$compact;
+    $compactWithoutPrefix=(string)preg_replace('/^YPFSC/','',$compact);
+    if($compactWithoutPrefix!==''&&!in_array($compactWithoutPrefix,$keys,true))$keys[]=$compactWithoutPrefix;
+  }
   return array_values(array_unique($keys));
 }
 
@@ -214,20 +226,23 @@ if($zafiroEnabled){
     foreach($zafiroMetadata as $zafiroMeta){
       $zafiroSourceName=trim((string)($zafiroMeta['COLUMN_NAME']??''));
       $zafiroSourceKey=tg_zafiro_column_key($zafiroSourceName);
-      if($zafiroSourceWell===''&&in_array($zafiroSourceKey,['POZO','WELL','WELLNAME'],true)){
+      if($zafiroSourceWell===''&&in_array($zafiroSourceKey,['POZO','POZONOMBRE','NOMBREPOZO','AFPOZO','WELL','WELLNAME'],true)){
         $zafiroSourceWell=$zafiroSourceName;
       }
       if($zafiroSourceState===''&&(
-        strpos($zafiroSourceKey,'ESTADOZAFIRO')!==false
+        in_array($zafiroSourceKey,['ESTADO','ESTADOPOZO','ESTADOPRODUCCION','ESTADOZAFIRO','ZAFIROESTADO'],true)
+        || strpos($zafiroSourceKey,'ESTADOZAFIRO')!==false
         || strpos($zafiroSourceKey,'ZAFIROESTADO')!==false
         || strpos($zafiroSourceKey,'CAMBIODEESTADOESTADO')!==false
       )){
         $zafiroSourceState=$zafiroSourceName;
       }
       if($zafiroSourceMethod===''&&(
-        strpos($zafiroSourceKey,'METODOZAFIRO')!==false
+        in_array($zafiroSourceKey,['METODO','METODOPOZO','METODOZAFIRO','ZAFIROMETODO','SISTEMAEXTRACCION','SISTEMADEEXTRACCION'],true)
+        || strpos($zafiroSourceKey,'METODOZAFIRO')!==false
         || strpos($zafiroSourceKey,'ZAFIROMETODO')!==false
         || strpos($zafiroSourceKey,'SISTEMADEEXTRACCION')!==false
+        || strpos($zafiroSourceKey,'SISTEMAEXTRACCION')!==false
       )){
         $zafiroSourceMethod=$zafiroSourceName;
       }
@@ -727,7 +742,7 @@ document.querySelectorAll('[data-server-filter]').forEach(function(select){
 });
 </script>
 <script src="assets/js/app.js?v=3.1.7"></script>
-<script>window.CLEAR_TELEMETRY_GRID=<?php echo json_encode(['key'=>$TELEMETRY['key'],'title'=>$TELEMETRY['title'],'batteryColumn'=>$batteryCol,'remoteStopColumn'=>$remoteStopEnabled?$remoteStopColumn:'','persistFilters'=>$persistFiltersEnabled,'columnStateVersion'=>(string)($TELEMETRY['column_state_version'] ?? '317').'-zafiro-1'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script>
+<script>window.CLEAR_TELEMETRY_GRID=<?php echo json_encode(['key'=>$TELEMETRY['key'],'title'=>$TELEMETRY['title'],'batteryColumn'=>$batteryCol,'remoteStopColumn'=>$remoteStopEnabled?$remoteStopColumn:'','persistFilters'=>$persistFiltersEnabled,'columnStateVersion'=>(string)($TELEMETRY['column_state_version'] ?? '317').'-zafiro-2'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script>
 <script src="assets/js/telemetry_grid.js?v=20260902-column-menu-1"></script>
 <script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
 <script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
