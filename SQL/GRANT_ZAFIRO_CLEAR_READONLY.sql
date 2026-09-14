@@ -48,12 +48,8 @@ PRINT 'Permisos de solo lectura aplicados a LCMDB.dbo.VW_CLEAR_ZAFIRO_TELEMETRIA
 BEGIN TRY
     EXECUTE AS USER = N'fix';
 
-    SELECT TOP (5)
-        [Pozo],
-        [Estado Zafiro],
-        [Metodo Zafiro]
-    FROM [dbo].[VW_CLEAR_ZAFIRO_TELEMETRIA]
-    WHERE [Pozo] LIKE N'%CnE-1373%';
+    SELECT TOP (5) *
+    FROM [dbo].[VW_CLEAR_ZAFIRO_TELEMETRIA];
 
     REVERT;
 END TRY
