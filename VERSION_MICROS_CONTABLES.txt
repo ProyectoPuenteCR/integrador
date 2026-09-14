@@ -1,0 +1,18 @@
+CLEAR MICROS CONTABLES
+Versión: 1.6
+Fecha: 2026-08-26
+
+Incluye:
+- Micros contables dedicado únicamente a los partes diarios.
+- Nueva pantalla Cierre diario dentro de Novedades semanales.
+- Seis indicadores con las sumas del cierre seleccionado.
+- Gráfico semanal combinado de ACUM_BRUTA, ACUM_NETA y CAUDAL_INSTANTANEO.
+- Selector de tipo de gráfico y paleta con preferencias por usuario.
+- Grilla estándar con filtros, búsqueda, orden, paginación y Excel.
+- Menú y Pantallas habilitadas actualizados.
+- Lectura exclusiva de la caché histórica local.
+- Sin cambios de base de datos sobre v1.4.
+- Partes de Micros contables incorporables al reporte semanal.
+- Malos actores con semana sin fechas, filtro por combo y comentario junto a la descripción.
+- Columnas visibles configurables y reordenables mediante arrastre.
+- Reporte semanal abierto como ventana emergente, sin ocupar una pantalla del menú.

@@ -1,0 +1,31 @@
+CLEAR - RETIRO DE ESTADO-GRAL EN TECSS
+Fecha: 09/09/2026
+
+OBJETIVO
+Retirar el atributo ESTADO-GRAL de todos los circuitos TECSS porque su valor
+no representa correctamente el estado de los pozos.
+
+CAMBIOS INCLUIDOS
+- Telemetría TECSS: se elimina ESTADO-GRAL de la consulta, grilla, filtros,
+  selector de columnas, exportación Excel y reportes.
+- 3Sigma TECSS: se elimina ESTADO-GRAL de la grilla, búsqueda, filtros,
+  exportación Excel y reportes.
+- Histórico 3Sigma: se elimina Estado general de la tabla, API y exportación.
+- Dashboard de Pozos: TECSS deja de usar ESTADO-GRAL en las estadísticas y
+  utiliza el atributo válido ESTADO.
+- El gráfico y los reportes del dashboard se identifican como Estado operativo.
+- Caché 3Sigma: el procedimiento deja de copiar ESTADO-GRAL desde el histórico.
+
+INSTALACIÓN
+1. Copiar la carpeta clear incluida en este ZIP sobre la carpeta clear del
+   servidor, conservando la misma estructura.
+2. En SQL Server Management Studio, abrir y ejecutar:
+   clear\SQL\CLEAR_TECSS_3SIGMA_CACHE_JOB.sql
+3. Actualizar el navegador con Ctrl+F5.
+
+IMPORTANTE
+- No se modifica la vista de origen TECSS_RTQP ni se elimina ninguna columna
+  física del histórico existente.
+- ESTADO-GRAL queda completamente fuera del consumo, presentación, exportación,
+  reportes y estadísticas TECSS de la plataforma.
+- El estado operativo válido ESTADO continúa disponible.

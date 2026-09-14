@@ -1,0 +1,18 @@
+CLEAR - COMENTARIOS DE ALARMAS CENTRALIZADOS
+Versión: 1.0
+Fecha: 2026-08-26
+
+Incluye:
+- Un único repositorio: dbo.FIXALARMS_COMENTARIOS.
+- Un comentario vigente y compartido por TAG, pozo o instalación.
+- Top 20 alarmas y Top 20 24 h con comentario sin depender de una fecha.
+- Alarmas 24 h, alarmas semanales, todas las alarmas y rankings con el mismo componente.
+- Comentario junto al contador ALM en todas las grillas de telemetría.
+- Comentario de alarmas en Inyección de Agua y su detalle por satélite.
+- Exportaciones Top 20 leyendo el comentario central.
+- Compatibilidad de lectura con comentarios históricos por evento y semanales existentes.
+
+Base de datos:
+- No requiere crear tablas ni ejecutar scripts SQL.
+- Los comentarios nuevos usan MOTIVO = "Comentario alarma centralizado".
+- Los registros históricos anteriores no se eliminan ni se modifican.

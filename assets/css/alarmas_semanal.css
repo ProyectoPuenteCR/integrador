@@ -1,0 +1,80 @@
+/* Alarmas semanal · Pozos / Instalaciones */
+.asPageHead{margin-bottom:18px}
+.asToolbar{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(155px,.48fr) minmax(250px,.9fr) minmax(145px,.42fr) auto auto;gap:10px;align-items:center;margin-bottom:14px}
+.asWeekPicker{min-height:64px;display:flex;align-items:center;gap:9px;padding:7px 10px;background:var(--bg-card,#fff);border:1px solid var(--line-mid);border-radius:11px;box-shadow:0 2px 8px rgba(20,59,71,.035)}
+.asWeekPicker__label{flex:0 0 auto;color:var(--text-mut);font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
+.asWeekPicker__row{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.asWeekPicker__nav{display:inline-flex;align-items:center;justify-content:center;width:31px;height:34px;flex:0 0 31px;border:1px solid var(--line-mid);border-radius:8px;background:var(--bg-th,#f7fafc);color:var(--petrol);font-size:22px;font-weight:700;text-decoration:none;transition:.14s ease}
+.asWeekPicker__nav:hover{border-color:var(--petrol);background:var(--petrol-soft)}
+.asWeekPicker__nav.is-disabled{opacity:.3;cursor:not-allowed}
+.asWeekPicker__date{min-width:0;flex:1;height:36px;display:flex;align-items:center;gap:7px;padding:0 9px;border:1px solid #aac3cd;border-radius:8px;background:var(--bg-card,#fff);color:var(--petrol)}
+.asWeekPicker__date svg{width:16px;height:16px;flex:0 0 16px}.asWeekPicker__date input{width:100%;min-width:120px;height:32px;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:11px;font-weight:700;cursor:pointer;color-scheme:light}
+.asWeekPicker small{flex:0 0 auto;max-width:74px;color:var(--text-mut);font-size:9px;line-height:1.25;text-align:center}
+.asControl{min-height:44px;display:flex;align-items:center;gap:8px;padding:0 11px;background:var(--bg-card,#fff);border:1px solid var(--line-mid);border-radius:10px;overflow:hidden}
+.asControl>span{flex:0 0 auto;color:var(--text-mut);font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
+.asControl input,.asControl select{min-width:0;flex:1;height:40px;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:12px}
+.asControl--search svg{width:16px;height:16px;flex:0 0 16px;color:var(--text-mut)}
+.asToolbar .toolbar__dateApply,.asToolbar .btn-export{min-height:44px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.asStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.asStats .stat{padding:14px 16px}
+.asStats .stat__value{font-size:31px}
+.asStats .stat__detail{margin-top:9px;padding-top:9px}
+.asPeakValue{font-size:25px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asCharts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+.asChartCard{background:var(--bg-card,#fff);border:1px solid var(--line-mid);border-radius:12px;padding:16px 17px 13px;min-width:0;box-shadow:0 3px 12px rgba(20,59,71,.035)}
+.asChartHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.asChartHead h2,.asGridHead h2{margin:0;color:var(--text);font-family:var(--font-head);font-size:21px;line-height:1.1}
+.asChartHead p{margin:4px 0 0;color:var(--text-mut);font-size:11px}
+.asChartReset{min-height:30px;padding:0 10px;border:1px solid var(--petrol-line);border-radius:8px;background:var(--petrol-soft);color:var(--petrol);font-size:11px;font-weight:700}
+.asChartBox{position:relative;height:270px;min-height:270px}
+.asGridCard{background:var(--bg-card,#fff);border:1px solid var(--line-mid);border-radius:12px;overflow:hidden;box-shadow:0 3px 12px rgba(20,59,71,.035)}
+.asGridHead{min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.asGridTitle{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.asGridMeta{color:var(--text-mut);font-size:12px}.asGridMeta b{color:var(--text)}
+.asFilterChip{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border:1px solid #b9d8e4;border-radius:999px;background:#edf7fb;color:var(--petrol);font-size:11px;font-weight:700}
+.asGrid{min-width:1500px;table-layout:auto}
+.asGrid th,.asGrid td{padding:8px 9px;font-size:11px;vertical-align:middle}
+.tablescroll .asGrid thead tr:first-child th{position:sticky!important;top:0!important;z-index:14!important;height:29px;padding:6px 8px!important;background:var(--bg-th,#f7fafc)!important;color:var(--text)!important;border-right:1px solid var(--line)!important;box-shadow:none!important;font-size:10px!important;font-weight:800!important;line-height:1.1!important;letter-spacing:.15px!important}
+.tablescroll .asGrid thead .asFilterRow th{position:sticky!important;top:29px!important;z-index:13!important;height:37px;padding:4px 6px!important;background:var(--bg-th,#f7fafc)!important;color:var(--text-soft)!important;border-right:1px solid var(--line)!important;border-bottom:1px solid var(--line-mid)!important;box-shadow:0 2px 4px rgba(13,48,59,.05)!important}
+.asSortButton{display:flex;align-items:center;justify-content:space-between;gap:7px;width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:800;text-align:left;white-space:nowrap;cursor:pointer}
+.asSortButton span{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;flex:0 0 17px;border-radius:5px;background:rgba(26,77,92,.07);color:var(--text-mut);font-size:11px;line-height:1}
+.asSortButton:hover span,.asSortButton.is-active span{background:var(--petrol);color:#fff}.asSortButton:focus-visible{outline:2px solid var(--petrol);outline-offset:2px;border-radius:4px}
+.asFilterRow input,.asFilterRow select{display:block;width:100%;height:28px;min-height:28px;padding:0 8px;border:1px solid var(--line-mid);border-radius:7px;background:var(--bg-card,#fff);color:var(--text);font:inherit;font-size:10px;outline:0}
+.asFilterRow select{padding-right:22px;cursor:pointer}
+.asFilterRow input:focus,.asFilterRow select:focus{border-color:var(--petrol);box-shadow:0 0 0 2px var(--petrol-soft)}
+.asFilterHint{display:flex;align-items:center;height:28px;min-height:28px;color:var(--text-mut);font-size:9px;font-weight:700;letter-spacing:.25px;text-transform:uppercase;white-space:nowrap}
+.asFilterButton{width:100%;height:28px;min-height:28px;border:0;border-radius:7px;background:var(--petrol);color:#fff;font-size:10px;font-weight:700}
+.asTagLink{color:var(--petrol);font-weight:700;text-decoration:underline;text-decoration-color:rgba(26,77,92,.25);text-underline-offset:3px}
+.asTagText{display:block;max-width:260px;color:var(--petrol);font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asTypeBadge{display:inline-flex;align-items:center;justify-content:center;min-width:88px;min-height:25px;padding:2px 9px;border:1px solid var(--line-mid);border-radius:999px;font-size:9px;font-weight:850;letter-spacing:.35px;text-transform:uppercase;white-space:nowrap}.asTypeBadge.is-well{border-color:#b8d9c7;background:#edf8f2;color:#24734b}.asTypeBadge.is-battery{border-color:#edcf97;background:#fff7e8;color:#8a5b08}.asTypeBadge.is-satellite{border-color:#afd2df;background:#edf7fb;color:#1a6074}.asTypeBadge.is-unknown{background:#f2f5f7;color:var(--text-mut)}
+.asTypeBadge.is-gas{border-color:#c8b8e8;background:#f5f1fc;color:#65449c}.asTypeBadge.is-plant{border-color:#e8b9b2;background:#fff1ef;color:#a34539}
+.asTypeBadge.is-pias{border-color:#8fd1cb;background:#eaf9f7;color:#176e67}.asTypeBadge.is-energy{border-color:#e6c56b;background:#fff8df;color:#806000}
+.asTypeBadge.is-plant-lh{border-color:#b2d9d1;background:#edf9f7;color:#247266}
+.asRepeatButton{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:72px;height:29px;padding:0 9px;border:1px solid var(--petrol-line);border-radius:8px;background:var(--petrol-soft);color:var(--petrol);font:inherit;font-size:10px;cursor:pointer;transition:.14s ease}
+.asRepeatButton b{font-size:11px}.asRepeatButton svg{width:14px;height:14px}.asRepeatButton:hover,.asRepeatButton:focus-visible{border-color:var(--petrol);background:var(--bg-card,#fff);transform:translateY(-1px);outline:0}
+.asCommentCell{text-align:center}.asCommentCell .alarmCell{display:flex;justify-content:center;min-width:48px}.asCommentCell .alarmCell__text{display:none}.asCommentCell .alarmCell__actions{margin:0;padding:0;border:0;gap:0}.asCommentCell .alarmAction--comment{width:38px;height:30px;border-width:1px}.asCommentCell .alarmAction--comment svg{width:17px;height:17px}
+.asBadge{display:inline-flex;align-items:center;justify-content:center;min-width:74px;max-width:125px;min-height:24px;padding:2px 8px;border-radius:7px;font-size:9px;font-weight:800;letter-spacing:.25px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.asBadge.is-red{background:var(--red-soft);border:1px solid #f5c5c1;color:var(--red-tx)}
+.asBadge.is-amber{background:var(--amber-soft);border:1px solid #f2d9ab;color:var(--amber-tx)}
+.asBadge.is-blue{background:var(--petrol-soft);border:1px solid var(--petrol-line);color:var(--petrol)}
+.asBadge.is-muted{background:#f2f5f7;border:1px solid var(--line-mid);color:var(--text-soft)}
+.asEmpty{text-align:center!important;padding:30px!important;color:var(--text-mut)}
+.asPager{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 15px;border-top:1px solid var(--line);color:var(--text-mut);font-size:11px}
+.asPager label,.asPager>div{display:flex;align-items:center;gap:8px}
+.asPager select{height:30px;border:1px solid var(--line-mid);border-radius:7px;background:var(--bg-card,#fff);color:var(--text)}
+.asPager a{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border:1px solid var(--line-mid);border-radius:7px;background:var(--bg-card,#fff);color:var(--petrol);font-size:18px;font-weight:700}
+.asPager a.is-disabled{opacity:.35;pointer-events:none}
+.asCacheNote{margin-top:8px;text-align:right;color:var(--text-mut);font-size:10px}
+.asNotice{padding:13px 15px;border:1px solid var(--line-mid);border-radius:10px;background:var(--bg-card,#fff);color:var(--text-soft);font-size:12px;margin-bottom:14px}
+.asNotice.is-warning{border-color:#ecd19e;background:var(--amber-soft);color:var(--amber-tx)}
+.asNotice.is-error{border-color:#f3c5c1;background:var(--red-soft);color:var(--red-tx)}
+.asNotice code{font-family:monospace;font-weight:700}
+@media(max-width:1350px){.asToolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.asCharts{grid-template-columns:1fr}.asChartBox{height:250px}.asStats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.asToolbar,.asStats{grid-template-columns:1fr}.asGridHead,.asPager{align-items:flex-start;flex-direction:column}.asChartCard{padding:13px}.asChartBox{height:230px;min-height:230px}}
+html[data-theme="dark"] .tablescroll .asGrid thead tr:first-child th,html[data-theme="dark"] .tablescroll .asGrid thead .asFilterRow th{background:#174a59!important;color:#d9edf2!important;border-color:#35606d!important}
+html[data-theme="dark"] .asFilterRow input,html[data-theme="dark"] .asFilterRow select{background:#132832;color:#dce9ee;border-color:#35606d}
+html[data-theme="dark"] .asWeekPicker__date input{color-scheme:dark}html[data-theme="dark"] .asSortButton span{background:rgba(255,255,255,.1);color:#c7dbe2}html[data-theme="dark"] .asSortButton.is-active span{background:#64adc0;color:#102630}
+html[data-theme="dark"] .asTypeBadge.is-well{background:rgba(35,178,109,.15);color:#8de0b5;border-color:#34795a}html[data-theme="dark"] .asTypeBadge.is-battery{background:rgba(229,166,45,.14);color:#f0cb7d;border-color:#7d673a}html[data-theme="dark"] .asTypeBadge.is-satellite{background:rgba(68,160,185,.16);color:#9ad6e5;border-color:#3c7180}html[data-theme="dark"] .asTypeBadge.is-unknown{background:#1b333e;color:#b8cbd2;border-color:#3b5965}
+html[data-theme="dark"] .asTypeBadge.is-gas{background:rgba(151,106,213,.16);color:#cdb1f1;border-color:#694e8e}html[data-theme="dark"] .asTypeBadge.is-plant{background:rgba(211,88,72,.15);color:#f0a89e;border-color:#864b43}
+html[data-theme="dark"] .asTypeBadge.is-pias{background:rgba(49,170,159,.16);color:#99ddd7;border-color:#397a74}html[data-theme="dark"] .asTypeBadge.is-energy{background:rgba(224,181,55,.16);color:#f1d47d;border-color:#7f6a32}
+html[data-theme="dark"] .asTypeBadge.is-plant-lh{background:rgba(58,171,151,.15);color:#96dfd2;border-color:#3c796f}

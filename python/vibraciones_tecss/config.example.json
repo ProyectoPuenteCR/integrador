@@ -1,0 +1,42 @@
+{
+  "source": {
+    "server": "10.17.4.85\\MSSQL",
+    "database": "SYS_MP_YPF_LH",
+    "user": "COMPLETAR_USUARIO",
+    "password": "COMPLETAR_PASSWORD",
+    "trusted_connection": false,
+    "view": "dbo.vwDatosEyesOnVibracionGpm",
+    "connection_timeout": 30
+  },
+  "destination": {
+    "server": "10.17.40.37",
+    "database": "LC_MDB",
+    "trusted_connection": true,
+    "connection_timeout": 30
+  },
+  "mapping": {
+    "table": "dbo.TECSS_RTQP",
+    "well_column": "POZO",
+    "battery_column": "BATERIA"
+  },
+  "analysis": {
+    "history_days": 90,
+    "retention_days": 120,
+    "overlap_hours": 2,
+    "alert_multiplier": 2.5,
+    "critical_multiplier": 3.5,
+    "cooldown_hours": 12,
+    "zero_threshold": 1.0,
+    "zero_last_readings": 5,
+    "alert_sustained_minutes": 60,
+    "critical_sustained_minutes": 120,
+    "frequent_excess_count": 10,
+    "recent_window_hours": 48,
+    "active_state_hours": 6,
+    "clean_hours": 10
+  },
+  "runtime": {
+    "batch_size": 1000,
+    "log_days": 30
+  }
+}

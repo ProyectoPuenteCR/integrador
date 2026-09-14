@@ -1,0 +1,346 @@
+USE [LC_MDB];
+GO
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+GO
+
+/*
+  CLEAR - RESTAURAR ALARMAS EN FALLA Y OCULTAR EL ESTADO TECNICO CFN
+
+  CFN identifica en iFIX el cambio desde condición normal. Esas filas contienen
+  las activaciones que luego se clasifican por ALM_VALUE como FALLA o ALARMA.
+  Por ese motivo se conservan las filas, pero ALM_ALMSTATUS se entrega como NULL
+  en las vistas CLEAR para que CFN no aparezca como estado, filtro o estadística.
+
+  dbo.FIXALARMS permanece exclusivamente como fuente de lectura.
+*/
+
+IF OBJECT_ID(N'dbo.FIXALARMS') IS NULL
+    THROW 51030,N'No existe dbo.FIXALARMS en LC_MDB.',1;
+
+IF OBJECT_ID(N'dbo.CLEAR_ALARM_FILTERS',N'U') IS NULL
+    THROW 51031,N'No existe dbo.CLEAR_ALARM_FILTERS.',1;
+GO
+
+/* Recrea las tres vistas conservando todas las filas y enmascarando únicamente
+   el texto CFN de la columna de estado. Se mantiene el orden y nombre original
+   de todas las columnas para no afectar las pantallas existentes. */
+DECLARE @Objetos TABLE
+(
+    ORDEN int NOT NULL,
+    ORIGEN sysname NOT NULL,
+    DESTINO sysname NOT NULL
+);
+
+INSERT @Objetos(ORDEN,ORIGEN,DESTINO) VALUES
+    (1,N'FIXALARMS',N'CLEAR_F_FIXALARMS'),
+    (2,N'FIXALARMS_24H',N'CLEAR_F_FIXALARMS_24H'),
+    (3,N'FIXALARMS_ONLY',N'CLEAR_F_FIXALARMS_ONLY');
+
+DECLARE @Origen sysname,@Destino sysname,@Columnas nvarchar(max),@Sql nvarchar(max);
+DECLARE C_OBJETOS CURSOR LOCAL FAST_FORWARD FOR
+    SELECT ORIGEN,DESTINO FROM @Objetos ORDER BY ORDEN;
+
+OPEN C_OBJETOS;
+FETCH NEXT FROM C_OBJETOS INTO @Origen,@Destino;
+
+WHILE @@FETCH_STATUS=0
+BEGIN
+    IF OBJECT_ID(N'dbo.'+@Origen) IS NOT NULL
+    BEGIN
+        IF NOT EXISTS
+        (
+            SELECT 1 FROM sys.columns
+            WHERE object_id=OBJECT_ID(N'dbo.'+@Origen)
+              AND name=N'ALM_ALMSTATUS'
+        )
+            THROW 51032,N'Una fuente de alarmas no contiene ALM_ALMSTATUS.',1;
+
+        SELECT @Columnas=STUFF
+        (
+            (
+                SELECT N','+
+                    CASE WHEN C.name=N'ALM_ALMSTATUS' THEN
+                        N'CASE WHEN UPPER(LTRIM(RTRIM(CONVERT(nvarchar(100),A.'+QUOTENAME(C.name)+
+                        N'))))=N''CFN'' THEN NULL ELSE A.'+QUOTENAME(C.name)+N' END AS '+QUOTENAME(C.name)
+                    ELSE N'A.'+QUOTENAME(C.name) END
+                FROM sys.columns AS C
+                WHERE C.object_id=OBJECT_ID(N'dbo.'+@Origen)
+                ORDER BY C.column_id
+                FOR XML PATH(''),TYPE
+            ).value('.','nvarchar(max)'),1,1,N''
+        );
+
+        SET @Sql=N'CREATE OR ALTER VIEW dbo.'+QUOTENAME(@Destino)+N' AS
+SELECT '+@Columnas+N'
+FROM dbo.'+QUOTENAME(@Origen)+N' AS A
+WHERE NOT EXISTS
+(
+    SELECT 1 FROM dbo.CLEAR_ALARM_FILTERS AS F
+    WHERE F.ACTIVO=1 AND
+    (
+        (F.CAMPO IN (N''TAG'',N''AMBOS'') AND
+         ((F.MODO=N''EXACTO'' AND LTRIM(RTRIM(CONVERT(nvarchar(1000),A.ALM_TAGNAME))) COLLATE DATABASE_DEFAULT=F.VALOR COLLATE DATABASE_DEFAULT)
+          OR (F.MODO=N''COMIENZA'' AND CONVERT(nvarchar(1000),A.ALM_TAGNAME) COLLATE DATABASE_DEFAULT LIKE (F.VALOR+N''%'') COLLATE DATABASE_DEFAULT)
+          OR (F.MODO=N''CONTIENE'' AND CONVERT(nvarchar(1000),A.ALM_TAGNAME) COLLATE DATABASE_DEFAULT LIKE (N''%''+F.VALOR+N''%'') COLLATE DATABASE_DEFAULT)))
+        OR
+        (F.CAMPO IN (N''DESCRIPCION'',N''AMBOS'') AND
+         ((F.MODO=N''EXACTO'' AND LTRIM(RTRIM(CONVERT(nvarchar(1000),A.ALM_DESCR))) COLLATE DATABASE_DEFAULT=F.VALOR COLLATE DATABASE_DEFAULT)
+          OR (F.MODO=N''COMIENZA'' AND CONVERT(nvarchar(1000),A.ALM_DESCR) COLLATE DATABASE_DEFAULT LIKE (F.VALOR+N''%'') COLLATE DATABASE_DEFAULT)
+          OR (F.MODO=N''CONTIENE'' AND CONVERT(nvarchar(1000),A.ALM_DESCR) COLLATE DATABASE_DEFAULT LIKE (N''%''+F.VALOR+N''%'') COLLATE DATABASE_DEFAULT)))
+    )
+)';
+
+        EXEC sys.sp_executesql @Sql;
+    END;
+
+    FETCH NEXT FROM C_OBJETOS INTO @Origen,@Destino;
+END;
+
+CLOSE C_OBJETOS;
+DEALLOCATE C_OBJETOS;
+GO
+
+/* Top 20: conserva los eventos CFN porque contienen las activaciones en Falla. */
+IF OBJECT_ID(N'dbo.CLEAR_CACHE_TOP20_24H',N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.CLEAR_CACHE_TOP20_24H',N'ULTIMA_APARICION') IS NULL
+BEGIN
+    ALTER TABLE dbo.CLEAR_CACHE_TOP20_24H
+        ADD ULTIMA_APARICION datetime2(3) NULL;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.SP_CLEAR_ACTUALIZAR_CACHE_TOP20_24H
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF OBJECT_ID(N'dbo.CLEAR_CACHE_TOP20_24H',N'U') IS NULL RETURN;
+
+    CREATE TABLE #NUEVOS_DATOS
+    (
+        ALM_TAGNAME nvarchar(500) NOT NULL,
+        DESCRIPCION nvarchar(1000) NULL,
+        TOTAL_ALARMAS bigint NOT NULL,
+        ALM_ALMEXTFLD2 nvarchar(500) NULL,
+        ULTIMA_APARICION datetime2(3) NULL
+    );
+
+    INSERT #NUEVOS_DATOS
+        (ALM_TAGNAME,DESCRIPCION,TOTAL_ALARMAS,ALM_ALMEXTFLD2,ULTIMA_APARICION)
+    SELECT
+        LTRIM(RTRIM(CONVERT(nvarchar(500),A.ALM_TAGNAME))),
+        NULLIF(MAX(COALESCE(
+            NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(1000),A.ALM_DESCR))),N''),
+            NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(1000),A.ALM_TAGDESC))),N''),N''
+        )),N''),
+        COUNT_BIG(*),
+        NULLIF(MAX(COALESCE(NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(500),A.ALM_ALMEXTFLD2))),N''),N'')),N''),
+        MAX(CONVERT(datetime2(3),A.ALM_NATIVETIMEIN))
+    FROM dbo.FIXALARMS AS A
+    WHERE A.ALM_NATIVETIMEIN>=DATEADD(hour,-24,SYSDATETIME())
+      AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(500),A.ALM_TAGNAME))),N'') IS NOT NULL
+      AND NOT EXISTS
+      (
+          SELECT 1 FROM dbo.CLEAR_ALARM_FILTERS AS F
+          WHERE F.ACTIVO=1 AND
+          (
+              (F.CAMPO IN (N'TAG',N'AMBOS') AND
+               ((F.MODO=N'EXACTO' AND LTRIM(RTRIM(CONVERT(nvarchar(1000),A.ALM_TAGNAME))) COLLATE DATABASE_DEFAULT=F.VALOR COLLATE DATABASE_DEFAULT)
+                OR (F.MODO=N'COMIENZA' AND CONVERT(nvarchar(1000),A.ALM_TAGNAME) COLLATE DATABASE_DEFAULT LIKE (F.VALOR+N'%') COLLATE DATABASE_DEFAULT)
+                OR (F.MODO=N'CONTIENE' AND CONVERT(nvarchar(1000),A.ALM_TAGNAME) COLLATE DATABASE_DEFAULT LIKE (N'%'+F.VALOR+N'%') COLLATE DATABASE_DEFAULT)))
+              OR
+              (F.CAMPO IN (N'DESCRIPCION',N'AMBOS') AND
+               ((F.MODO=N'EXACTO' AND LTRIM(RTRIM(CONVERT(nvarchar(1000),A.ALM_DESCR))) COLLATE DATABASE_DEFAULT=F.VALOR COLLATE DATABASE_DEFAULT)
+                OR (F.MODO=N'COMIENZA' AND CONVERT(nvarchar(1000),A.ALM_DESCR) COLLATE DATABASE_DEFAULT LIKE (F.VALOR+N'%') COLLATE DATABASE_DEFAULT)
+                OR (F.MODO=N'CONTIENE' AND CONVERT(nvarchar(1000),A.ALM_DESCR) COLLATE DATABASE_DEFAULT LIKE (N'%'+F.VALOR+N'%') COLLATE DATABASE_DEFAULT)))
+          )
+      )
+    GROUP BY LTRIM(RTRIM(CONVERT(nvarchar(500),A.ALM_TAGNAME)))
+    OPTION (MAXDOP 1,RECOMPILE);
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+            TRUNCATE TABLE dbo.CLEAR_CACHE_TOP20_24H;
+            INSERT dbo.CLEAR_CACHE_TOP20_24H
+                (ALM_TAGNAME,DESCRIPCION,TOTAL_ALARMAS,ALM_ALMEXTFLD2,ULTIMA_APARICION,FECHA_ACTUALIZACION)
+            SELECT ALM_TAGNAME,DESCRIPCION,TOTAL_ALARMAS,ALM_ALMEXTFLD2,ULTIMA_APARICION,SYSDATETIME()
+            FROM #NUEVOS_DATOS;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+/* Telemetría: el contador ALM vuelve a incluir las activaciones en Falla. */
+CREATE OR ALTER PROCEDURE dbo.SP_ACTUALIZAR_TELEMETRIA_POZOS_GENERAL_CACHE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    SET DEADLOCK_PRIORITY LOW;
+    SET LOCK_TIMEOUT 15000;
+
+    IF OBJECT_ID(N'dbo.TELEMETRIA_POZOS_GENERAL_CACHE',N'U') IS NULL RETURN;
+    IF OBJECT_ID(N'dbo.VW_TELEMETRIA_POZOS_GENERAL') IS NULL RETURN;
+
+    DECLARE @Ahora datetime2(0)=SYSDATETIME();
+    DECLARE @LockResult int;
+
+    EXEC @LockResult=sys.sp_getapplock
+        @Resource=N'CLEAR_TELEMETRIA_POZOS_GENERAL_CACHE',
+        @LockMode=N'Exclusive',@LockOwner=N'Session',@LockTimeout=0;
+
+    IF @LockResult<0
+        THROW 51033,N'Ya existe otra actualización de telemetría en curso.',1;
+
+    BEGIN TRY
+        CREATE TABLE #Alarmas24h
+        (
+            POZO nvarchar(255) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY,
+            TOTAL bigint NOT NULL
+        );
+
+        INSERT #Alarmas24h(POZO,TOTAL)
+        SELECT
+            UPPER(LTRIM(RTRIM(CONVERT(nvarchar(255),A.ALM_ALMEXTFLD2)))),
+            COUNT_BIG(*)
+        FROM dbo.FIXALARMS AS A
+        WHERE A.ALM_NATIVETIMEIN>=DATEADD(hour,-24,@Ahora)
+          AND A.ALM_ALMEXTFLD2 IS NOT NULL
+          AND A.ALM_ALMEXTFLD2<>N''
+        GROUP BY UPPER(LTRIM(RTRIM(CONVERT(nvarchar(255),A.ALM_ALMEXTFLD2))))
+        OPTION (MAXDOP 1,RECOMPILE);
+
+        CREATE TABLE #CacheNueva
+        (
+            POZO nvarchar(255) COLLATE DATABASE_DEFAULT NOT NULL,
+            BATERIA nvarchar(255) COLLATE DATABASE_DEFAULT NULL,
+            TIPO nvarchar(20) COLLATE DATABASE_DEFAULT NOT NULL,
+            ALM int NOT NULL,
+            COMUNICACION nvarchar(255) COLLATE DATABASE_DEFAULT NULL,
+            ESTADO nvarchar(255) COLLATE DATABASE_DEFAULT NULL,
+            PANTALLA nvarchar(1000) COLLATE DATABASE_DEFAULT NULL,
+            ULTIMA_ACTUALIZACION datetime2(0) NULL,
+            FECHA_CACHE datetime2(0) NOT NULL
+        );
+
+        INSERT #CacheNueva
+            (POZO,BATERIA,TIPO,ALM,COMUNICACION,ESTADO,PANTALLA,ULTIMA_ACTUALIZACION,FECHA_CACHE)
+        SELECT
+            V.POZO,V.BATERIA,V.TIPO,CONVERT(int,ISNULL(A.TOTAL,0)),
+            V.COMUNICACION,V.ESTADO,V.PANTALLA,V.ULTIMA_ACTUALIZACION,@Ahora
+        FROM dbo.VW_TELEMETRIA_POZOS_GENERAL AS V
+        LEFT JOIN #Alarmas24h AS A
+          ON A.POZO COLLATE DATABASE_DEFAULT
+             =UPPER(LTRIM(RTRIM(CONVERT(nvarchar(255),V.POZO)))) COLLATE DATABASE_DEFAULT
+        WHERE V.POZO IS NOT NULL AND V.POZO<>N''
+        OPTION (MAXDOP 1);
+
+        BEGIN TRANSACTION;
+            TRUNCATE TABLE dbo.TELEMETRIA_POZOS_GENERAL_CACHE;
+            INSERT dbo.TELEMETRIA_POZOS_GENERAL_CACHE
+                (POZO,BATERIA,TIPO,ALM,COMUNICACION,ESTADO,PANTALLA,ULTIMA_ACTUALIZACION,FECHA_CACHE)
+            SELECT POZO,BATERIA,TIPO,ALM,COMUNICACION,ESTADO,PANTALLA,ULTIMA_ACTUALIZACION,FECHA_CACHE
+            FROM #CacheNueva;
+        COMMIT TRANSACTION;
+
+        EXEC sys.sp_releaseapplock
+            @Resource=N'CLEAR_TELEMETRIA_POZOS_GENERAL_CACHE',@LockOwner=N'Session';
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
+        EXEC sys.sp_releaseapplock
+            @Resource=N'CLEAR_TELEMETRIA_POZOS_GENERAL_CACHE',@LockOwner=N'Session';
+        THROW;
+    END CATCH;
+END;
+GO
+
+/* Reconstruye todos los resúmenes que habían quedado sin las filas de Falla. */
+DECLARE @Resultados TABLE
+(
+    COMPONENTE nvarchar(100) NOT NULL,
+    CORRECTO bit NOT NULL,
+    DETALLE nvarchar(2048) NULL
+);
+
+IF OBJECT_ID(N'dbo.SP_CLEAR_ACTUALIZAR_CACHE_OPERATIVA',N'P') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        EXEC dbo.SP_CLEAR_ACTUALIZAR_CACHE_OPERATIVA;
+        INSERT @Resultados VALUES(N'Caché operativa',1,N'Actualizada');
+    END TRY
+    BEGIN CATCH
+        INSERT @Resultados VALUES(N'Caché operativa',0,ERROR_MESSAGE());
+    END CATCH;
+END;
+
+IF OBJECT_ID(N'dbo.CLEAR_CACHE_TOP20_24H',N'U') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        EXEC dbo.SP_CLEAR_ACTUALIZAR_CACHE_TOP20_24H;
+        INSERT @Resultados VALUES(N'Top 20 24 h',1,N'Actualizada');
+    END TRY
+    BEGIN CATCH
+        INSERT @Resultados VALUES(N'Top 20 24 h',0,ERROR_MESSAGE());
+    END CATCH;
+END;
+
+IF OBJECT_ID(N'dbo.TELEMETRIA_POZOS_GENERAL_CACHE',N'U') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        EXEC dbo.SP_ACTUALIZAR_TELEMETRIA_POZOS_GENERAL_CACHE;
+        INSERT @Resultados VALUES(N'Telemetría de pozos',1,N'Actualizada');
+    END TRY
+    BEGIN CATCH
+        INSERT @Resultados VALUES(N'Telemetría de pozos',0,ERROR_MESSAGE());
+    END CATCH;
+END;
+
+IF OBJECT_ID(N'dbo.CLEAR_ALARMAS_SEMANA_CACHE',N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.SP_CLEAR_ACTUALIZAR_ALARMAS_SEMANA_CACHE',N'P') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        TRUNCATE TABLE dbo.CLEAR_ALARMAS_SEMANA_CACHE;
+        EXEC dbo.SP_CLEAR_ACTUALIZAR_ALARMAS_SEMANA_CACHE @DiasRecarga=120;
+        INSERT @Resultados VALUES(N'Caché semanal',1,N'Reconstruida');
+    END TRY
+    BEGIN CATCH
+        INSERT @Resultados VALUES(N'Caché semanal',0,ERROR_MESSAGE());
+    END CATCH;
+END;
+
+IF OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_CACHE',N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.SP_CLEAR_ACTUALIZAR_NOVEDADES_SEMANALES',N'P') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        TRUNCATE TABLE dbo.CLEAR_NOVEDADES_SEMANALES_CACHE;
+        EXEC dbo.SP_CLEAR_ACTUALIZAR_NOVEDADES_SEMANALES @SemanasRecarga=16;
+        INSERT @Resultados VALUES(N'Novedades semanales',1,N'Reconstruida');
+    END TRY
+    BEGIN CATCH
+        INSERT @Resultados VALUES(N'Novedades semanales',0,ERROR_MESSAGE());
+    END CATCH;
+END;
+
+SELECT COMPONENTE,CORRECTO,DETALLE FROM @Resultados ORDER BY CORRECTO,COMPONENTE;
+
+IF EXISTS(SELECT 1 FROM @Resultados WHERE CORRECTO=0)
+    THROW 51034,N'Una o más cachés no pudieron reconstruirse. Revise la tabla de resultados.',1;
+
+/* CFN debe quedar oculto, pero las filas FALLA deben volver a estar disponibles. */
+SELECT
+    COALESCE(SUM(CASE WHEN UPPER(LTRIM(RTRIM(CONVERT(nvarchar(100),ALM_ALMSTATUS))))=N'CFN' THEN 1 ELSE 0 END),0) AS CFN_VISIBLE,
+    COALESCE(SUM(CASE WHEN UPPER(LTRIM(RTRIM(CONVERT(nvarchar(500),ALM_VALUE))))=N'FALLA' THEN 1 ELSE 0 END),0) AS FALLAS_VISIBLES,
+    COUNT_BIG(*) AS TOTAL_VISIBLE_24H
+FROM dbo.CLEAR_F_FIXALARMS
+WHERE ALM_NATIVETIMEIN>=DATEADD(hour,-24,SYSDATETIME());
+
+PRINT N'CORRECCIÓN COMPLETADA: las Fallas fueron restauradas y CFN quedó oculto como estado.';
+PRINT N'dbo.FIXALARMS no fue modificada.';
+GO

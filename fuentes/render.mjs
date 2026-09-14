@@ -1,0 +1,21 @@
+import fs from 'node:fs';import path from 'node:path';
+import {getPHPLoaderModule} from '../patch_test_tools/node_modules/@php-wasm/node-7-4/index.js';
+import {PHP,loadPHPRuntime} from '../patch_test_tools/node_modules/@php-wasm/universal/index.js';
+const php=new PHP(await loadPHPRuntime(await getPHPLoaderModule()));php.mkdir('/app');
+function copy(dir,rel=''){for(const d of fs.readdirSync(dir,{withFileTypes:true})){const r=path.join(rel,d.name);if(d.isDirectory()){php.mkdir('/app/'+r);copy(path.join(dir,d.name),r);}else if(d.name.endsWith('.php')&&!/^(config|config_pi|mail_config|pumpoff_config|reporte_pozos_config)\.php$/.test(d.name))php.writeFile('/app/'+r,fs.readFileSync(path.join(dir,d.name)));}}
+copy('clear_patch_work/clear');
+const unit=fs.readFileSync('patch_validation/unit.php','utf8');
+const db=unit.slice(unit.indexOf('class TestDB'),unit.indexOf("$GLOBALS['passed']=[];"));
+php.writeFile('/app/includes/db.php',`<?php\nfunction check($v,$l){if(!$v)throw new RuntimeException($l);}\n${db}\nclass PageDB extends TestDB{function all($sql,$params=[]){if(strpos($sql,'FROM dbo.CLEAR_NS_GESTIONES WHERE')!==false)return $GLOBALS['demo_rows'];return parent::all($sql,$params);}}\nfunction clear_db(){static $db=null;if(!$db)$db=new PageDB();return $db;}\nfunction h($v){return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}`);
+php.writeFile('/app/includes/auth.php',`<?php function auth_require(){} function auth_user(){return 'Demo';} function auth_es_admin(){return true;}`);
+php.writeFile('/app/includes/permissions.php',`<?php function permissions_can_menu($k){return $k!=='novedades_semanales_monitoreo_bm';} function permissions_require_menu($k){} function permissions_can($k){return true;} function user_pref_get($k,$d=null){return $d;}`);
+php.writeFile('/app/includes/appconfig.php',`<?php function menu_ocultos(){return [];}`);
+php.writeFile('/app/config.php',`<?php return ['app'=>['tz'=>'UTC']];`);
+php.writeFile('/app/get-catalog.php',`<?php require '/app/includes/novedades_gestion.php'; require '/app/includes/db.php'; echo json_encode(ngr_catalog(clear_db()),JSON_UNESCAPED_UNICODE);`);
+const c=await php.run({scriptPath:'/app/get-catalog.php'});if(c.errors)throw new Error(c.errors);fs.writeFileSync('patch_validation/catalog.json',c.text);
+for(const type of ['REQUERIMIENTO','AUDITORIA']){
+ const rows=[{ID:1,VERSION:1,TIPO:type,FECHA:'2026-08-28',ZONA:type==='AUDITORIA'?'LHCG':'',BATERIA:type==='AUDITORIA'?'BAT 01':'',SUPERVISOR:'Ana Campo',JEFE_PRODUCCION:'Jefa Norte',REQUERIMIENTO:type==='REQUERIMIENTO'?'Verificar comunicación y registrar evidencia':'',RESPONSABLE:type==='REQUERIMIENTO'?'Jefa Norte':'',RESPONSABLE_TIPO:type==='REQUERIMIENTO'?'JEFE_PRODUCCION':'',SUPERVISORES_JSON:type==='REQUERIMIENTO'?'["Ana Campo","Bruno Campo"]':'[]',ESTADO:'PENDIENTE',FECHA_CIERRE:'',FECHA_PRIMER_CIERRE:'',OBSERVACIONES:'Registro de demostración · sin datos operativos reales',ADJUNTO_NOMBRE:'',ADJUNTO_BYTES:0,USUARIO_CARGA:'Demo',USUARIO_MODIFICACION:'Demo',FECHA_MODIFICACION:'2026-08-28 18:00:00'},
+ {ID:2,VERSION:1,TIPO:type,FECHA:'2026-08-27',ZONA:type==='AUDITORIA'?'CED I':'',BATERIA:type==='AUDITORIA'?'BAT 03':'',SUPERVISOR:type==='AUDITORIA'?'Carlos Campo':'',JEFE_PRODUCCION:type==='AUDITORIA'?'Jefe Sur':'',REQUERIMIENTO:type==='REQUERIMIENTO'?'Revisar señal de caudal':'',RESPONSABLE:type==='REQUERIMIENTO'?'Nombre anterior':'',RESPONSABLE_TIPO:'',SUPERVISORES_JSON:'[]',ESTADO:'FINALIZADO',FECHA_CIERRE:'2026-08-28',FECHA_PRIMER_CIERRE:'2026-08-28',OBSERVACIONES:'Carga de ejemplo',ADJUNTO_NOMBRE:'',ADJUNTO_BYTES:0,USUARIO_CARGA:'Demo',USUARIO_MODIFICACION:'Demo',FECHA_MODIFICACION:'2026-08-28 18:00:00'}];
+ php.writeFile('/app/render.php',`<?php $GLOBALS['demo_rows']=json_decode('${JSON.stringify(rows).replaceAll("'","\\'")}',true); $_GET=['desde'=>'2026-08-01','hasta'=>'2026-08-28']; $_SESSION=[]; $gestionTipo='${type}'; require '/app/includes/novedades_gestion_pagina.php';`);
+ const r=await php.run({scriptPath:'/app/render.php'});if(r.errors||r.exitCode){console.error(r.errors,r.text.slice(0,1000));process.exit(1);}fs.writeFileSync('patch_validation/'+type+'.html',r.text);console.log('Rendered actual PHP template:',type,r.text.length,'bytes');
+}

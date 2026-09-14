@@ -1,0 +1,16 @@
+CLEAR · PARCHE CAMBIO 1 · 02/09/2026
+
+Copiar el contenido del ZIP sobre la carpeta del sitio CLEAR conservando la
+misma estructura. El parche contiene únicamente archivos nuevos o modificados.
+
+CAMBIOS
+- Auditoría: selección individual o total de los registros visibles y borrado
+  administrativo con confirmación, validación de sesión y trazabilidad.
+- Comparativa semanal: línea de tendencia lineal en gráficos de barras y líneas.
+- Malos actores: nuevo gráfico de sumatoria de alarmas por semana, configurable
+  como barras o líneas y basado en los filtros activos, sin consultar histórico.
+- Telemetría de pozos: fondo sólido, prioridad visual y controles utilizables en
+  el selector de columnas compartido por Grilla general, Monitoreo, PCP, BES y
+  TECCS. También se corrigieron los tokens visuales usados por 3Sigma.
+
+No requiere ejecutar scripts SQL ni modificar la base de datos.

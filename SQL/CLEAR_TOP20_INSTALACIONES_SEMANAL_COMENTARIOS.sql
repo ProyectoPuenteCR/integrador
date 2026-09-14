@@ -1,0 +1,99 @@
+USE [LC_MDB];
+GO
+
+/*
+  Top 20 de instalaciones semanal (miércoles a martes)
+  -------------------------------------------------------------
+  Crea únicamente la tabla de comentarios del agrupamiento
+  INSTALACION + SEMANA. dbo.FIXALARMS permanece solo en lectura.
+*/
+
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+GO
+
+IF OBJECT_ID(N'dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES
+    (
+        ID                    BIGINT IDENTITY(1,1) NOT NULL,
+        INSTALACION           NVARCHAR(255) NOT NULL,
+        SEMANA_DESDE          DATE NOT NULL,
+        SEMANA_HASTA          DATE NOT NULL,
+        COMENTARIO            NVARCHAR(2000) NOT NULL,
+        USUARIO_CARGA         NVARCHAR(128) NOT NULL,
+        FECHA_CARGA           DATETIME2(0) NOT NULL
+            CONSTRAINT DF_FIXALARMS_INST_COM_SEM_FECHA_CARGA DEFAULT (SYSDATETIME()),
+        USUARIO_MODIFICACION  NVARCHAR(128) NULL,
+        FECHA_MODIFICACION    DATETIME2(0) NULL,
+        ACTIVO                BIT NOT NULL
+            CONSTRAINT DF_FIXALARMS_INST_COM_SEM_ACTIVO DEFAULT (1),
+
+        CONSTRAINT PK_FIXALARMS_INST_COMENTARIOS_SEMANALES
+            PRIMARY KEY CLUSTERED (ID),
+        CONSTRAINT CK_FIXALARMS_INST_COM_SEM_RANGO
+            CHECK (DATEDIFF(DAY, SEMANA_DESDE, SEMANA_HASTA) = 6),
+        CONSTRAINT CK_FIXALARMS_INST_COM_SEM_MIERCOLES
+            CHECK (DATEDIFF(DAY, CONVERT(DATE, '19000103', 112), SEMANA_DESDE) % 7 = 0)
+    );
+END;
+GO
+
+IF NOT EXISTS
+(
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES')
+      AND name = N'UX_FIXALARMS_INST_COM_SEM_INSTALACION_SEMANA'
+)
+BEGIN
+    CREATE UNIQUE INDEX UX_FIXALARMS_INST_COM_SEM_INSTALACION_SEMANA
+        ON dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES (INSTALACION, SEMANA_DESDE);
+END;
+GO
+
+IF NOT EXISTS
+(
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES')
+      AND name = N'IX_FIXALARMS_INST_COM_SEM_SEMANA_ACTIVO'
+)
+BEGIN
+    CREATE INDEX IX_FIXALARMS_INST_COM_SEM_SEMANA_ACTIVO
+        ON dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES (SEMANA_DESDE, ACTIVO)
+        INCLUDE (INSTALACION, USUARIO_CARGA, FECHA_CARGA, USUARIO_MODIFICACION, FECHA_MODIFICACION);
+END;
+GO
+
+/* Copia los permisos de lectura/escritura de la tabla de comentarios ya
+   utilizada por la aplicación, sin asumir el usuario SQL del sitio. */
+IF OBJECT_ID(N'dbo.FIXALARMS_COMENTARIOS', N'U') IS NOT NULL
+BEGIN
+    DECLARE @Permisos NVARCHAR(MAX) = N'';
+
+    SELECT @Permisos = @Permisos
+        + N'GRANT ' + P.permission_name
+        + N' ON OBJECT::dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES TO '
+        + QUOTENAME(USER_NAME(P.grantee_principal_id)) + N';' + CHAR(13) + CHAR(10)
+    FROM sys.database_permissions AS P
+    WHERE P.class = 1
+      AND P.major_id = OBJECT_ID(N'dbo.FIXALARMS_COMENTARIOS')
+      AND P.state IN (N'G', N'W')
+      AND P.permission_name IN (N'SELECT', N'INSERT', N'UPDATE');
+
+    IF @Permisos <> N'' EXEC sys.sp_executesql @Permisos;
+END;
+GO
+
+SELECT
+    OBJECT_SCHEMA_NAME(object_id) AS ESQUEMA,
+    OBJECT_NAME(object_id) AS TABLA,
+    SUM(row_count) AS REGISTROS
+FROM sys.dm_db_partition_stats
+WHERE object_id = OBJECT_ID(N'dbo.FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES')
+  AND index_id IN (0, 1)
+GROUP BY object_id;
+GO
+
+PRINT N'Tabla de comentarios semanales por instalación instalada correctamente.';
+PRINT N'dbo.FIXALARMS no fue modificada.';
+GO

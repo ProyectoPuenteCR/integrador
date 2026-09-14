@@ -1,0 +1,311 @@
+USE [LC_MDB];
+GO
+
+/*
+   CLEAR · Módulo Novedades semanales v2
+   ===================================
+   Instalación aditiva y desacoplada.
+
+   - NO modifica dbo.FIXALARMS.
+   - NO modifica las pantallas actuales.
+   - Resume únicamente dbo.CLEAR_ALARMAS_SEMANA_CACHE.
+   - Agrega selección de elementos de reporte por usuario.
+   - El Job propio actualiza la semana actual y la anterior cada 30 minutos.
+*/
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+GO
+
+IF OBJECT_ID(N'dbo.CLEAR_ALARMAS_SEMANA_CACHE',N'U') IS NULL
+BEGIN
+    THROW 50001, N'Primero debe instalarse SQL/CLEAR_ALARMAS_SEMANAL_CACHE_JOB.sql.', 1;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.CLEAR_ALARMAS_SEMANA_CACHE',N'TIPO_INSTALACION') IS NULL
+BEGIN
+    THROW 50002, N'La caché semanal no posee TIPO_INSTALACION. Ejecute la versión actual de CLEAR_ALARMAS_SEMANAL_CACHE_JOB.sql.', 1;
+END;
+GO
+
+IF OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_CACHE',N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CLEAR_NOVEDADES_SEMANALES_CACHE
+    (
+        ID                  bigint IDENTITY(1,1) NOT NULL,
+        SEMANA_DESDE        date NOT NULL,
+        SEMANA_HASTA        date NOT NULL,
+        TIPO_INSTALACION    nvarchar(30) NOT NULL,
+        INSTALACION         nvarchar(255) NOT NULL,
+        TAG                 nvarchar(255) NOT NULL,
+        DESCRIPCION         nvarchar(1000) NULL,
+        TOTAL_ALARMAS       bigint NOT NULL,
+        CAMPO_EXT           nvarchar(255) NULL,
+        FECHA_ACTUALIZACION datetime2(0) NOT NULL,
+        CONSTRAINT PK_CLEAR_NOVEDADES_SEMANALES_CACHE PRIMARY KEY CLUSTERED(ID),
+        CONSTRAINT CK_CLEAR_NOVEDADES_SEMANA_RANGO CHECK(DATEDIFF(day,SEMANA_DESDE,SEMANA_HASTA)=6),
+        CONSTRAINT CK_CLEAR_NOVEDADES_SEMANA_TOTAL CHECK(TOTAL_ALARMAS>=0)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_CACHE') AND name=N'UX_CLEAR_NOVEDADES_SEMANA_FILA')
+BEGIN
+    CREATE UNIQUE INDEX UX_CLEAR_NOVEDADES_SEMANA_FILA
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_CACHE(SEMANA_DESDE,TIPO_INSTALACION,INSTALACION,TAG);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_CACHE') AND name=N'IX_CLEAR_NOVEDADES_SEMANA_RANKING')
+BEGIN
+    CREATE INDEX IX_CLEAR_NOVEDADES_SEMANA_RANKING
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_CACHE(SEMANA_DESDE,TOTAL_ALARMAS DESC)
+        INCLUDE(TIPO_INSTALACION,INSTALACION,TAG,DESCRIPCION,CAMPO_EXT,SEMANA_HASTA,FECHA_ACTUALIZACION);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_CACHE') AND name=N'IX_CLEAR_NOVEDADES_TAG_SEMANA')
+BEGIN
+    CREATE INDEX IX_CLEAR_NOVEDADES_TAG_SEMANA
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_CACHE(TAG,SEMANA_DESDE)
+        INCLUDE(TOTAL_ALARMAS,TIPO_INSTALACION,INSTALACION);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_CACHE') AND name=N'IX_CLEAR_NOVEDADES_INST_SEMANA')
+BEGIN
+    CREATE INDEX IX_CLEAR_NOVEDADES_INST_SEMANA
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_CACHE(INSTALACION,SEMANA_DESDE)
+        INCLUDE(TOTAL_ALARMAS,TIPO_INSTALACION,TAG);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS',N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS
+    (
+        ID                   bigint IDENTITY(1,1) NOT NULL,
+        SEMANA_DESDE         date NOT NULL,
+        SEMANA_HASTA         date NOT NULL,
+        TIPO_INSTALACION     nvarchar(30) NOT NULL,
+        INSTALACION          nvarchar(255) NOT NULL,
+        TAG                  nvarchar(255) NOT NULL,
+        COMENTARIO           nvarchar(2000) NOT NULL,
+        USUARIO_CARGA        nvarchar(128) NOT NULL,
+        FECHA_CARGA          datetime2(0) NOT NULL CONSTRAINT DF_CLEAR_NS_COM_FECHA DEFAULT(SYSDATETIME()),
+        USUARIO_MODIFICACION nvarchar(128) NULL,
+        FECHA_MODIFICACION   datetime2(0) NULL,
+        ACTIVO               bit NOT NULL CONSTRAINT DF_CLEAR_NS_COM_ACTIVO DEFAULT(1),
+        CONSTRAINT PK_CLEAR_NOVEDADES_SEMANALES_COM PRIMARY KEY CLUSTERED(ID),
+        CONSTRAINT CK_CLEAR_NS_COM_RANGO CHECK(DATEDIFF(day,SEMANA_DESDE,SEMANA_HASTA)=6)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS') AND name=N'UX_CLEAR_NS_COM_FILA')
+BEGIN
+    CREATE UNIQUE INDEX UX_CLEAR_NS_COM_FILA
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS(SEMANA_DESDE,TIPO_INSTALACION,INSTALACION,TAG);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS') AND name=N'IX_CLEAR_NS_COM_SEMANA_ACTIVO')
+BEGIN
+    CREATE INDEX IX_CLEAR_NS_COM_SEMANA_ACTIVO
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS(SEMANA_DESDE,ACTIVO)
+        INCLUDE(TIPO_INSTALACION,INSTALACION,TAG,COMENTARIO,USUARIO_CARGA,USUARIO_MODIFICACION,FECHA_CARGA,FECHA_MODIFICACION);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS',N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS
+    (
+        ID              bigint IDENTITY(1,1) NOT NULL,
+        USUARIO         nvarchar(128) COLLATE DATABASE_DEFAULT NOT NULL,
+        ITEM_KEY        nvarchar(120) COLLATE DATABASE_DEFAULT NOT NULL,
+        ITEM_TIPO       nvarchar(30) COLLATE DATABASE_DEFAULT NOT NULL,
+        TITULO          nvarchar(255) COLLATE DATABASE_DEFAULT NOT NULL,
+        PAYLOAD_JSON    nvarchar(max) COLLATE DATABASE_DEFAULT NOT NULL,
+        ACTIVO          bit NOT NULL CONSTRAINT DF_CLEAR_NS_REP_ACTIVO DEFAULT(1),
+        FECHA_CARGA     datetime2(0) NOT NULL CONSTRAINT DF_CLEAR_NS_REP_FECHA DEFAULT(SYSDATETIME()),
+        FECHA_CAMBIO    datetime2(0) NULL,
+        CONSTRAINT PK_CLEAR_NS_REPORTE_ITEMS PRIMARY KEY CLUSTERED(ID)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS') AND name=N'UX_CLEAR_NS_REP_USUARIO_ITEM')
+BEGIN
+    CREATE UNIQUE INDEX UX_CLEAR_NS_REP_USUARIO_ITEM
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS(USUARIO,ITEM_KEY);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS') AND name=N'IX_CLEAR_NS_REP_USUARIO_ACTIVO')
+BEGIN
+    CREATE INDEX IX_CLEAR_NS_REP_USUARIO_ACTIVO
+        ON dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS(USUARIO,ACTIVO,FECHA_CARGA)
+        INCLUDE(ITEM_KEY,ITEM_TIPO,TITULO,FECHA_CAMBIO);
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.SP_CLEAR_ACTUALIZAR_NOVEDADES_SEMANALES
+    @SemanasRecarga int = 2
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    SET @SemanasRecarga=CASE WHEN @SemanasRecarga<1 THEN 1 WHEN @SemanasRecarga>16 THEN 16 ELSE @SemanasRecarga END;
+    DECLARE @Hoy date=CONVERT(date,SYSDATETIME());
+    DECLARE @SemanaActual date=DATEADD(day,-(DATEDIFF(day,CONVERT(date,'19000103',112),@Hoy)%7),@Hoy);
+    DECLARE @Desde date=DATEADD(day,-7*(@SemanasRecarga-1),@SemanaActual);
+    DECLARE @Hasta date=DATEADD(day,7,@SemanaActual);
+    DECLARE @Actualizacion datetime2(0)=SYSDATETIME();
+
+    CREATE TABLE #INSTALACIONES
+    (
+        SEMANA_DESDE date NOT NULL,
+        SEMANA_HASTA date NOT NULL,
+        /* Las tablas temporales nacen en tempdb. DATABASE_DEFAULT evita
+           conflictos entre SQL_Latin1_General_CP1_CI_AS y
+           Modern_Spanish_CI_AS al compararlas con LC_MDB. */
+        TIPO_INSTALACION nvarchar(30) COLLATE DATABASE_DEFAULT NOT NULL,
+        INSTALACION nvarchar(255) COLLATE DATABASE_DEFAULT NOT NULL,
+        TAG nvarchar(255) COLLATE DATABASE_DEFAULT NOT NULL,
+        DESCRIPCION nvarchar(1000) COLLATE DATABASE_DEFAULT NULL,
+        TOTAL_ALARMAS bigint NOT NULL,
+        CAMPO_EXT nvarchar(255) COLLATE DATABASE_DEFAULT NULL
+    );
+
+    INSERT INTO #INSTALACIONES(SEMANA_DESDE,SEMANA_HASTA,TIPO_INSTALACION,INSTALACION,TAG,DESCRIPCION,TOTAL_ALARMAS,CAMPO_EXT)
+    SELECT
+        W.SEMANA_DESDE,
+        DATEADD(day,6,W.SEMANA_DESDE),
+        COALESCE(NULLIF(LTRIM(RTRIM(C.TIPO_INSTALACION)),N''),N'SIN CLASIFICAR'),
+        C.ENTIDAD,
+        C.TAG,
+        MAX(C.DESCRIPCION),
+        SUM(C.TOTAL),
+        NULL
+    FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE C
+    CROSS APPLY(VALUES(DATEADD(day,-(DATEDIFF(day,CONVERT(date,'19000103',112),C.FECHA)%7),C.FECHA))) W(SEMANA_DESDE)
+    WHERE C.TIPO='I' AND C.FECHA>=@Desde AND C.FECHA<@Hasta
+    GROUP BY W.SEMANA_DESDE,COALESCE(NULLIF(LTRIM(RTRIM(C.TIPO_INSTALACION)),N''),N'SIN CLASIFICAR'),C.ENTIDAD,C.TAG;
+
+    /* CAMPO_EXT se recupera de la rama resumida de Pozos. Si un mismo TAG
+       apunta a más de un campo en la semana, se informa VARIOS sin inventar
+       una relación. No se consulta FIXALARMS. */
+    ;WITH CAMPOS AS
+    (
+        SELECT
+            W.SEMANA_DESDE,
+            C.TAG,
+            CASE WHEN MIN(C.ENTIDAD)=MAX(C.ENTIDAD) THEN MAX(C.ENTIDAD) ELSE N'VARIOS' END AS CAMPO_EXT
+        FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE C
+        CROSS APPLY(VALUES(DATEADD(day,-(DATEDIFF(day,CONVERT(date,'19000103',112),C.FECHA)%7),C.FECHA))) W(SEMANA_DESDE)
+        WHERE C.TIPO='P' AND C.FECHA>=@Desde AND C.FECHA<@Hasta
+        GROUP BY W.SEMANA_DESDE,C.TAG
+    )
+    UPDATE I SET CAMPO_EXT=P.CAMPO_EXT
+    FROM #INSTALACIONES I
+    INNER JOIN CAMPOS P
+        ON P.SEMANA_DESDE=I.SEMANA_DESDE
+       AND P.TAG COLLATE DATABASE_DEFAULT=I.TAG COLLATE DATABASE_DEFAULT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DELETE FROM dbo.CLEAR_NOVEDADES_SEMANALES_CACHE WHERE SEMANA_DESDE>=@Desde AND SEMANA_DESDE<@Hasta;
+        INSERT INTO dbo.CLEAR_NOVEDADES_SEMANALES_CACHE
+            (SEMANA_DESDE,SEMANA_HASTA,TIPO_INSTALACION,INSTALACION,TAG,DESCRIPCION,TOTAL_ALARMAS,CAMPO_EXT,FECHA_ACTUALIZACION)
+        SELECT SEMANA_DESDE,SEMANA_HASTA,TIPO_INSTALACION,INSTALACION,TAG,DESCRIPCION,TOTAL_ALARMAS,CAMPO_EXT,@Actualizacion
+        FROM #INSTALACIONES;
+
+        DELETE FROM dbo.CLEAR_NOVEDADES_SEMANALES_CACHE WHERE SEMANA_DESDE<DATEADD(day,-730,@SemanaActual);
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+
+    SELECT @Desde AS DESDE,DATEADD(day,-1,@Hasta) AS HASTA,COUNT_BIG(*) AS FILAS,SUM(TOTAL_ALARMAS) AS TOTAL_ALARMAS,@Actualizacion AS ACTUALIZADO
+    FROM #INSTALACIONES;
+END;
+GO
+
+/* Copiar permisos del sitio sin asumir el nombre del usuario SQL. */
+DECLARE @Grants nvarchar(max)=N'';
+SELECT @Grants=@Grants+N'GRANT SELECT ON OBJECT::dbo.CLEAR_NOVEDADES_SEMANALES_CACHE TO '+QUOTENAME(USER_NAME(P.grantee_principal_id))+N';'+CHAR(13)
+FROM sys.database_permissions P
+WHERE P.class=1 AND P.major_id=OBJECT_ID(N'dbo.CLEAR_ALARMAS_SEMANA_CACHE') AND P.state IN(N'G',N'W') AND P.permission_name=N'SELECT';
+IF @Grants<>N'' EXEC sys.sp_executesql @Grants;
+GO
+
+IF OBJECT_ID(N'dbo.FIXALARMS_COMENTARIOS',N'U') IS NOT NULL
+BEGIN
+    DECLARE @CommentGrants nvarchar(max)=N'';
+    SELECT @CommentGrants=@CommentGrants+N'GRANT '+P.permission_name+N' ON OBJECT::dbo.CLEAR_NOVEDADES_SEMANALES_COMENTARIOS TO '+QUOTENAME(USER_NAME(P.grantee_principal_id))+N';'+CHAR(13)
+    FROM sys.database_permissions P
+    WHERE P.class=1 AND P.major_id=OBJECT_ID(N'dbo.FIXALARMS_COMENTARIOS') AND P.state IN(N'G',N'W') AND P.permission_name IN(N'SELECT',N'INSERT',N'UPDATE');
+    IF @CommentGrants<>N'' EXEC sys.sp_executesql @CommentGrants;
+
+    DECLARE @ReportGrants nvarchar(max)=N'';
+    SELECT @ReportGrants=@ReportGrants+N'GRANT '+P.permission_name+N' ON OBJECT::dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS TO '+QUOTENAME(USER_NAME(P.grantee_principal_id))+N';'+CHAR(13)
+    FROM sys.database_permissions P
+    WHERE P.class=1 AND P.major_id=OBJECT_ID(N'dbo.FIXALARMS_COMENTARIOS') AND P.state IN(N'G',N'W') AND P.permission_name IN(N'SELECT',N'INSERT',N'UPDATE');
+    IF @ReportGrants<>N'' EXEC sys.sp_executesql @ReportGrants;
+END;
+GO
+
+EXEC dbo.SP_CLEAR_ACTUALIZAR_NOVEDADES_SEMANALES @SemanasRecarga=2;
+GO
+
+USE [msdb];
+GO
+
+IF EXISTS(SELECT 1 FROM dbo.sysjobs WHERE name=N'CLEAR - Novedades semanales caché')
+    EXEC dbo.sp_delete_job @job_name=N'CLEAR - Novedades semanales caché',@delete_unused_schedule=1;
+GO
+IF EXISTS(SELECT 1 FROM dbo.sysschedules WHERE name=N'CLEAR - Novedades semanales cada 30 minutos')
+    EXEC dbo.sp_delete_schedule @schedule_name=N'CLEAR - Novedades semanales cada 30 minutos',@force_delete=1;
+GO
+
+EXEC dbo.sp_add_job
+    @job_name=N'CLEAR - Novedades semanales caché',
+    @enabled=1,
+    @description=N'Actualiza resúmenes semanales desde CLEAR_ALARMAS_SEMANA_CACHE; nunca consulta FIXALARMS.';
+GO
+EXEC dbo.sp_add_jobstep
+    @job_name=N'CLEAR - Novedades semanales caché',
+    @step_name=N'Resumir semana actual y anterior',
+    @subsystem=N'TSQL',
+    @database_name=N'LC_MDB',
+    @command=N'EXEC dbo.SP_CLEAR_ACTUALIZAR_NOVEDADES_SEMANALES @SemanasRecarga=2;',
+    @retry_attempts=2,
+    @retry_interval=2;
+GO
+EXEC dbo.sp_add_schedule
+    @schedule_name=N'CLEAR - Novedades semanales cada 30 minutos',
+    @enabled=1,
+    @freq_type=4,
+    @freq_interval=1,
+    @freq_subday_type=4,
+    @freq_subday_interval=30,
+    @active_start_time=000500;
+GO
+EXEC dbo.sp_attach_schedule @job_name=N'CLEAR - Novedades semanales caché',@schedule_name=N'CLEAR - Novedades semanales cada 30 minutos';
+GO
+EXEC dbo.sp_add_jobserver @job_name=N'CLEAR - Novedades semanales caché';
+GO
+
+USE [LC_MDB];
+GO
+SELECT MIN(SEMANA_DESDE) AS DESDE,MAX(SEMANA_HASTA) AS HASTA,COUNT_BIG(*) AS FILAS,SUM(TOTAL_ALARMAS) AS ALARMAS,MAX(FECHA_ACTUALIZACION) AS ACTUALIZADO
+FROM dbo.CLEAR_NOVEDADES_SEMANALES_CACHE;
+GO
+
+PRINT N'Fin del script Novedades semanales. Confirme que la consulta anterior muestre ACTUALIZADO y que no se hayan informado errores.';
+PRINT N'FIXALARMS y las pantallas existentes no fueron modificados.';
+GO
