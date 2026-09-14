@@ -31,7 +31,11 @@ $remoteStopExtraColumns=array_values(array_intersect(
 $remoteStopValueColumns=array_values(array_unique(array_merge([$remoteStopColumn],$remoteStopExtraColumns)));
 $persistFiltersEnabled=!empty($TELEMETRY['persist_filters']);
 $zafiroEnabled=!array_key_exists('zafiro_telemetry',$TELEMETRY)||!empty($TELEMETRY['zafiro_telemetry']);
-$zafiroView='VW_CLEAR_ZAFIRO_TELEMETRIA';
+$zafiroSources=[
+  ['database'=>'','schema'=>'dbo','object'=>'VW_CLEAR_ZAFIRO_TELEMETRIA'],
+  ['database'=>'LCMDB','schema'=>'dbo','object'=>'VW_CLEAR_ZAFIRO_TELEMETRIA'],
+  ['database'=>'LCMDB','schema'=>'dbo','object'=>'CLEAR_API_Q158_POZOS']
+];
 $zafiroStateColumn='Estado Zafiro';
 $zafiroMethodColumn='Método Zafiro';
 $zafiroColumns=[$zafiroStateColumn,$zafiroMethodColumn];
@@ -211,66 +215,88 @@ if($zafiroEnabled){
   }
 
   if($db->ok()){
-    $zafiroObjectName='dbo.'.$zafiroView;
-    $zafiroMetadata=$db->all(
-      "SELECT c.name AS COLUMN_NAME
-       FROM sys.columns c
-       WHERE c.object_id=OBJECT_ID(?)
-       ORDER BY c.column_id",
-      [$zafiroObjectName]
-    );
-    $zafiroSourceWell='';
-    $zafiroSourceState='';
-    $zafiroSourceMethod='';
+    $zafiroRows=[];
 
-    foreach($zafiroMetadata as $zafiroMeta){
-      $zafiroSourceName=trim((string)($zafiroMeta['COLUMN_NAME']??''));
-      $zafiroSourceKey=tg_zafiro_column_key($zafiroSourceName);
-      if($zafiroSourceWell===''&&in_array($zafiroSourceKey,['POZO','POZONOMBRE','NOMBREPOZO','AFPOZO','WELL','WELLNAME'],true)){
-        $zafiroSourceWell=$zafiroSourceName;
-      }
-      if($zafiroSourceState===''&&(
-        in_array($zafiroSourceKey,['ESTADO','ESTADOPOZO','ESTADOPRODUCCION','ESTADOZAFIRO','ZAFIROESTADO'],true)
-        || strpos($zafiroSourceKey,'ESTADOZAFIRO')!==false
-        || strpos($zafiroSourceKey,'ZAFIROESTADO')!==false
-        || strpos($zafiroSourceKey,'CAMBIODEESTADOESTADO')!==false
-      )){
-        $zafiroSourceState=$zafiroSourceName;
-      }
-      if($zafiroSourceMethod===''&&(
-        in_array($zafiroSourceKey,['METODO','METODOPOZO','METODOZAFIRO','ZAFIROMETODO','SISTEMAEXTRACCION','SISTEMADEEXTRACCION'],true)
-        || strpos($zafiroSourceKey,'METODOZAFIRO')!==false
-        || strpos($zafiroSourceKey,'ZAFIROMETODO')!==false
-        || strpos($zafiroSourceKey,'SISTEMADEEXTRACCION')!==false
-        || strpos($zafiroSourceKey,'SISTEMAEXTRACCION')!==false
-      )){
-        $zafiroSourceMethod=$zafiroSourceName;
-      }
-    }
+    /*
+     * CLEAR puede estar conectado a una base distinta de LCMDB. Se intenta
+     * primero la vista solicitada en la base actual, luego en LCMDB y, como
+     * respaldo, la caché diaria LCMDB.dbo.CLEAR_API_Q158_POZOS.
+     */
+    foreach($zafiroSources as $zafiroSource){
+      $zafiroDatabase=trim((string)($zafiroSource['database']??''));
+      $zafiroSchema=trim((string)($zafiroSource['schema']??'dbo'));
+      $zafiroObject=trim((string)($zafiroSource['object']??''));
+      if($zafiroObject==='')continue;
 
-    if($zafiroSourceWell!==''&&$zafiroSourceState!==''&&$zafiroSourceMethod!==''){
+      $zafiroMetadataFrom=$zafiroDatabase!==''
+        ?tg_q($zafiroDatabase).'.[INFORMATION_SCHEMA].[COLUMNS]'
+        :'[INFORMATION_SCHEMA].[COLUMNS]';
+      $zafiroMetadata=$db->all(
+        'SELECT COLUMN_NAME FROM '.$zafiroMetadataFrom
+        .' WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY ORDINAL_POSITION',
+        [$zafiroSchema,$zafiroObject]
+      );
+      if(!$zafiroMetadata)continue;
+
+      $zafiroSourceWell='';
+      $zafiroSourceState='';
+      $zafiroSourceMethod='';
+
+      foreach($zafiroMetadata as $zafiroMeta){
+        $zafiroSourceName=trim((string)($zafiroMeta['COLUMN_NAME']??''));
+        $zafiroSourceKey=tg_zafiro_column_key($zafiroSourceName);
+        if($zafiroSourceWell===''&&in_array($zafiroSourceKey,['POZO','POZONOMBRE','NOMBREPOZO','AFPOZO','WELL','WELLNAME'],true)){
+          $zafiroSourceWell=$zafiroSourceName;
+        }
+        if($zafiroSourceState===''&&(
+          in_array($zafiroSourceKey,['ESTADO','ESTADOPOZO','ESTADOPRODUCCION','ESTADOZAFIRO','ZAFIROESTADO'],true)
+          || strpos($zafiroSourceKey,'ESTADOZAFIRO')!==false
+          || strpos($zafiroSourceKey,'ZAFIROESTADO')!==false
+          || strpos($zafiroSourceKey,'CAMBIODEESTADOESTADO')!==false
+        )){
+          $zafiroSourceState=$zafiroSourceName;
+        }
+        if($zafiroSourceMethod===''&&(
+          in_array($zafiroSourceKey,['METODO','METODOPOZO','METODOZAFIRO','ZAFIROMETODO','SISTEMAEXTRACCION','SISTEMADEEXTRACCION'],true)
+          || strpos($zafiroSourceKey,'METODOZAFIRO')!==false
+          || strpos($zafiroSourceKey,'ZAFIROMETODO')!==false
+          || strpos($zafiroSourceKey,'SISTEMADEEXTRACCION')!==false
+          || strpos($zafiroSourceKey,'SISTEMAEXTRACCION')!==false
+        )){
+          $zafiroSourceMethod=$zafiroSourceName;
+        }
+      }
+
+      if($zafiroSourceWell===''||$zafiroSourceState===''||$zafiroSourceMethod==='')continue;
+
+      $zafiroObjectSql=($zafiroDatabase!==''?tg_q($zafiroDatabase).'.':'')
+        .tg_q($zafiroSchema).'.'.tg_q($zafiroObject);
       $zafiroSql='SELECT '
         .tg_q($zafiroSourceWell).' AS [__ZAFIRO_POZO],'
         .tg_q($zafiroSourceState).' AS [__ZAFIRO_ESTADO],'
         .tg_q($zafiroSourceMethod).' AS [__ZAFIRO_METODO]'
-        .' FROM [dbo].'.tg_q($zafiroView)
+        .' FROM '.$zafiroObjectSql
         .' WHERE '.tg_q($zafiroSourceWell).' IS NOT NULL';
-      $zafiroRows=$db->all($zafiroSql);
+      $zafiroCandidateRows=$db->all($zafiroSql);
+      if(!$zafiroCandidateRows)continue;
 
-      foreach($zafiroRows as $zafiroRow){
-        $zafiroData=[
-          $zafiroStateColumn=>tg_text($zafiroRow['__ZAFIRO_ESTADO']??''),
-          $zafiroMethodColumn=>tg_text($zafiroRow['__ZAFIRO_METODO']??'')
-        ];
-        foreach(tg_zafiro_well_keys($zafiroRow['__ZAFIRO_POZO']??'') as $zafiroKey){
-          if(!isset($zafiroMap[$zafiroKey])){
-            $zafiroMap[$zafiroKey]=$zafiroData;
-            continue;
-          }
-          foreach($zafiroColumns as $zafiroColumn){
-            if(($zafiroMap[$zafiroKey][$zafiroColumn]??'')===''&&($zafiroData[$zafiroColumn]??'')!==''){
-              $zafiroMap[$zafiroKey][$zafiroColumn]=$zafiroData[$zafiroColumn];
-            }
+      $zafiroRows=$zafiroCandidateRows;
+      break;
+    }
+
+    foreach($zafiroRows as $zafiroRow){
+      $zafiroData=[
+        $zafiroStateColumn=>tg_text($zafiroRow['__ZAFIRO_ESTADO']??''),
+        $zafiroMethodColumn=>tg_text($zafiroRow['__ZAFIRO_METODO']??'')
+      ];
+      foreach(tg_zafiro_well_keys($zafiroRow['__ZAFIRO_POZO']??'') as $zafiroKey){
+        if(!isset($zafiroMap[$zafiroKey])){
+          $zafiroMap[$zafiroKey]=$zafiroData;
+          continue;
+        }
+        foreach($zafiroColumns as $zafiroColumn){
+          if(($zafiroMap[$zafiroKey][$zafiroColumn]??'')===''&&($zafiroData[$zafiroColumn]??'')!==''){
+            $zafiroMap[$zafiroKey][$zafiroColumn]=$zafiroData[$zafiroColumn];
           }
         }
       }
@@ -742,7 +768,7 @@ document.querySelectorAll('[data-server-filter]').forEach(function(select){
 });
 </script>
 <script src="assets/js/app.js?v=3.1.7"></script>
-<script>window.CLEAR_TELEMETRY_GRID=<?php echo json_encode(['key'=>$TELEMETRY['key'],'title'=>$TELEMETRY['title'],'batteryColumn'=>$batteryCol,'remoteStopColumn'=>$remoteStopEnabled?$remoteStopColumn:'','persistFilters'=>$persistFiltersEnabled,'columnStateVersion'=>(string)($TELEMETRY['column_state_version'] ?? '317').'-zafiro-2'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script>
+<script>window.CLEAR_TELEMETRY_GRID=<?php echo json_encode(['key'=>$TELEMETRY['key'],'title'=>$TELEMETRY['title'],'batteryColumn'=>$batteryCol,'remoteStopColumn'=>$remoteStopEnabled?$remoteStopColumn:'','persistFilters'=>$persistFiltersEnabled,'columnStateVersion'=>(string)($TELEMETRY['column_state_version'] ?? '317').'-zafiro-3'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script>
 <script src="assets/js/telemetry_grid.js?v=20260902-column-menu-1"></script>
 <script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
 <script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
