@@ -32,9 +32,16 @@ $remoteStopValueColumns=array_values(array_unique(array_merge([$remoteStopColumn
 $persistFiltersEnabled=!empty($TELEMETRY['persist_filters']);
 $zafiroEnabled=!array_key_exists('zafiro_telemetry',$TELEMETRY)||!empty($TELEMETRY['zafiro_telemetry']);
 $zafiroSources=[
-  ['database'=>'','schema'=>'dbo','object'=>'VW_CLEAR_ZAFIRO_TELEMETRIA'],
-  ['database'=>'LCMDB','schema'=>'dbo','object'=>'VW_CLEAR_ZAFIRO_TELEMETRIA'],
-  ['database'=>'LCMDB','schema'=>'dbo','object'=>'CLEAR_API_Q158_POZOS']
+  [
+    'database'=>'',
+    'schema'=>'dbo',
+    'object'=>'CLEAR_API_Q158_POZOS',
+    'well'=>'Pozo',
+    'state'=>'Resumen de Producción Teórica de Pozo>>Cambio de estado>>Estado',
+    'method'=>'Resumen de Producción Teórica de Pozo>>Sistema de Extracción>>Sistema de Extracción_name',
+    'order'=>'FechaCarga DESC, CacheId DESC'
+  ],
+  ['database'=>'','schema'=>'dbo','object'=>'VW_CLEAR_ZAFIRO_TELEMETRIA']
 ];
 $zafiroStateColumn='Estado Zafiro';
 $zafiroMethodColumn='Método Zafiro';
@@ -218,9 +225,9 @@ if($zafiroEnabled){
     $zafiroRows=[];
 
     /*
-     * CLEAR puede estar conectado a una base distinta de LCMDB. Se intenta
-     * primero la vista solicitada en la base actual, luego en LCMDB y, como
-     * respaldo, la caché diaria LCMDB.dbo.CLEAR_API_Q158_POZOS.
+     * La aplicación ya está conectada a LC_MDB. Se consulta primero la caché
+     * diaria dbo.CLEAR_API_Q158_POZOS de esa misma base y se conserva la vista
+     * dbo.VW_CLEAR_ZAFIRO_TELEMETRIA como alternativa local.
      */
     foreach($zafiroSources as $zafiroSource){
       $zafiroDatabase=trim((string)($zafiroSource['database']??''));
@@ -228,42 +235,49 @@ if($zafiroEnabled){
       $zafiroObject=trim((string)($zafiroSource['object']??''));
       if($zafiroObject==='')continue;
 
-      $zafiroMetadataFrom=$zafiroDatabase!==''
-        ?tg_q($zafiroDatabase).'.[INFORMATION_SCHEMA].[COLUMNS]'
-        :'[INFORMATION_SCHEMA].[COLUMNS]';
-      $zafiroMetadata=$db->all(
-        'SELECT COLUMN_NAME FROM '.$zafiroMetadataFrom
-        .' WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY ORDINAL_POSITION',
-        [$zafiroSchema,$zafiroObject]
-      );
-      if(!$zafiroMetadata)continue;
+      /*
+       * La caché Zafiro está en la base actual configurada (LC_MDB).
+       * Para CLEAR_API_Q158_POZOS se usan los nombres exactos, evitando
+       * depender de INFORMATION_SCHEMA y de bases con nombres parecidos.
+       */
+      $zafiroSourceWell=trim((string)($zafiroSource['well']??''));
+      $zafiroSourceState=trim((string)($zafiroSource['state']??''));
+      $zafiroSourceMethod=trim((string)($zafiroSource['method']??''));
 
-      $zafiroSourceWell='';
-      $zafiroSourceState='';
-      $zafiroSourceMethod='';
+      if($zafiroSourceWell===''||$zafiroSourceState===''||$zafiroSourceMethod===''){
+        $zafiroMetadataFrom=$zafiroDatabase!==''
+          ?tg_q($zafiroDatabase).'.[INFORMATION_SCHEMA].[COLUMNS]'
+          :'[INFORMATION_SCHEMA].[COLUMNS]';
+        $zafiroMetadata=$db->all(
+          'SELECT COLUMN_NAME FROM '.$zafiroMetadataFrom
+          .' WHERE TABLE_SCHEMA=? AND TABLE_NAME=? ORDER BY ORDINAL_POSITION',
+          [$zafiroSchema,$zafiroObject]
+        );
+        if(!$zafiroMetadata)continue;
 
-      foreach($zafiroMetadata as $zafiroMeta){
-        $zafiroSourceName=trim((string)($zafiroMeta['COLUMN_NAME']??''));
-        $zafiroSourceKey=tg_zafiro_column_key($zafiroSourceName);
-        if($zafiroSourceWell===''&&in_array($zafiroSourceKey,['POZO','POZONOMBRE','NOMBREPOZO','AFPOZO','WELL','WELLNAME'],true)){
-          $zafiroSourceWell=$zafiroSourceName;
-        }
-        if($zafiroSourceState===''&&(
-          in_array($zafiroSourceKey,['ESTADO','ESTADOPOZO','ESTADOPRODUCCION','ESTADOZAFIRO','ZAFIROESTADO'],true)
-          || strpos($zafiroSourceKey,'ESTADOZAFIRO')!==false
-          || strpos($zafiroSourceKey,'ZAFIROESTADO')!==false
-          || strpos($zafiroSourceKey,'CAMBIODEESTADOESTADO')!==false
-        )){
-          $zafiroSourceState=$zafiroSourceName;
-        }
-        if($zafiroSourceMethod===''&&(
-          in_array($zafiroSourceKey,['METODO','METODOPOZO','METODOZAFIRO','ZAFIROMETODO','SISTEMAEXTRACCION','SISTEMADEEXTRACCION'],true)
-          || strpos($zafiroSourceKey,'METODOZAFIRO')!==false
-          || strpos($zafiroSourceKey,'ZAFIROMETODO')!==false
-          || strpos($zafiroSourceKey,'SISTEMADEEXTRACCION')!==false
-          || strpos($zafiroSourceKey,'SISTEMAEXTRACCION')!==false
-        )){
-          $zafiroSourceMethod=$zafiroSourceName;
+        foreach($zafiroMetadata as $zafiroMeta){
+          $zafiroSourceName=trim((string)($zafiroMeta['COLUMN_NAME']??''));
+          $zafiroSourceKey=tg_zafiro_column_key($zafiroSourceName);
+          if($zafiroSourceWell===''&&in_array($zafiroSourceKey,['POZO','POZONOMBRE','NOMBREPOZO','AFPOZO','WELL','WELLNAME'],true)){
+            $zafiroSourceWell=$zafiroSourceName;
+          }
+          if($zafiroSourceState===''&&(
+            in_array($zafiroSourceKey,['ESTADO','ESTADOPOZO','ESTADOPRODUCCION','ESTADOZAFIRO','ZAFIROESTADO'],true)
+            || strpos($zafiroSourceKey,'ESTADOZAFIRO')!==false
+            || strpos($zafiroSourceKey,'ZAFIROESTADO')!==false
+            || strpos($zafiroSourceKey,'CAMBIODEESTADOESTADO')!==false
+          )){
+            $zafiroSourceState=$zafiroSourceName;
+          }
+          if($zafiroSourceMethod===''&&(
+            in_array($zafiroSourceKey,['METODO','METODOPOZO','METODOZAFIRO','ZAFIROMETODO','SISTEMAEXTRACCION','SISTEMADEEXTRACCION'],true)
+            || strpos($zafiroSourceKey,'METODOZAFIRO')!==false
+            || strpos($zafiroSourceKey,'ZAFIROMETODO')!==false
+            || strpos($zafiroSourceKey,'SISTEMADEEXTRACCION')!==false
+            || strpos($zafiroSourceKey,'SISTEMAEXTRACCION')!==false
+          )){
+            $zafiroSourceMethod=$zafiroSourceName;
+          }
         }
       }
 
@@ -277,6 +291,16 @@ if($zafiroEnabled){
         .tg_q($zafiroSourceMethod).' AS [__ZAFIRO_METODO]'
         .' FROM '.$zafiroObjectSql
         .' WHERE '.tg_q($zafiroSourceWell).' IS NOT NULL';
+      $zafiroSourceOrder=trim((string)($zafiroSource['order']??''));
+      if($zafiroSourceOrder!==''){
+        $zafiroOrderParts=[];
+        foreach(explode(',',$zafiroSourceOrder) as $zafiroOrderPart){
+          if(preg_match('/^([A-Za-z0-9_]+)\s+(ASC|DESC)$/i',trim($zafiroOrderPart),$zafiroOrderMatch)){
+            $zafiroOrderParts[]=tg_q($zafiroOrderMatch[1]).' '.strtoupper($zafiroOrderMatch[2]);
+          }
+        }
+        if($zafiroOrderParts)$zafiroSql.=' ORDER BY '.implode(',',$zafiroOrderParts);
+      }
       $zafiroCandidateRows=$db->all($zafiroSql);
       if(!$zafiroCandidateRows)continue;
 
