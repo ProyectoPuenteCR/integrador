@@ -1,0 +1,42 @@
+CLEAR - INTEGRACION ZAFIRO EN TELEMETRIA POR POZO
+Fecha: 14/09/2026
+
+ARCHIVOS DE ESTA ENTREGA
+1. MODIFICADO: includes/telemetry_grid.php
+2. NUEVO: LEEME_ZAFIRO_TELEMETRIA_20260914.txt
+
+ALCANCE
+- Grilla general de pozos.
+- Monitoreo Pozos (BM).
+- Telemetria PCP.
+- Telemetria BES.
+- Telemetria TECCS.
+
+CAMBIO IMPLEMENTADO
+- CLEAR ya está conectado a la base LC_MDB.
+- Se consulta directamente dbo.CLEAR_API_Q158_POZOS dentro de esa misma base.
+- Se usan los nombres exactos de Pozo, Estado y Sistema de Extracción publicados por Zafiro.
+- Los registros se leen por FechaCarga y CacheId descendentes para priorizar la carga más reciente.
+- dbo.VW_CLEAR_ZAFIRO_TELEMETRIA queda como alternativa local si estuviera disponible.
+- Se agregan "Estado Zafiro" y "Método Zafiro" inmediatamente después de la columna de estado operativo de cada pantalla.
+- Las dos columnas participan en filtros múltiples, filtro de encabezado, búsqueda general, selector/orden de columnas, Excel y reportes.
+- La tabla CLEAR_API_Q158_POZOS no depende de detección de metadatos ni de acceso entre bases.
+- El pozo se compara sin distinguir mayúsculas/minúsculas ni espacios, aceptando además la variante con o sin el prefijo YPF.SC.
+
+CONTROL DE DUPLICADOS
+El cruce no usa JOIN sobre la consulta principal. La caché Zafiro se transforma en un mapa único por pozo y luego se enriquece cada fila ya obtenida. Si Zafiro contiene más de un registro para el mismo pozo, la grilla conserva exactamente la cantidad original de filas.
+
+SEGURIDAD Y BASE DE DATOS
+- No se modifica dbo.FIXALARMS.
+- No se modifica ninguna tabla, vista ni procedimiento.
+- dbo.CLEAR_API_Q158_POZOS y la vista alternativa se utilizan únicamente como fuentes de lectura.
+- Los pozos sin coincidencia muestran "Sin dato".
+
+VERIFICACION
+1. Abrir cada una de las cinco pantallas indicadas.
+2. Confirmar el orden: Estado / Estado Zafiro / Método Zafiro.
+3. Probar los filtros de ambas columnas.
+4. Abrir "Columnas" y verificar que ambas puedan ocultarse y reordenarse.
+5. Exportar a Excel y comprobar las dos columnas.
+6. Seleccionar una fila para reporte y confirmar los dos valores en la grilla del reporte.
+7. Comparar la cantidad de registros antes y después: no debe aumentar por el cruce con Zafiro.
