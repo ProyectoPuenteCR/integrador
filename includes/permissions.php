@@ -132,6 +132,18 @@ function permissions_save_user($usuario,array $p,$updatedBy='')
 
 function permissions_can_menu($key,$usuario=null)
 {
+    /*
+     * En render automático el navegador recibe una sesión de pocos minutos.
+     * Se limita a la única pantalla que se está imprimiendo para que la
+     * navegación lateral y el resto de módulos no queden habilitados.
+     */
+    if(function_exists('auth_start')){
+        auth_start();
+        if(!empty($_SESSION['clear_report_mode'])){
+            $allowed=trim((string)($_SESSION['clear_report_menu']??''));
+            if($allowed!=='' && (string)$key!==$allowed) return false;
+        }
+    }
     if($usuario===null && function_exists('auth_user')) $usuario=auth_user();
     if(!$usuario) return false;
     $p=permissions_get_user($usuario); if(!$p['active']) return false;
