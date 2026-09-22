@@ -113,7 +113,7 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Sin telemetría en Zafiro · CLEAR Plataforma</title>
   <link rel="stylesheet" href="assets/css/app.css?v=20260824-as1">
-  <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-1">
+  <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
   <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
