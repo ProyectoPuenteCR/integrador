@@ -5,6 +5,7 @@ require_once __DIR__.'/includes/recon_comments.php';
 require_once __DIR__.'/includes/screens.php';
 require_once __DIR__.'/includes/ai_analysis.php';
 require_once __DIR__.'/includes/comments_repository.php';
+require_once __DIR__.'/includes/zafiro_sin_telemetria.php';
 $id=(int)($_GET['id']??0);$token=(string)($_GET['token']??'');$screen=trim((string)($_GET['screen']??'dashboard'));
 if(!$id||!hash_equals(report_generate_token($id),$token)){http_response_code(403);exit('Acceso denegado');}
 $db=clear_db();$rows=$db->all("SELECT * FROM dbo.CLEAR_REPORT_SCHEDULES WHERE ID=?",[$id]);if(!$rows){http_response_code(404);exit('Reporte no encontrado');}$schedule=$rows[0];
@@ -12,10 +13,41 @@ if($screen==='dashboard'){require __DIR__.'/report_dashboard.php';exit;}
 $catalog=report_screen_catalog();if(!isset($catalog[$screen])){http_response_code(404);exit('Pantalla no soportada');}
 date_default_timezone_set($schedule['ZONA_HORARIA']?:'America/Argentina/Buenos_Aires');
 function rh($v){return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}
-function rn($v){return number_format((float)$v,0,',','.');}
+function rn($v,$decimals=0){return number_format((float)$v,(int)$decimals,',','.');}
 function rbar($label,$value,$max,$color='#1a596b'){ $pct=$max>0?max(2,round($value/$max*100)):0; echo '<div class="barrow"><span>'.rh($label).'</span><div class="bar"><i style="width:'.$pct.'%;background:'.$color.'"></i></div><b>'.rn($value).'</b></div>'; }
-$title=$catalog[$screen];$subtitle='Reporte operativo automático';$cards=[];$panels=[];$genericData=[];$genericColumns=[];
-if($screen==='comentarios_semana'){
+$title=$catalog[$screen];$subtitle='Reporte operativo automático';$cards=[];$panels=[];$genericData=[];$genericColumns=[];$zstReport=null;$zstError='';
+if($screen==='sin_telemetria_zafiro'){
+  if(!zst_ready($db)){
+    $zstError='La captura de Sin telemetría en Zafiro no está instalada o no está disponible.';
+    $subtitle='Sin datos disponibles';
+  }else{
+    $zstFilters=zst_filters(['semanas'=>6]);
+    $zstReport=zst_load($db,$zstFilters);
+    if(!$zstReport['ok']){
+      $zstError=$zstReport['error']!==''?$zstReport['error']:'No se pudo cargar la información.';
+    }elseif(!$zstReport['hasData']){
+      $zstError='Todavía no hay capturas de pozos sin telemetría en Zafiro.';
+    }else{
+      $zstCurrent=count($zstReport['current']);
+      $zstPrevious=$zstReport['previous']===null?null:count($zstReport['previous']);
+      $zstNormalized=count($zstReport['normalized']);
+      $zstNew=count($zstReport['newWells']);
+      $zstRun=$zstReport['weekRun'];
+      $cards=[
+        ['Pozos sin telemetría',$zstCurrent,'red'],
+        ['Normalizados última semana',$zstPrevious===null?0:$zstNormalized,'green'],
+        ['Nuevos sin telemetría',$zstPrevious===null?0:$zstNew,'amber'],
+        ['Total pozos grilla',(int)($zstRun['totalGrid']??0)],
+        ['Producción petróleo',(float)($zstReport['productionOilTotal']??0),'',2],
+        ['Producción Bruta',(float)($zstReport['productionLiquidTotal']??0),'',2]
+      ];
+      $zstWeekStart=$zstReport['weekStart']?$zstReport['weekStart']->format('d/m/Y'):'';
+      $zstWeekEnd=$zstReport['weekEnd']?$zstReport['weekEnd']->format('d/m/Y'):'';
+      $zstSync=$zstReport['latestRun']['zafiro']??'';
+      $subtitle='Semana '.$zstWeekStart.' al '.$zstWeekEnd.($zstSync!==''?' · Zafiro '.zst_fmt_datetime($zstSync):'');
+    }
+  }
+}elseif($screen==='comentarios_semana'){
   $from=(new DateTime('today'))->modify('-6 days')->format('Y-m-d');$to=(new DateTime('today'))->format('Y-m-d');
   $result=clear_comments_search($db,['from'=>$from,'to'=>$to],1,500);$data=$result['rows'];$sources=clear_comments_sources();$bySource=[];$users=[];
   foreach($data as $r){$origin=(string)($r['ORIGEN']??'');$bySource[$origin]=($bySource[$origin]??0)+1;$user=trim((string)($r['USUARIO']??''));if($user!=='')$users[strtoupper($user)]=1;}
@@ -112,9 +144,17 @@ if($screen==='comentarios_semana'){
   }
 }
 ?><!doctype html><html lang="es"><head><meta charset="utf-8"><title><?=rh($title)?></title><style>
-@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#183746;background:#fff}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1a596b;padding-bottom:9px}.brand{font-weight:800;font-size:23px}.sub{color:#718697;font-size:11px}.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:12px 0}.card,.panel{border:1px solid #d8e2e7;border-radius:9px;padding:11px;background:#fff}.card b{font-size:23px;display:block;margin-top:5px}.red{color:#e94035}.amber{color:#d98300}.green{color:#0c8a63}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.panel h2{font-size:14px;margin:0 0 9px;color:#1a596b}.barrow{display:grid;grid-template-columns:190px 1fr 60px;gap:7px;align-items:center;margin:5px 0;font-size:10px}.bar{height:8px;background:#e9f0f3;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%}.footer{margin-top:10px;border-top:1px solid #d8e2e7;padding-top:7px;font-size:9px;color:#718697}table{width:100%;border-collapse:collapse;font-size:9px}th,td{padding:5px;border-bottom:1px solid #e5ecef;text-align:left}th{background:#1a596b;color:#fff}
+@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#183746;background:#fff}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1a596b;padding-bottom:9px}.brand{font-weight:800;font-size:23px}.sub{color:#718697;font-size:11px}.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin:12px 0}.card,.panel{border:1px solid #d8e2e7;border-radius:9px;padding:11px;background:#fff}.card b{font-size:23px;display:block;margin-top:5px}.red{color:#e94035}.amber{color:#d98300}.green{color:#0c8a63}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.panel h2{font-size:14px;margin:0 0 9px;color:#1a596b}.barrow{display:grid;grid-template-columns:190px 1fr 60px;gap:7px;align-items:center;margin:5px 0;font-size:10px}.bar{height:8px;background:#e9f0f3;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%}.summaryline{margin:10px 0;padding:9px 11px;border:1px solid #d8e2e7;border-radius:8px;background:#f7fbfc;font-size:10px}.footer{margin-top:10px;border-top:1px solid #d8e2e7;padding-top:7px;font-size:9px;color:#718697}table{width:100%;border-collapse:collapse;font-size:9px}th,td{padding:5px;border-bottom:1px solid #e5ecef;text-align:left}th{background:#1a596b;color:#fff}
 </style></head><body><div class="head"><div><div class="brand">CLEAR PETROLEUM · <?=rh($title)?></div><div class="sub"><?=rh($schedule['NOMBRE'])?> · Generado <?=date('d/m/Y H:i:s')?></div></div><div class="sub"><?=rh($subtitle)?></div></div>
-<?php if($cards):?><div class="cards"><?php foreach($cards as $c):?><div class="card"><span><?=rh($c[0])?></span><b class="<?=rh($c[2]??'')?>"><?=rn($c[1])?></b></div><?php endforeach;?></div><?php endif;?>
+<?php if($cards):?><div class="cards"><?php foreach($cards as $c):?><div class="card"><span><?=rh($c[0])?></span><b class="<?=rh($c[2]??'')?>"><?=rn($c[1],$c[3]??0)?></b></div><?php endforeach;?></div><?php endif;?>
+<?php if($screen==='sin_telemetria_zafiro'):?>
+<?php if($zstError!==''):?><section class="panel"><h2>Sin telemetría en Zafiro</h2><div><?=rh($zstError)?></div></section>
+<?php elseif($zstReport):?>
+<?php $zt=$zstReport['trend']??null; if($zt):?><div class="summaryline"><b>Tendencia:</b> <?=rh(($zt['pct']===null?'—':(($zt['pct']>0?'+':'').number_format($zt['pct'],1,',','.').' %')))?> respecto a <?=$zt['weeks']?> semana<?=$zt['weeks']===1?'':'s'?> atrás · <?=rn(abs($zt['diff']))?> pozo<?=$zt['diff']==1||$zt['diff']==-1?'':'s'?> <?=$zt['diff']<=0?'menos':'más'?> (<?=rn($zt['from'])?> → <?=rn($zt['to'])?>).</div><?php endif;?>
+<section class="panel"><h2>Evolución semanal de pozos sin telemetría</h2><table><thead><tr><th>Semana</th><th>Sin telemetría</th><th>Normalizados</th><th>Nuevos</th><th>Cierre</th></tr></thead><tbody><?php foreach($zstReport['chart'] as $p):?><tr><td><?=rh($p['weekLabel'].' · '.$p['label'])?></td><td><?=rh($p['count']===null?'Sin captura':rn($p['count']))?></td><td><?=rh($p['normalized']===null?'—':rn($p['normalized']))?></td><td><?=rh($p['newWells']===null?'—':rn($p['newWells']))?></td><td><?=rh($p['close']!==''?zst_fmt_date($p['close']):'—')?></td></tr><?php endforeach;?></tbody></table></section>
+<section class="panel"><h2>Listado completo de pozos sin telemetría</h2><table><thead><tr><th>Pozo</th><th>Batería</th><th>Zona</th><th>Telemetría</th><th>Comunicación</th><th>Sem. anterior</th><th>Estado actual</th><th>Semanas sin telemetría</th><th>Desde</th><th>Producción Bruta</th><th>Producción petróleo</th><th>Observaciones</th></tr></thead><tbody><?php foreach($zstReport['rows'] as $r):$prev=$r['prevStatus']==='without'?'Sin dato':($r['prevStatus']==='new'?'Nuevo':'—');$cur=$r['currentStatus']==='normalized'?'Con telemetría':'Sin dato';?><tr><td><?=rh($r['well'])?></td><td><?=rh($r['battery']?:'—')?></td><td><?=rh($r['zone']?:'—')?></td><td><?=rh($r['telemetry']?:'—')?></td><td><?=rh($r['comm']?:'—')?></td><td><?=rh($prev)?></td><td><?=rh($cur)?></td><td><?=rh($r['weeksWithout']===null?'—':$r['weeksWithout'])?></td><td><?=rh($r['firstSeen']!==''?zst_fmt_date($r['firstSeen']):'—')?></td><td><?=rh($r['productionLiquid']===null?'—':rn($r['productionLiquid'],2))?></td><td><?=rh($r['productionOil']===null?'—':rn($r['productionOil'],2))?></td><td><?=rh($r['notes']!==''?$r['notes']:'—')?></td></tr><?php endforeach;?><?php if(!$zstReport['rows']):?><tr><td colspan="12">No hay pozos sin telemetría en la captura actual.</td></tr><?php endif;?></tbody></table></section>
+<?php endif;?>
+<?php endif;?>
 <?php if($panels):?><div class="grid"><?php foreach($panels as $p):$max=1;foreach($p[1] as $r)$max=max($max,(float)($r[$p[3]]??0));?><section class="panel"><h2><?=rh($p[0])?></h2><?php foreach($p[1] as $r)rbar($r[$p[2]]??'-',(float)($r[$p[3]]??0),$max);?></section><?php endforeach;?></div><?php endif;?>
 <?php if(isset($data)&&$screen==='pozos_alarmas24'):?><section class="panel"><h2>Últimas alarmas de pozos</h2><table><thead><tr><th>Pozo</th><th>Descripción</th><th>Hora inicio</th><th>Última</th><th>Valor</th><th>TAG</th><th>Estado</th><th>Prioridad</th></tr></thead><tbody><?php foreach($data as $r):?><tr><td><?=rh($r['POZO']??'')?></td><td><?=rh($r['DESCRIPCION']??'')?></td><td><?=rh($r['FECHA_INICIO']??'')?></td><td><?=rh($r['FECHA_ULTIMA']??'')?></td><td><?=rh($r['VALOR']??'')?></td><td><?=rh($r['TAG']??'')?></td><td><?=rh($r['ESTADO']??'')?></td><td><?=rh($r['PRIORIDAD']??'')?></td></tr><?php endforeach;?><?php if(!$data):?><tr><td colspan="8">No hay alarmas de pozos en las últimas 24 horas.</td></tr><?php endif;?></tbody></table></section><?php endif;?>
 <?php if(isset($data)&&$screen==='alarmas24h'):?><section class="panel"><h2>Últimos registros</h2><table><thead><tr><th>Fecha</th><th>TAG</th><th>Valor</th><th>Descripción</th><th>Estado</th><th>Prioridad</th></tr></thead><tbody><?php foreach($data as $r):?><tr><td><?=rh($r['ALM_NATIVETIMEIN']??'')?></td><td><?=rh($r['ALM_TAGNAME']??'')?></td><td><?=rh($r['ALM_VALUE']??'')?></td><td><?=rh($r['ALM_DESCR']??'')?></td><td><?=rh($r['ALM_ALMSTATUS']??'')?></td><td><?=rh($r['ALM_ALMPRIORITY']??'')?></td></tr><?php endforeach;?></tbody></table></section><?php endif;?>
