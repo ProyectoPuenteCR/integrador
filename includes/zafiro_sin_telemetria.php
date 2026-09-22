@@ -14,6 +14,8 @@
    Compatible PHP 7.4.
 ============================================================= */
 
+require_once __DIR__ . '/production_q164.php';
+
 function zst_value($row, $key, $default = '')
 {
     if (!is_array($row)) return $default;
@@ -129,6 +131,8 @@ function zst_load($db, array $filters)
         'chart' => [], 'trend' => null,
         'zones' => [], 'batteries' => [],
         'rows' => [], 'total' => 0,
+        'productionOilTotal' => 0.0, 'productionLiquidTotal' => 0.0,
+        'productionOilCount' => 0, 'productionLiquidCount' => 0,
         'minWeek' => null, 'maxWeek' => null,
     ];
     if (!$db || !$db->ok()) { $out['error'] = $db ? (string)$db->error() : 'Sin conexión.'; return $out; }
@@ -296,6 +300,25 @@ function zst_load($db, array $filters)
     }
     usort($out['rows'], function ($a, $b) { return strnatcasecmp($a['well'], $b['well']); });
     $out['total'] = count($source);
+
+    /* 8) Producción INFOIL Q164: misma fuente usada por telemetria_general.php. */
+    $productionMap = clear_q164_latest_map($db);
+    foreach ($out['rows'] as &$productionRow) {
+        $productionKey = clear_q164_well_key($productionRow['well']);
+        $productionData = $productionKey !== '' ? ($productionMap[$productionKey] ?? null) : null;
+        $productionRow['productionOil'] = $productionData['PRODUCCION_PETROLEO'] ?? null;
+        $productionRow['productionLiquid'] = $productionData['PRODUCCION_LIQUIDO'] ?? null;
+
+        if ($productionRow['productionOil'] !== null) {
+            $out['productionOilTotal'] += (float)$productionRow['productionOil'];
+            $out['productionOilCount']++;
+        }
+        if ($productionRow['productionLiquid'] !== null) {
+            $out['productionLiquidTotal'] += (float)$productionRow['productionLiquid'];
+            $out['productionLiquidCount']++;
+        }
+    }
+    unset($productionRow);
 
     return $out;
 }
