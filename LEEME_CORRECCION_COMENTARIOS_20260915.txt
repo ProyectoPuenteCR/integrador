@@ -1,0 +1,13 @@
+CORRECCION DE COMENTARIOS - CLEAR
+Fecha: 15/09/2026
+
+Copiar el contenido de este parche sobre la carpeta principal de CLEAR,
+conservando las carpetas assets/css y assets/js.
+
+Corrige:
+- textos superpuestos entre Contexto, Comentario y Usuario;
+- popup de detalle sin formato por caché de estilos;
+- orden ascendente y descendente al hacer clic en los encabezados.
+
+Después de copiar los archivos, actualizar la pantalla con Ctrl+F5.
+No requiere ejecutar SQL.

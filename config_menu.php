@@ -29,6 +29,7 @@ $items = [
     ['key'=>'telemetria_tecss','label'=>'Telemetría · TECCS','icon'=>'trend'],
     ['key'=>'tecss_3sigma','label'=>'Telemetría · 3Sigma TECSS','icon'=>'chart'],
     ['key'=>'tecss_vibraciones','label'=>'Telemetría · Análisis de Vibraciones TECSS','icon'=>'wave'],
+    ['key'=>'sin_telemetria_zafiro','label'=>'Telemetría · Sin Telemetría en Zafiro','icon'=>'signal-off'],
     ['key' => 'inyeccion_agua',  'label' => 'Inyección de Agua',   'icon' => 'droplet'],
     ['key' => 'alarmas24h',      'label' => 'Alarmas 24h',         'icon' => 'bell'],
     ['key' => 'instalaciones_alarmas_semanal','label' => 'Alarmas semanal','icon' => 'chart'],

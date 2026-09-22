@@ -38,6 +38,7 @@ function icon($name, $cls = '')
         'plus'       => '<path d="M12 5l0 14"/><path d="M5 12l14 0"/>',
         'trash'      => '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 14h10l1 -14"/><path d="M9 7v-3h6v3"/>',
         'message'    => '<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-7l-4 4v-4h-3a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2z"/>',
+        'signal-off' => '<path d="M12 18l0 .01"/><path d="M9.17 15.17a4 4 0 0 1 5.66 0"/><path d="M6.34 12.34a8 8 0 0 1 4.2 -2.2"/><path d="M3.5 9.5a12 12 0 0 1 6.5 -3.3"/><path d="M14 6.3a12 12 0 0 1 6.5 3.2"/><path d="M3 3l18 18"/>',
         'oil'        => '<path d="M5 21h14"/><path d="M6 21v-8l4 -2v-4l4 2v4l4 2v8"/><path d="M10 7v-3"/>',
     ];
 

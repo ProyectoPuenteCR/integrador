@@ -87,6 +87,7 @@ function report_screen_catalog(){
         'todas_alarmas'=>'Todas las alarmas',
         'importadas'=>'Alarmas importadas',
         'reconocimientos'=>'Reconocimientos de alarmas',
+        'comentarios_semana'=>'Comentarios · Última semana',
         'analisis_ia'=>'Análisis IA semanal'
     ];
 }

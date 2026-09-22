@@ -20,6 +20,7 @@ $telemetriaPozos = [
     ['key'=>'telemetria_tecss','label'=>'Telemetría TECCS','icon'=>'trend','url'=>'telemetria_tecss.php'],
     ['key'=>'tecss_3sigma','label'=>'3Sigma TECSS','icon'=>'chart','url'=>'tecss_3sigma.php'],
     ['key'=>'tecss_vibraciones','label'=>'Análisis de Vibraciones','icon'=>'wave','url'=>'tecss_vibraciones.php'],
+    ['key'=>'sin_telemetria_zafiro','label'=>'Sin Telemetría en Zafiro','icon'=>'signal-off','url'=>'sin_telemetria_zafiro.php'],
     ['key'=>'pozos','label'=>'Ficha de pozos','icon'=>'oil','url'=>'list.php?s=pozos'],
     ['key'=>'pozos_tecss','label'=>'Pozos · técnico','icon'=>'gauge','url'=>'list.php?s=pozos_tecss'],
 ];
@@ -73,6 +74,7 @@ $menuItems = [
     $inyeccionAgua,
     ['key'=>'grupo_novedades_semanales','label'=>'Novedades semanales','icon'=>'calendar','children'=>$novedadesSemanales],
     ['key'=>'reportes_guardados','label'=>'REPORTES','icon'=>'file','url'=>'reportes_guardados.php'],
+    ['key'=>'comentarios','label'=>'Comentarios','icon'=>'message','url'=>'comentarios.php'],
     ['key'=>'grupo_instalaciones','label'=>'Alarmas','icon'=>'bell','children'=>$alarmasInstalaciones],
 ];
 
@@ -84,7 +86,8 @@ $favCatalog = [
     'pozos_por_baterias'=>['Pozos por Baterías','grid','pozos_por_baterias.php'],
     'scada_realtime'=>['SCADA Real time','monitor','scada_realtime.php'],
     'reportes'=>['Reportes por correo','file','reportes.php'],
-    'reportes_guardados'=>['REPORTES','file','reportes_guardados.php']
+    'reportes_guardados'=>['REPORTES','file','reportes_guardados.php'],
+    'comentarios'=>['Comentarios','message','comentarios.php']
 ];
 foreach (array_merge($telemetriaPozos, $novedadesSemanales, $alarmasInstalaciones) as $n) {
     $favCatalog[$n['key']] = [$n['label'], $n['icon'], $n['url']];

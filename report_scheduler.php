@@ -76,6 +76,8 @@ try {
         );
     }
 
+    report_setting_save('SCHEDULER_LAST_RUN', date('Y-m-d H:i:s'), 'scheduler');
+
     /*
     |--------------------------------------------------------------------------
     | Obtención de programaciones pendientes

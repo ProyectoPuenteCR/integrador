@@ -1,0 +1,137 @@
+/* =============================================================
+   CLEAR — Sin telemetría en Zafiro
+   Usa los tokens de app.css, por lo que respeta modo claro/oscuro.
+============================================================= */
+
+.zstHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px;flex-wrap:wrap}
+.zstHead__title{display:flex;align-items:flex-start;gap:14px;min-width:0}
+.zstHead__icon{display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;border-radius:12px;background:var(--petrol-soft);color:var(--petrol)}
+.zstHead__icon svg{width:24px;height:24px}
+.zstHead h1{margin:0;font-family:var(--font-head);font-size:32px;font-weight:700;line-height:1.05;color:var(--text)}
+.zstHead p{margin:6px 0 0;max-width:70ch;color:var(--text-soft);font-size:13px;line-height:1.5}
+.zstHead__side{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.zstCaptureForm{margin:0}
+
+.zstSync{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line-mid);border-radius:10px;background:var(--bg-card)}
+.zstSync>svg{width:20px;height:20px;color:var(--petrol)}
+.zstSync span{display:block;color:var(--text-mut);font-size:11px}
+.zstSync b{display:block;color:var(--text);font-size:13px;font-weight:700}
+.zstSync__state{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff!important;font-weight:800}
+.zstSync__state svg{width:14px;height:14px}
+.zstSync.is-stale .zstSync__state{background:var(--amber)}
+
+.zstBtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:0 14px;border-radius:9px;border:1px solid var(--line-strong);background:var(--bg-card);color:var(--text);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
+.zstBtn svg{width:16px;height:16px}
+.zstBtn:hover{border-color:var(--petrol);color:var(--petrol)}
+.zstBtn.is-primary{background:var(--petrol-dark);border-color:var(--petrol-dark);color:#fff}
+.zstBtn.is-primary:hover{background:var(--petrol);color:#fff}
+html[data-theme="dark"] .zstBtn.is-primary{background:var(--petrol);border-color:var(--petrol)}
+.zstBtn:focus-visible,.zstKpi:focus-visible,.zstTable button:focus-visible,.zstWeek__nav:focus-visible{outline:2px solid var(--petrol);outline-offset:2px}
+
+.zstNotice{margin:0 0 14px;padding:11px 14px;border-radius:10px;border:1px solid var(--line-mid);background:var(--bg-card);font-size:13px;color:var(--text-soft)}
+.zstNotice.is-error{border-color:var(--red);background:var(--red-soft);color:var(--red-tx)}
+.zstNotice.is-warning{border-color:var(--amber);background:var(--amber-soft);color:var(--amber-tx)}
+.zstNotice.is-ok{border-color:var(--green);background:var(--green-soft);color:var(--green-tx)}
+
+/* KPIs */
+.zstKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.zstKpi{--tone:var(--petrol);--tone-soft:var(--petrol-soft);display:flex;align-items:center;gap:16px;padding:18px;border:1px solid var(--line-mid);border-radius:14px;background:var(--bg-card);color:var(--text);text-decoration:none;transition:border-color .15s}
+.zstKpi.is-red{--tone:var(--red);--tone-soft:var(--red-soft)}
+.zstKpi.is-green{--tone:var(--green);--tone-soft:var(--green-soft)}
+.zstKpi.is-amber{--tone:var(--amber);--tone-soft:var(--amber-soft)}
+.zstKpi:hover{border-color:var(--tone)}
+.zstKpi.is-active{border-color:var(--tone);box-shadow:inset 0 0 0 1px var(--tone);background:var(--tone-soft)}
+.zstKpi__icon{display:grid;place-items:center;width:58px;height:58px;flex:0 0 58px;border-radius:12px;background:var(--tone-soft);color:var(--tone)}
+.zstKpi.is-active .zstKpi__icon{background:var(--bg-card)}
+.zstKpi__icon svg{width:28px;height:28px}
+.zstKpi__label{display:block;color:var(--text-soft);font-size:13px;font-weight:600}
+.zstKpi.is-amber .zstKpi__label{color:var(--amber-tx)}
+.zstKpi__value{display:block;margin:3px 0 2px;font-family:var(--font-head);font-size:34px;line-height:1;color:var(--text)}
+.zstKpi.is-amber .zstKpi__value{color:var(--amber-tx)}
+.zstKpi__detail{display:block;color:var(--text-soft);font-size:12px;line-height:1.4}
+.zstKpi__detail em{font-style:normal;font-weight:700}
+.zstKpi__detail em.is-up{color:var(--red)}
+.zstKpi__detail em.is-down{color:var(--green)}
+.zstKpi.is-green .zstKpi__detail{color:var(--green-tx)}
+.zstKpi.is-amber .zstKpi__detail{color:var(--amber-tx)}
+
+/* Gráfico */
+.zstChartCard{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;margin-bottom:14px;padding:18px;border:1px solid var(--line-mid);border-radius:14px;background:var(--bg-card)}
+.zstCardHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.zstCardHead h2{display:flex;align-items:center;gap:9px;margin:0;font-size:16px;font-weight:700;color:var(--text)}
+.zstCardHead h2 svg{width:19px;height:19px;color:var(--petrol)}
+.zstChartBox{position:relative;height:266px;padding-top:36px;box-sizing:border-box}
+.zstChartBox .clearChartInlineBtn{top:0;right:0}
+.zstChartHint{margin:6px 0 0;color:var(--text-mut);font-size:11.5px}
+.zstTrend{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:20px;border:1px solid var(--green);border-radius:12px;background:var(--green-soft);color:var(--green-tx)}
+.zstTrend.is-worse{border-color:var(--red);background:var(--red-soft);color:var(--red-tx)}
+.zstTrend__icon{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--bg-card)}
+.zstTrend__icon svg{width:22px;height:22px}
+.zstTrend__label{font-size:13px;font-weight:700}
+.zstTrend__value{font-family:var(--font-head);font-size:38px;line-height:1}
+.zstTrend__detail{color:var(--text-soft);font-size:12.5px}
+.zstTrend__wells{font-size:13px;line-height:1.5}
+.zstTrend__wells b{color:var(--text)}
+
+/* Filtros */
+.zstFilters{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:14px 16px;border:1px solid var(--line-mid);border-radius:14px;background:var(--bg-card)}
+.zstField{display:flex;flex-direction:column;gap:5px;min-width:130px}
+.zstField>span{color:var(--text-soft);font-size:12px;font-weight:600}
+.zstField select,.zstField input{height:38px;padding:0 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--bg-card);color:var(--text);font:inherit;font-size:12.5px}
+.zstField select:focus,.zstField input:focus{outline:0;border-color:var(--petrol);box-shadow:0 0 0 2px var(--petrol-soft)}
+.zstField--search{min-width:200px;flex:1}
+.zstField--small{min-width:110px}
+.zstField small{color:var(--text-mut);font-size:11px}
+.zstWeek{display:flex;align-items:center;gap:4px}
+.zstWeek__nav{display:grid;place-items:center;width:30px;height:38px;border:1px solid var(--line-strong);border-radius:9px;color:var(--petrol);font-size:18px;text-decoration:none}
+.zstWeek__nav:hover{background:var(--petrol-soft)}
+.zstWeek__nav.is-disabled{color:var(--text-dim);pointer-events:none}
+.zstWeek__date{display:flex;align-items:center;gap:6px;height:38px;padding:0 8px;border:1px solid var(--line-strong);border-radius:9px}
+.zstWeek__date svg{width:16px;height:16px;color:var(--text-mut)}
+.zstWeek__date input{height:34px;border:0;padding:0;background:transparent}
+.zstWeek__date input:focus{box-shadow:none}
+.zstFilters__actions,.zstFilters__exports{display:flex;gap:8px;flex-wrap:wrap}
+.zstFilters__exports{margin-left:auto}
+
+/* Grilla */
+.zstGridCard{padding:16px 18px;border:1px solid var(--line-mid);border-radius:14px;background:var(--bg-card)}
+.zstGridMeta{display:flex;align-items:center;gap:10px;color:var(--text-mut);font-size:12px}
+.zstGridMeta b{color:var(--text)}
+.zstChip{padding:4px 10px;border-radius:99px;background:var(--petrol-soft);color:var(--petrol);font-size:11.5px;font-weight:600;text-decoration:none}
+.zstTableScroll{overflow-x:auto;border:1px solid var(--line-mid);border-radius:10px}
+.zstTable{width:100%;border-collapse:collapse;font-size:12.5px}
+.zstTable th{position:sticky;top:0;background:var(--bg-th);color:var(--text-soft);font-size:12px;font-weight:700;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line-mid);white-space:nowrap}
+.zstTable th button{display:inline-flex;align-items:center;gap:5px;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer}
+.zstTable th button span{color:var(--text-dim);font-size:11px}
+.zstTable th button.is-sorted span{color:var(--petrol)}
+.zstTable__filters th{top:36px;padding:6px 8px;font-weight:400}
+.zstTable__filters input,.zstTable__filters select{width:100%;min-width:90px;height:30px;padding:0 7px;border:1px solid var(--line-strong);border-radius:7px;background:var(--bg-card);color:var(--text);font:inherit;font-size:12px}
+.zstTable td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--text);vertical-align:middle}
+.zstTable tbody tr:hover td{background:var(--petrol-soft)}
+.zstTable tbody tr[hidden]{display:none}
+.zstCheck{width:34px;text-align:center}
+.zstCheck input{width:16px;height:16px;accent-color:var(--petrol)}
+.zstCheck .nsReportPick span{display:none}
+.zstCenter{text-align:center}
+.zstMono{font-variant-numeric:tabular-nums;color:var(--text-soft)}
+.zstNotes{color:var(--text-soft);max-width:320px}
+.zstEmpty{padding:28px!important;text-align:center;color:var(--text-mut)}
+.zstBadge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.zstBadge.is-red{background:var(--red-soft);color:var(--red-tx)}
+.zstBadge.is-amber{background:var(--amber-soft);color:var(--amber-tx)}
+.zstBadge.is-green{background:var(--green-soft);color:var(--green-tx)}
+.zstBadge.is-muted{background:var(--bg-th);color:var(--text-mut)}
+.zstWeeks{display:inline-grid;place-items:center;min-width:26px;height:22px;padding:0 6px;border-radius:99px;font-weight:700;font-size:12px}
+.zstWeeks.is-red{background:var(--red-soft);color:var(--red-tx)}
+.zstWeeks.is-amber{background:var(--amber-soft);color:var(--amber-tx)}
+.zstWeeks.is-green{background:var(--green-soft);color:var(--green-tx)}
+
+.zstTip{display:flex;align-items:flex-start;gap:9px;margin:14px 0 4px;padding:11px 14px;border:1px solid var(--petrol-line);border-radius:10px;background:var(--petrol-soft);color:var(--text-soft);font-size:12.5px;line-height:1.5}
+.zstTip svg{width:18px;height:18px;flex:0 0 18px;color:var(--petrol)}
+.zstTip b{color:var(--text)}
+
+@media (max-width:1280px){.zstKpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:980px){.zstChartCard{grid-template-columns:1fr}.zstFilters__exports{margin-left:0}}
+@media (max-width:620px){.zstKpis{grid-template-columns:1fr}.zstHead h1{font-size:26px}.zstField,.zstField--search{min-width:100%}}
+@media (prefers-reduced-motion:reduce){.zstKpi{transition:none}}
+@media print{.zstFilters,.zstHead__side,.zstTable__filters{display:none}}

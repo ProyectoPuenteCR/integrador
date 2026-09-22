@@ -1,0 +1,72 @@
+/* CLEAR PLATAFORMA — estado_sistema.css (17/09/2026)
+   Estilos previos (antes inline) + sección Jobs de base de datos. */
+
+.sys{padding:0 22px 22px}
+.sysgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.syscard{padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.sysok{color:#15803d}
+.sysbad{color:#c52d26}
+.syscard b{font-size:20px}
+.sysmeta{margin-top:18px;background:var(--surface);border:1px solid var(--line);padding:18px;border-radius:14px}
+@media(max-width:900px){.sysgrid{grid-template-columns:1fr}}
+
+/* ---- Jobs ---- */
+.jobs{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.jobs__head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.jobs__title{margin:0;font-size:18px;color:var(--text)}
+.jobs__sub{font-size:12px;color:var(--text-mut)}
+.jobs__filter{font-size:13px;color:var(--text-soft);display:flex;gap:6px;align-items:center;cursor:pointer}
+.jobs__alert{border:1px solid var(--red);background:var(--red-soft);color:var(--red-tx);border-radius:10px;padding:12px 14px;font-size:13px}
+.jobs__alert div{margin-top:4px;word-break:break-word}
+
+.jobs__cards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+.jcard{border:1px solid var(--line);border-left:4px solid var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.jcard span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-mut)}
+.jcard b{display:block;font-size:22px;margin:2px 0;color:var(--text)}
+.jcard small{display:block;font-size:11px;color:var(--text-mut);line-height:1.3}
+.jcard--ok{border-left-color:var(--green)}
+.jcard--fail{border-left-color:var(--red)}
+.jcard--fail b{color:var(--red)}
+.jcard--late{border-left-color:var(--amber)}
+.jcard--late b{color:var(--amber-tx)}
+@media(max-width:1300px){.jobs__cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.jobs__cards{grid-template-columns:1fr 1fr}}
+
+.jobs__wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+.jobs__table{width:100%;border-collapse:collapse;font-size:13px}
+.jobs__table th{background:var(--bg-th);color:var(--text-soft);text-align:left;font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.jobs__table td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.jobs__table tr.jrow:hover td{background:var(--petrol-soft)}
+.jobs__table td:nth-child(2){min-width:240px}
+.jname{font-weight:600;color:var(--text)}
+.jscript{display:inline-block;max-width:260px;word-break:break-all;white-space:normal}
+.jmeta{font-size:11.5px;color:var(--text-mut)}
+.jmono{font-family:Consolas,'Courier New',monospace;font-size:12px;color:var(--text-mono);white-space:nowrap}
+
+.jb{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.jb--ok{background:var(--green-soft);color:var(--green-tx)}
+.jb--fail{background:var(--red-soft);color:var(--red-tx)}
+.jb--late{background:var(--amber-soft);color:var(--amber-tx)}
+.jb--run{background:var(--petrol-soft);color:var(--petrol)}
+.jb--off{background:var(--surface-2);color:var(--text-mut);border:1px solid var(--line)}
+
+.jcount{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:6px;margin:0 4px 2px 0;white-space:nowrap}
+.jcount--ok{background:var(--green-soft);color:var(--green-tx)}
+.jcount--fail{background:var(--red-soft);color:var(--red-tx)}
+
+.jbtn{border:1px solid var(--line-mid);background:var(--surface);color:var(--petrol);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
+.jbtn:hover{border-color:var(--petrol)}
+
+.jdetail td{background:var(--surface-2)}
+.jd{display:flex;flex-direction:column;gap:10px}
+.jd__info{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:12.5px;color:var(--text-soft)}
+.jd__err{border:1px solid var(--red);background:var(--red-soft);color:var(--red-tx);border-radius:8px;padding:10px;font-size:12.5px}
+.jd__err pre{white-space:pre-wrap;word-break:break-word;margin:6px 0 0;font-family:Consolas,'Courier New',monospace;font-size:11.5px;max-height:220px;overflow:auto}
+.jd__hist{width:100%;border-collapse:collapse;font-size:12px;background:var(--surface)}
+.jd__hist th{background:var(--bg-th);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.jd__hist td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.jmsg{color:var(--text-mut);font-size:11.5px;word-break:break-word;min-width:260px}
+
+.jobs__note{margin-top:10px;font-size:11.5px;color:var(--text-mut);line-height:1.5}
+
+@media print{.jbtn,.jobs__filter{display:none}.jdetail[hidden]{display:none}}

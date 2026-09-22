@@ -2,7 +2,7 @@
 $TELEMETRY = [
     'key' => 'telemetria_general',
     'title' => 'Grilla general de pozos',
-    'subtitle' => 'Vista unificada de pozos BM, PCP, BES y TECCS · actualización SQL cada 10 minutos',
+    'subtitle' => 'Vista unificada de pozos con recepción SCADA y/o TECSS · actualización SQL cada 10 minutos',
     'table' => 'TELEMETRIA_POZOS_GENERAL_CACHE',
     'alarm_column' => 'ALM',
     'order' => 'POZO',
@@ -40,14 +40,29 @@ $TELEMETRY = [
     'remote_stop_extra_columns' => ['AF-TIPO-DESC','LINEA_ELECTRICA'],
     'persist_filters' => true,
     'select_filter_columns' => ['AF-TIPO-DESC','LINEA_ELECTRICA'],
-    'column_state_version' => '342',
+    'column_state_version' => '343',
     'filter_columns' => ['BATERIA','COMUNICACION','ESTADO'],
     'server_select_filters' => [
         'TIPO' => [
             'param' => 'tipo',
             'label' => 'Tipo de telemetría',
-            'values' => ['BM','PCP','BES','TECCS'],
-            'default' => 'TODOS'
+            'values' => ['SCADA','TECSS'],
+            'default' => 'TODOS',
+            /* El valor histórico TECCS también corresponde a TECSS. */
+            'display_value_map' => [
+                'TECSS' => 'TECSS',
+                'TECCS' => 'TECSS'
+            ],
+            /* BM, PCP, BES y cualquier otro origen no TECSS llegan por SCADA. */
+            'display_default_value' => 'SCADA',
+            'source_value_groups' => [
+                'SCADA' => [
+                    'exclude' => ['TECSS','TECCS']
+                ],
+                'TECSS' => [
+                    'include' => ['TECSS','TECCS']
+                ]
+            ]
         ]
     ],
     'labels' => [

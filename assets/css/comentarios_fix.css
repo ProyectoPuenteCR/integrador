@@ -1,0 +1,34 @@
+.commentsModalBackdrop[hidden],
+.commentsModal[hidden] {
+  display: none !important;
+}
+
+.commentsTable td {
+  max-width: 0;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.commentsTable th.commentsSortable {
+  padding-right: 25px;
+  cursor: pointer;
+}
+
+.commentsTable th.commentsSortable::after {
+  content: "↕";
+  position: absolute;
+  right: 10px;
+  color: var(--text-mut);
+  font-size: 11px;
+}
+
+.commentsTable th.commentsSortable[data-sort-direction="asc"]::after {
+  content: "↑";
+  color: var(--petrol);
+}
+
+.commentsTable th.commentsSortable[data-sort-direction="desc"]::after {
+  content: "↓";
+  color: var(--petrol);
+}

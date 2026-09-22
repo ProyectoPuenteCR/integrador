@@ -1,0 +1,26 @@
+REPORTE SEMANAL DE COMENTARIOS Y EJECUTOR AUTOMATICO - CLEAR
+Fecha: 15/09/2026
+
+1. Copiar el contenido del parche sobre C:\inetpub\wwwroot\CLEAR,
+   conservando las carpetas.
+2. No requiere ejecutar SQL.
+3. Abrir PowerShell como Administrador.
+4. Ejecutar:
+   powershell -ExecutionPolicy Bypass -File C:\inetpub\wwwroot\CLEAR\INSTALAR_TAREA_REPORTES.ps1
+5. Esperar uno o dos minutos y abrir Reportes por correo.
+6. El indicador "Ejecutor automatico" debe aparecer Activo.
+
+PARA CREAR EL REPORTE
+- Pulsar la plantilla "Comentarios semanales".
+- Completar destinatarios y horario.
+- Elegir el dia semanal y guardar la programacion.
+- Usar "Enviar prueba" una vez para verificar PDF y destinatarios.
+
+DIAGNOSTICO
+Los envios manuales funcionaban porque ejecutan el reporte inmediatamente desde
+la pagina. Los automaticos dependen de una tarea de Windows que llame al
+programador. El ultimo registro encontrado fue del 24/07/2026; por eso la
+configuracion SMTP no es la causa principal.
+
+La tarea se instala con la cuenta SYSTEM, privilegios elevados y ejecucion cada
+minuto. El programador solo envia reportes cuya fecha y hora ya hayan vencido.
