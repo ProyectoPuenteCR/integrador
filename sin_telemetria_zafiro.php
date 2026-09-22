@@ -77,6 +77,8 @@ $normalizedCount = $hasData ? count($data['normalized']) : 0;
 $newCount = $hasData ? count($data['newWells']) : 0;
 $weekRun = $hasData ? $data['weekRun'] : null;
 $latestRun = $hasData ? $data['latestRun'] : null;
+$productionOilTotal = $hasData ? (float)($data['productionOilTotal'] ?? 0) : 0.0;
+$productionLiquidTotal = $hasData ? (float)($data['productionLiquidTotal'] ?? 0) : 0.0;
 $dimensionFiltered = $filters['zone'] !== '' || $filters['battery'] !== '' || $filters['telemetry'] !== '';
 $totalGrid = $weekRun['totalGrid'] ?? 0;
 $pctWithout = (!$dimensionFiltered && $totalGrid > 0) ? $current * 100 / $totalGrid : null;
@@ -196,6 +198,14 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
             </span>
           </div>
         </a>
+        <div class="zstKpi is-oil">
+          <span class="zstKpi__icon"><?php echo icon('oil'); ?></span>
+          <div>
+            <span class="zstKpi__label">Producción petróleo</span>
+            <b class="zstKpi__value"><?php echo number_format($productionOilTotal, 2, ',', '.'); ?></b>
+            <span class="zstKpi__detail">Total de los pozos mostrados · Query 164</span>
+          </div>
+        </div>
       </section>
 
       <section class="zstChartCard">
@@ -277,6 +287,8 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
                 <th><button type="button" data-zst-sort="7" data-type="text">Estado actual <span>↕</span></button></th>
                 <th><button type="button" data-zst-sort="8" data-type="number">Semanas sin telemetría <span>↕</span></button></th>
                 <th><button type="button" data-zst-sort="9" data-type="text">Sin telemetría desde <span>↕</span></button></th>
+                <th><button type="button" data-zst-sort="10" data-type="number">Producción líquido <span>↕</span></button></th>
+                <th><button type="button" data-zst-sort="11" data-type="number">Producción petróleo <span>↕</span></button></th>
                 <th>Observaciones</th>
               </tr>
               <tr class="zstTable__filters">
@@ -288,12 +300,12 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
                 <th><select data-zst-filter="5" aria-label="Filtrar comunicación"><option value="">Todas</option></select></th>
                 <th><select data-zst-filter="6" aria-label="Filtrar semana anterior"><option value="">Todos</option></select></th>
                 <th><select data-zst-filter="7" aria-label="Filtrar estado actual"><option value="">Todos</option></select></th>
-                <th></th><th></th><th></th>
+                <th></th><th></th><th></th><th></th><th></th>
               </tr>
             </thead>
             <tbody>
             <?php if(!$data['rows']): ?>
-              <tr><td colspan="11" class="zstEmpty">
+              <tr><td colspan="13" class="zstEmpty">
                 <?php if($filters['view']==='normalizados'): ?>Ningún pozo volvió a tener telemetría esta semana con los filtros elegidos.
                 <?php elseif($filters['view']==='nuevos'): ?>No aparecieron pozos nuevos sin telemetría esta semana con los filtros elegidos.
                 <?php else: ?>No hay pozos sin telemetría con los filtros elegidos.<?php endif; ?>
@@ -306,7 +318,7 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
               $weeksWithout = $row['weeksWithout'];
               $weeksClass = $weeksWithout===null ? '' : ($weeksWithout>=4 ? 'is-red' : ($weeksWithout>=2 ? 'is-amber' : 'is-green'));
               $commClass = $row['comm']==='Comunicando' ? 'is-green' : ($row['comm']==='Sin comunicación' ? 'is-red' : 'is-muted');
-              $reportColumns = ['Pozo'=>$row['well'],'Batería'=>$row['battery'],'Zona'=>$row['zone'],'Telemetría'=>$row['telemetry'],'Comunicación'=>$row['comm'],'Sem. anterior'=>$prevText,'Estado actual'=>$curText,'Semanas sin telemetría'=>$weeksWithout===null?'—':$weeksWithout,'Sin telemetría desde'=>zst_fmt_date($row['firstSeen']),'Observaciones'=>$row['notes']!==''?$row['notes']:'—'];
+              $reportColumns = ['Pozo'=>$row['well'],'Batería'=>$row['battery'],'Zona'=>$row['zone'],'Telemetría'=>$row['telemetry'],'Comunicación'=>$row['comm'],'Sem. anterior'=>$prevText,'Estado actual'=>$curText,'Semanas sin telemetría'=>$weeksWithout===null?'—':$weeksWithout,'Sin telemetría desde'=>zst_fmt_date($row['firstSeen']),'Producción líquido'=>$row['productionLiquid']===null?'—':number_format((float)$row['productionLiquid'],2,',','.'),'Producción petróleo'=>$row['productionOil']===null?'—':number_format((float)$row['productionOil'],2,',','.'),'Observaciones'=>$row['notes']!==''?$row['notes']:'—'];
             ?>
               <tr>
                 <td class="zstCheck"><?php if($reportEnabled): echo ns_report_pick(ns_report_key('zafiro-sin-telemetria',[$weekKey,$row['key'],$filters['view']]),'row','Sin telemetría en Zafiro · '.$row['well'],ns_report_row_payload($reportColumns),'Incluir'); else: ?><input type="checkbox" data-zst-row-check value="<?php echo h($row['key']); ?>" aria-label="Seleccionar <?php echo h($row['well']); ?>"><?php endif; ?></td>
@@ -319,6 +331,8 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
                 <td data-v="<?php echo h($curText); ?>"><span class="zstBadge <?php echo $curClass; ?>"><?php echo h($curText); ?></span></td>
                 <td data-v="<?php echo $weeksWithout===null?'0':(int)$weeksWithout; ?>" class="zstCenter"><?php if($weeksWithout===null): ?>—<?php else: ?><span class="zstWeeks <?php echo $weeksClass; ?>"><?php echo (int)$weeksWithout; ?></span><?php endif; ?></td>
                 <td data-v="<?php echo h($row['firstSeen']); ?>" class="zstMono"><?php echo h(zst_fmt_date($row['firstSeen'])); ?></td>
+                <td data-v="<?php echo $row['productionLiquid']===null?'':h((string)$row['productionLiquid']); ?>" class="zstMono"><?php echo $row['productionLiquid']===null?'—':number_format((float)$row['productionLiquid'],2,',','.'); ?></td>
+                <td data-v="<?php echo $row['productionOil']===null?'':h((string)$row['productionOil']); ?>" class="zstMono"><?php echo $row['productionOil']===null?'—':number_format((float)$row['productionOil'],2,',','.'); ?></td>
                 <td data-v="<?php echo h($row['notes']); ?>" class="zstNotes"><?php echo h($row['notes']!==''?$row['notes']:'—'); ?></td>
               </tr>
             <?php endforeach; endif; ?>
