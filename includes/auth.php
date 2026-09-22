@@ -69,6 +69,13 @@ function auth_check()
 {
     auth_start();
     if(!isset($_SESSION['clear_user']) || $_SESSION['clear_user']==='') return false;
+
+    /* Sesión efímera usada únicamente por el generador de PDF automático. */
+    if(!empty($_SESSION['clear_report_mode'])){
+        $expires=(int)($_SESSION['clear_report_exp']??0);
+        if($expires<=time()){ auth_logout(); return false; }
+    }
+
     $p=permissions_get_user($_SESSION['clear_user']);
     $timeout=max(5,(int)($p['session_timeout_min']??60))*60;
     $last=(int)($_SESSION['clear_last_activity']??$_SESSION['clear_login_time']??time());
@@ -111,6 +118,7 @@ function auth_require()
 function auth_rol()
 {
     auth_start();
+    if(!empty($_SESSION['clear_report_mode'])) return 'operador';
     return $_SESSION['clear_rol'] ?? 'operador';
 }
 
