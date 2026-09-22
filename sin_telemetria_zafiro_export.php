@@ -42,6 +42,7 @@ echo "\xEF\xBB\xBF";
   <tr><td colspan="12"><b>Sin telemetría en Zafiro · <?php echo zex($views[$filters['view']]); ?></b></td></tr>
   <tr><td colspan="12">Semana: <?php echo zex($weekText); ?><?php if ($data['weekRun']): ?> · cierre <?php echo zex(zst_fmt_date($data['weekRun']['date'])); ?> · Zafiro <?php echo zex(zst_fmt_datetime($data['weekRun']['zafiro'])); ?><?php endif; ?></td></tr>
   <tr><td colspan="12">Filtros: zona <?php echo zex($filters['zone'] ?: 'Todas'); ?> · batería <?php echo zex($filters['battery'] ?: 'Todas'); ?> · telemetría <?php echo zex($filters['telemetry'] ?: 'Todas'); ?><?php if ($filters['q'] !== ''): ?> · búsqueda "<?php echo zex($filters['q']); ?>"<?php endif; ?></td></tr>
+  <tr><td colspan="12"><b>Producción Bruta total:</b> <?php echo number_format((float)($data['productionLiquidTotal'] ?? 0), 2, ',', '.'); ?> · <b>Producción petróleo total:</b> <?php echo number_format((float)($data['productionOilTotal'] ?? 0), 2, ',', '.'); ?></td></tr>
   <tr><td colspan="12"></td></tr>
   <tr>
     <th>Pozo</th><th>Batería</th><th>Zona</th><th>Telemetría</th><th>Comunicación</th>
