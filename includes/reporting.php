@@ -89,9 +89,9 @@ function report_screen_definitions(){
 
         'pozos_alarmas24'=>['label'=>'Pozos · Alarmas 24 hs','group'=>'Alarmas de Pozos','target'=>'pozos_alarmas24.php'],
         'pozos_todas_alarmas'=>['label'=>'Pozos · Histórico de alarmas','group'=>'Alarmas de Pozos','target'=>'pozos_todas_alarmas.php'],
-        'pozos_alarmas_semanal'=>['label'=>'Pozos · Alarmas semanal','group'=>'Alarmas de Pozos','target'=>null],
-        'top_pozos'=>['label'=>'Pozos · Top Pozos','group'=>'Alarmas de Pozos','target'=>null],
-        'pozos_top20'=>['label'=>'Pozos · Top 20 alarmas','group'=>'Alarmas de Pozos','target'=>null],
+        'pozos_alarmas_semanal'=>['label'=>'Pozos · Alarmas semanal','group'=>'Alarmas de Pozos','target'=>'pozos_alarmas_semanal.php'],
+        'top_pozos'=>['label'=>'Pozos · Top Pozos','group'=>'Alarmas de Pozos','target'=>'top_pozos.php'],
+        'pozos_top20'=>['label'=>'Pozos · Top 20 alarmas','group'=>'Alarmas de Pozos','target'=>'pozos_top20.php'],
 
         'novedades_semanales_panel'=>['label'=>'Panel semanal','group'=>'Novedades Semanales','target'=>'novedades_semanales.php'],
         'novedades_semanales_monitoreo'=>['label'=>'Reporte de Pozos','group'=>'Novedades Semanales','target'=>'novedades_semanales_monitoreo.php'],
