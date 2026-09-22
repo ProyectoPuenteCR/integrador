@@ -88,6 +88,7 @@ function report_screen_catalog(){
         'importadas'=>'Alarmas importadas',
         'reconocimientos'=>'Reconocimientos de alarmas',
         'comentarios_semana'=>'Comentarios · Última semana',
+        'sin_telemetria_zafiro'=>'Sin telemetría en Zafiro',
         'analisis_ia'=>'Análisis IA semanal'
     ];
 }
