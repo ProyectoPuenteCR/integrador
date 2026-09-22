@@ -39,13 +39,13 @@ echo "\xEF\xBB\xBF";
 ?>
 <html><head><meta charset="UTF-8"></head><body>
 <table>
-  <tr><td colspan="10"><b>Sin telemetría en Zafiro · <?php echo zex($views[$filters['view']]); ?></b></td></tr>
-  <tr><td colspan="10">Semana: <?php echo zex($weekText); ?><?php if ($data['weekRun']): ?> · cierre <?php echo zex(zst_fmt_date($data['weekRun']['date'])); ?> · Zafiro <?php echo zex(zst_fmt_datetime($data['weekRun']['zafiro'])); ?><?php endif; ?></td></tr>
-  <tr><td colspan="10">Filtros: zona <?php echo zex($filters['zone'] ?: 'Todas'); ?> · batería <?php echo zex($filters['battery'] ?: 'Todas'); ?> · telemetría <?php echo zex($filters['telemetry'] ?: 'Todas'); ?><?php if ($filters['q'] !== ''): ?> · búsqueda "<?php echo zex($filters['q']); ?>"<?php endif; ?></td></tr>
-  <tr><td colspan="10"></td></tr>
+  <tr><td colspan="12"><b>Sin telemetría en Zafiro · <?php echo zex($views[$filters['view']]); ?></b></td></tr>
+  <tr><td colspan="12">Semana: <?php echo zex($weekText); ?><?php if ($data['weekRun']): ?> · cierre <?php echo zex(zst_fmt_date($data['weekRun']['date'])); ?> · Zafiro <?php echo zex(zst_fmt_datetime($data['weekRun']['zafiro'])); ?><?php endif; ?></td></tr>
+  <tr><td colspan="12">Filtros: zona <?php echo zex($filters['zone'] ?: 'Todas'); ?> · batería <?php echo zex($filters['battery'] ?: 'Todas'); ?> · telemetría <?php echo zex($filters['telemetry'] ?: 'Todas'); ?><?php if ($filters['q'] !== ''): ?> · búsqueda "<?php echo zex($filters['q']); ?>"<?php endif; ?></td></tr>
+  <tr><td colspan="12"></td></tr>
   <tr>
     <th>Pozo</th><th>Batería</th><th>Zona</th><th>Telemetría</th><th>Comunicación</th>
-    <th>Sem. anterior</th><th>Estado actual</th><th>Semanas sin telemetría</th><th>Sin telemetría desde</th><th>Observaciones</th>
+    <th>Sem. anterior</th><th>Estado actual</th><th>Semanas sin telemetría</th><th>Sin telemetría desde</th><th>Producción líquido</th><th>Producción petróleo</th><th>Observaciones</th>
   </tr>
   <?php foreach ($data['rows'] as $row):
     $prev = $row['prevStatus'] === 'without' ? 'Sin dato' : ($row['prevStatus'] === 'new' ? 'Nuevo' : '');
@@ -61,6 +61,8 @@ echo "\xEF\xBB\xBF";
     <td><?php echo zex($cur); ?></td>
     <td><?php echo $row['weeksWithout'] === null ? '' : (int)$row['weeksWithout']; ?></td>
     <td><?php echo zex($row['firstSeen'] !== '' ? zst_fmt_date($row['firstSeen']) : ''); ?></td>
+    <td><?php echo $row['productionLiquid'] === null ? '' : number_format((float)$row['productionLiquid'], 2, ',', '.'); ?></td>
+    <td><?php echo $row['productionOil'] === null ? '' : number_format((float)$row['productionOil'], 2, ',', '.'); ?></td>
     <td><?php echo zex($row['notes']); ?></td>
   </tr>
   <?php endforeach; ?>
