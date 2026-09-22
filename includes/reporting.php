@@ -62,35 +62,108 @@ function report_log($id,$to,$status,$file='',$error='',$seconds=0,$user='schedul
 function report_generate_token($id){
     $cfg=require dirname(__DIR__).'/config.php'; $secret=($cfg['db']['password']??'clear').'|'.($cfg['db']['database']??'db'); return hash_hmac('sha256',(string)$id.'|'.date('Y-m-d'),$secret);
 }
-function report_screen_catalog(){
+function report_screen_definitions(){
+    /*
+     * Catálogo único de pantallas que pueden formar parte de un PDF automático.
+     * target = pantalla real de CLEAR que el renderizador abre en modo solo lectura.
+     * hidden = compatibilidad con programaciones antiguas; no se muestra en el selector.
+     */
     return [
-        'dashboard'=>'Dashboard',
-        'pozos_alarmas24'=>'Pozos · Alarmas 24 hs',
-        'top_pozos'=>'Pozos · Top Pozos',
-        'pozos_top20'=>'Pozos · Top 20 alarmas',
-        'pozos'=>'Pozos · Ficha de pozos',
-        'pozos_tecss'=>'Pozos · Estado técnico',
-        'alarmas24h'=>'Alarmas 24h',
-        'alarmas_activas'=>'Alarmas por históricos',
-        'pi_historico'=>'PI Histórico',
-        'suprimidas'=>'Suprimidas',
-        'reconocidas'=>'Reconocidas',
-        'reconocidas_usr'=>'Reconocidas por usuario',
-        'top20'=>'Top 20 alarmas',
-        'top20_24h'=>'Top 20 alarmas 24h',
-        'ranking24h'=>'Ranking 24h',
-        'top_total'=>'Top Total',
-        'top_hml'=>'Top semanal',
-        'tendencia_sem'=>'Tendencia semanal',
-        'tend_sem_tags'=>'Tendencia por TAG',
-        'prioridad'=>'Prioridad',
-        'todas_alarmas'=>'Todas las alarmas',
-        'importadas'=>'Alarmas importadas',
-        'reconocimientos'=>'Reconocimientos de alarmas',
-        'comentarios_semana'=>'Comentarios · Última semana',
-        'sin_telemetria_zafiro'=>'Sin telemetría en Zafiro',
-        'analisis_ia'=>'Análisis IA semanal'
+        'inicio'=>['label'=>'Inicio','group'=>'General','target'=>'inicio.php'],
+        'dashboard_inst_sup'=>['label'=>'Dashboard Inst Sup','group'=>'Dashboards','target'=>'dashboard_inst_sup.php'],
+        'dashboard_pozos'=>['label'=>'Dashboard Pozos','group'=>'Dashboards','target'=>'dashboard_pozos.php'],
+        'pozos_por_baterias'=>['label'=>'Pozos por Baterías','group'=>'Dashboards','target'=>'pozos_por_baterias.php'],
+        'scada_realtime'=>['label'=>'SCADA Real time','group'=>'Operación','target'=>'scada_realtime.php'],
+
+        'telemetria_general'=>['label'=>'Grilla general de pozos','group'=>'Telemetría de Pozos','target'=>'telemetria_general.php'],
+        'monitoreo_pozos'=>['label'=>'Monitoreo Pozos','group'=>'Telemetría de Pozos','target'=>'monitoreo_pozos.php'],
+        'telemetria_pcp'=>['label'=>'Telemetría PCP','group'=>'Telemetría de Pozos','target'=>'telemetria_pcp.php'],
+        'telemetria_bes'=>['label'=>'Telemetría BES','group'=>'Telemetría de Pozos','target'=>'telemetria_bes.php'],
+        'telemetria_tecss'=>['label'=>'Telemetría TECCS','group'=>'Telemetría de Pozos','target'=>'telemetria_tecss.php'],
+        'tecss_3sigma'=>['label'=>'3Sigma TECSS','group'=>'Telemetría de Pozos','target'=>'tecss_3sigma.php'],
+        'tecss_vibraciones'=>['label'=>'Análisis de Vibraciones','group'=>'Telemetría de Pozos','target'=>'tecss_vibraciones.php'],
+        'sin_telemetria_zafiro'=>['label'=>'Sin telemetría en Zafiro','group'=>'Telemetría de Pozos','target'=>'sin_telemetria_zafiro.php'],
+        'pozos'=>['label'=>'Ficha de pozos','group'=>'Telemetría de Pozos','target'=>'list.php?s=pozos'],
+        'pozos_tecss'=>['label'=>'Pozos · técnico','group'=>'Telemetría de Pozos','target'=>'list.php?s=pozos_tecss'],
+        'inyeccion_agua'=>['label'=>'Inyección de Agua','group'=>'Telemetría de Pozos','target'=>'inyeccion_agua.php'],
+
+        'pozos_alarmas24'=>['label'=>'Pozos · Alarmas 24 hs','group'=>'Alarmas de Pozos','target'=>'pozos_alarmas24.php'],
+        'pozos_todas_alarmas'=>['label'=>'Pozos · Histórico de alarmas','group'=>'Alarmas de Pozos','target'=>'pozos_todas_alarmas.php'],
+        'pozos_alarmas_semanal'=>['label'=>'Pozos · Alarmas semanal','group'=>'Alarmas de Pozos','target'=>null],
+        'top_pozos'=>['label'=>'Pozos · Top Pozos','group'=>'Alarmas de Pozos','target'=>null],
+        'pozos_top20'=>['label'=>'Pozos · Top 20 alarmas','group'=>'Alarmas de Pozos','target'=>null],
+
+        'novedades_semanales_panel'=>['label'=>'Panel semanal','group'=>'Novedades Semanales','target'=>'novedades_semanales.php'],
+        'novedades_semanales_monitoreo'=>['label'=>'Reporte de Pozos','group'=>'Novedades Semanales','target'=>'novedades_semanales_monitoreo.php'],
+        'novedades_semanales_auditoria'=>['label'=>'Auditoría de instalaciones','group'=>'Novedades Semanales','target'=>'novedades_semanales_auditoria.php'],
+        'novedades_semanales_requerimientos'=>['label'=>'Requerimientos de sala de control','group'=>'Novedades Semanales','target'=>'novedades_semanales_requerimientos.php'],
+        'micros_contables'=>['label'=>'Micros contables','group'=>'Novedades Semanales','target'=>'micros_contables.php'],
+        'micros_contables_cierre'=>['label'=>'Cierre diario','group'=>'Novedades Semanales','target'=>'micros_contables_cierre.php'],
+        'novedades_semanales_malos_actores'=>['label'=>'Malos actores','group'=>'Novedades Semanales','target'=>'novedades_semanales_malos_actores.php'],
+        'novedades_semanales_comparativa'=>['label'=>'Comparativa semanal','group'=>'Novedades Semanales','target'=>'novedades_semanales_comparativa.php'],
+        'novedades_semanales_seguimiento'=>['label'=>'Seguimiento','group'=>'Novedades Semanales','target'=>'novedades_semanales_seguimiento.php'],
+        'novedades_semanales_reporte'=>['label'=>'Reporte de novedades','group'=>'Novedades Semanales','target'=>'novedades_semanales_reporte.php'],
+
+        'reportes_guardados'=>['label'=>'REPORTES guardados','group'=>'Reportes y Comentarios','target'=>'reportes_guardados.php'],
+        'comentarios'=>['label'=>'Comentarios','group'=>'Reportes y Comentarios','target'=>'comentarios.php'],
+        'comentarios_semana'=>['label'=>'Comentarios · Última semana','group'=>'Reportes y Comentarios','target'=>null],
+
+        'alarmas24h'=>['label'=>'Alarmas 24h','group'=>'Alarmas','target'=>'list.php?s=alarmas24h'],
+        'instalaciones_alarmas_semanal'=>['label'=>'Alarmas semanal','group'=>'Alarmas','target'=>'instalaciones_alarmas_semanal.php'],
+        'alarmas_activas'=>['label'=>'Alarmas por Históricos','group'=>'Alarmas','target'=>'list.php?s=alarmas_activas'],
+        'pi_historico'=>['label'=>'PI Histórico','group'=>'Alarmas','target'=>'pi_historico.php'],
+        'suprimidas'=>['label'=>'Suprimidas','group'=>'Alarmas','target'=>'list.php?s=suprimidas'],
+        'reconocidas'=>['label'=>'Reconocidas','group'=>'Alarmas','target'=>'list.php?s=reconocidas'],
+        'reconocidas_usr'=>['label'=>'Reconocidas por usuario','group'=>'Alarmas','target'=>'list.php?s=reconocidas_usr'],
+        'top20_all'=>['label'=>'Top 20 alarmas','group'=>'Alarmas','target'=>'instalaciones_top20.php'],
+        'top20_24h'=>['label'=>'Top 20 alarmas 24h','group'=>'Alarmas','target'=>'list.php?s=top20_24h'],
+        'ranking24h'=>['label'=>'Ranking 24h','group'=>'Alarmas','target'=>'list.php?s=ranking24h'],
+        'tendencia_sem'=>['label'=>'Tendencia semanal','group'=>'Alarmas','target'=>'list.php?s=tendencia_sem'],
+        'tend_sem_tags'=>['label'=>'Tendencia por TAG','group'=>'Alarmas','target'=>'list.php?s=tend_sem_tags'],
+        'prioridad'=>['label'=>'Prioridad','group'=>'Alarmas','target'=>'list.php?s=prioridad'],
+        'todas_alarmas'=>['label'=>'Todas las alarmas','group'=>'Alarmas','target'=>'todas_alarmas.php'],
+        'analisis_ia'=>['label'=>'Análisis IA','group'=>'Alarmas','target'=>'analisis_ia.php'],
+        'importadas'=>['label'=>'Alarmas importadas','group'=>'Alarmas','target'=>'list.php?s=importadas'],
+
+        /*
+         * Compatibilidad de reportes creados antes de unificar el catálogo.
+         * Siguen siendo válidos para ejecutar programaciones existentes.
+         */
+        'dashboard'=>['label'=>'Dashboard (compatibilidad)','group'=>'Compatibilidad','target'=>null,'hidden'=>true],
+        'top20'=>['label'=>'Top 20 alarmas (compatibilidad)','group'=>'Compatibilidad','target'=>null,'hidden'=>true],
+        'top_total'=>['label'=>'Top Total','group'=>'Otros reportes','target'=>null],
+        'top_hml'=>['label'=>'Top semanal','group'=>'Otros reportes','target'=>null],
     ];
+}
+function report_screen_catalog(){
+    $out=[];
+    foreach(report_screen_definitions() as $key=>$def)$out[$key]=(string)($def['label']??$key);
+    return $out;
+}
+function report_screen_picker_definitions(){
+    return array_filter(report_screen_definitions(),static function($def){return empty($def['hidden']);});
+}
+function report_screen_group($screen){
+    $defs=report_screen_definitions();
+    return isset($defs[$screen])?(string)($defs[$screen]['group']??'Otros'):'Otros';
+}
+function report_screen_native_target($screen){
+    $defs=report_screen_definitions();
+    if(!isset($defs[$screen]))return '';
+    return trim((string)($defs[$screen]['target']??''));
+}
+function report_page_token($id,$screen,$expires){
+    $cfg=require dirname(__DIR__).'/config.php';
+    $secret=($cfg['db']['password']??'clear').'|'.($cfg['db']['database']??'db').'|native-report';
+    return hash_hmac('sha256',(int)$id.'|'.(string)$screen.'|'.(int)$expires,$secret);
+}
+function report_build_native_url($id,$screen){
+    $base=rtrim(report_setting('APP_BASE_URL','http://localhost/CLEAR'),'/');
+    $expires=time()+180;
+    return $base.'/report_page_proxy.php?id='.(int)$id
+        .'&screen='.rawurlencode((string)$screen)
+        .'&exp='.$expires
+        .'&token='.report_page_token($id,$screen,$expires);
 }
 function report_parse_screens($value){
     $allowed=report_screen_catalog();
@@ -106,8 +179,12 @@ function report_build_url($id,$screen='dashboard'){
 function report_generate_pdf($id,$screen,$outfile){
     $chrome=report_setting('CHROME_PATH','C:\Program Files\Google\Chrome\Application\chrome.exe');
     if(!is_file($chrome)) return [false,'No se encontró Chrome en: '.$chrome];
-    $url=report_build_url($id,$screen);
-    $cmd='"'.$chrome.'" --headless --disable-gpu --no-sandbox --print-to-pdf="'.$outfile.'" --print-to-pdf-no-header "'.$url.'" 2>&1';
+    $url=report_screen_native_target($screen)!==''?report_build_native_url($id,$screen):report_build_url($id,$screen);
+    /*
+     * El pequeño presupuesto virtual permite que gráficos y grillas terminen
+     * de pintar antes de imprimir, sin dejar procesos de Chrome abiertos.
+     */
+    $cmd='"'.$chrome.'" --headless --disable-gpu --no-sandbox --run-all-compositor-stages-before-draw --virtual-time-budget=2500 --print-to-pdf="'.$outfile.'" --print-to-pdf-no-header "'.$url.'" 2>&1';
     exec($cmd,$out,$code);
     if($code!==0||!is_file($outfile))return [false,implode("\n",$out)?:'Chrome no generó el PDF'];
     return [true,''];
