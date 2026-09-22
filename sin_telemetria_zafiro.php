@@ -27,6 +27,7 @@ $db = clear_db();
 $dbError = $db->ok() ? '' : $db->error();
 $ready = !$dbError && zst_ready($db);
 $reportEnabled = $ready && ns_report_ready($db) && permissions_can_menu('novedades_semanales_reporte');
+$autoReportEnabled = permissions_can_menu('reportes');
 
 /* Captura manual (solo administradores). */
 if (empty($_SESSION['zst_csrf'])) $_SESSION['zst_csrf'] = bin2hex(random_bytes(16));
@@ -138,6 +139,7 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
           </div>
         <?php endif; ?>
         <a class="zstBtn is-ghost" href="<?php echo h(zst_url()); ?>"><?php echo icon('history'); ?> Actualizar</a>
+        <?php if ($autoReportEnabled): ?><a class="zstBtn is-primary" href="reportes.php?pantalla=sin_telemetria_zafiro"><?php echo icon('file'); ?> Agregar a reporte automático</a><?php endif; ?>
         <?php if ($isAdmin && $ready): ?>
           <form method="post" action="<?php echo h(zst_url()); ?>" class="zstCaptureForm" onsubmit="return confirm('¿Capturar ahora el listado del día? Reemplaza la captura de hoy.');">
             <input type="hidden" name="accion" value="capturar">
@@ -204,6 +206,14 @@ $zafiroStale = $latestRun && !$latestRun['zafiroSameDay'];
             <span class="zstKpi__label">Producción petróleo</span>
             <b class="zstKpi__value"><?php echo number_format($productionOilTotal, 2, ',', '.'); ?></b>
             <span class="zstKpi__detail">Total de los pozos mostrados · Query 164</span>
+          </div>
+        </div>
+        <div class="zstKpi is-bruta">
+          <span class="zstKpi__icon"><?php echo icon('gauge'); ?></span>
+          <div>
+            <span class="zstKpi__label">Producción Bruta</span>
+            <b class="zstKpi__value"><?php echo number_format($productionLiquidTotal, 2, ',', '.'); ?></b>
+            <span class="zstKpi__detail">Suma de Producción Líquido · Query 164</span>
           </div>
         </div>
       </section>
