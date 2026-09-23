@@ -82,6 +82,7 @@ function report_screen_definitions(){
         'telemetria_tecss'=>['label'=>'Telemetría TECCS','group'=>'Telemetría de Pozos','target'=>'telemetria_tecss.php'],
         'tecss_3sigma'=>['label'=>'3Sigma TECSS','group'=>'Telemetría de Pozos','target'=>'tecss_3sigma.php'],
         'tecss_vibraciones'=>['label'=>'Análisis de Vibraciones','group'=>'Telemetría de Pozos','target'=>'tecss_vibraciones.php'],
+        'gestion_telemetria'=>['label'=>'Gestión de Telemetría','group'=>'Telemetría de Pozos','target'=>'gestion_telemetria.php'],
         'sin_telemetria_zafiro'=>['label'=>'Sin telemetría en Zafiro','group'=>'Telemetría de Pozos','target'=>'sin_telemetria_zafiro.php'],
         'pozos'=>['label'=>'Ficha de pozos','group'=>'Telemetría de Pozos','target'=>'list.php?s=pozos'],
         'pozos_tecss'=>['label'=>'Pozos · técnico','group'=>'Telemetría de Pozos','target'=>'list.php?s=pozos_tecss'],
