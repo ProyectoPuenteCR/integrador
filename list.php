@@ -175,6 +175,8 @@ if ($alarmScope === 'instalaciones') {
 $installationTypeEnabled = false;
 $installationTypeExpr = '';
 $installationTypeExternalField = '';
+$surfaceInstallationColumn = false;
+$displayCols = $sc ? $sc['cols'] : [];
 $columnFilters = [];
 $columnTypes = [];
 $statusField = '';
@@ -488,7 +490,9 @@ if ($sc) {
             $filterPriority === '' && $filterValue === '' && $filterInstallationType === '' && !$columnFilters && $filterFrom === '' && $filterTo === '';
 
         // ORDER BY
-        if ($sortCol === '__TIPO_INSTALACION' && $installationTypeExpr !== '') {
+        if ($sortCol === '__INSTALACION' && $alarmScope === 'instalaciones' && $installationExpr !== '') {
+            $orderBy = "$installationExpr $sortDir";
+        } elseif ($sortCol === '__TIPO_INSTALACION' && $installationTypeExpr !== '') {
             $orderBy = "$installationTypeExpr $sortDir";
         } elseif ($sortCol !== '' && in_array($sortCol, $validCols, true)) {
             $orderBy = "[$sortCol] $sortDir";
@@ -523,6 +527,10 @@ if ($sc) {
                 return '[' . str_replace(']', ']]', $field) . ']';
             }, $selectFields));
             if ($selectSql === '') $selectSql = '*';
+            if ($alarmScope === 'instalaciones' && $installationExpr !== '') {
+                $surfaceInstallationColumn = true;
+                $selectSql = "$installationExpr AS [__INSTALACION], $selectSql";
+            }
             if ($installationTypeExpr !== '') $selectSql = "$installationTypeExpr AS [__TIPO_INSTALACION], $selectSql";
             if ($showAllRows) {
                 $sql = "SELECT $selectSql FROM $table $where ORDER BY $orderBy";
@@ -879,6 +887,24 @@ if ($sc) {
     }
 }
 
+/* Columnas visibles para instalaciones de superficie.
+   ALM_ALMEXTFLD2 corresponde a la referencia de pozo; en este módulo se
+   reemplaza por la instalación real derivada del prefijo del TAG. */
+if ($sc && $surfaceInstallationColumn) {
+    $displayCols = $sc['cols'];
+    $replacedInstallationField = false;
+    foreach ($displayCols as &$displayCol) {
+        if ($installationTypeExternalField !== '' && (string)($displayCol[0] ?? '') === $installationTypeExternalField) {
+            $displayCol = ['__INSTALACION', 'Instalación', 'text'];
+            $replacedInstallationField = true;
+        }
+    }
+    unset($displayCol);
+    if (!$replacedInstallationField) {
+        array_unshift($displayCols, ['__INSTALACION', 'Instalación', 'text']);
+    }
+}
+
 if ($CAN_VIEW_COMMENTS && in_array($key, ['reconocidas_usr', 'reconocidas'], true)) {
     $reconCommentCounts = clear_recon_comment_counts_by_group();
 }
@@ -980,6 +1006,7 @@ function url_without($keys) {
         <!-- Toolbar: búsqueda + calendario + contador -->
         <form class="toolbar" method="get" action="list.php" id="tableFilters">
           <input type="hidden" name="s" value="<?php echo h($key); ?>">
+          <?php if ($alarmScope !== ''): ?><input type="hidden" name="scope" value="<?php echo h($alarmScope); ?>"><?php endif; ?>
           <?php if ($filterValue !== ''): ?>
             <input type="hidden" name="valor" value="<?php echo h($filterValue); ?>">
           <?php endif; ?>
@@ -1512,7 +1539,7 @@ function url_without($keys) {
                     <a href="<?php echo h(url_with(['sort'=>'__TIPO_INSTALACION','dir'=>$typeNextDir,'p'=>1])); ?>" title="Ordenar por tipo de instalación"><span>Tipo de instalación</span><span class="sort-indicator" aria-hidden="true"><?php echo $typeIsSorted ? ($sortDir === 'ASC' ? '▲' : '▼') : '↕'; ?></span></a>
                   </th>
                 <?php endif; ?>
-                <?php foreach ($sc['cols'] as $c):
+                <?php foreach ($displayCols as $c):
                   list($field, $label, $type) = $c;
                   $isSorted = ($sortCol === $field);
                   $nextDir = ($isSorted && $sortDir === 'ASC') ? 'desc' : 'asc';
@@ -1542,12 +1569,14 @@ function url_without($keys) {
                     </select>
                   </th>
                 <?php endif; ?>
-                <?php foreach ($sc['cols'] as $c):
+                <?php foreach ($displayCols as $c):
                   list($field, $label, $type) = $c;
                   $columnFilterValue = $columnFilters[$field] ?? '';
                 ?>
                   <th>
-                    <?php if ($type === 'status' && $statuses): ?>
+                    <?php if ($field === '__INSTALACION'): ?>
+                      <select name="instalacion" form="tableFilters" data-auto-submit="true" aria-label="Filtrar instalación"><option value="">Todas</option><?php foreach ($installations as $installationValue): ?><option value="<?php echo h($installationValue); ?>" <?php echo $filterInstallation === $installationValue ? 'selected' : ''; ?>><?php echo h($installationValue); ?></option><?php endforeach; ?></select>
+                    <?php elseif ($type === 'status' && $statuses): ?>
                       <select name="col[<?php echo h($field); ?>]" form="tableFilters" data-auto-submit="true" aria-label="Filtrar <?php echo h($label); ?>"><option value="">Todos</option><?php foreach ($statuses as $optionValue): ?><option value="<?php echo h($optionValue); ?>" <?php echo $columnFilterValue === $optionValue ? 'selected' : ''; ?>><?php echo h($optionValue); ?></option><?php endforeach; ?></select>
                     <?php elseif ($type === 'prio' && $priorities): ?>
                       <select name="col[<?php echo h($field); ?>]" form="tableFilters" data-auto-submit="true" aria-label="Filtrar <?php echo h($label); ?>"><option value="">Todas</option><?php foreach ($priorities as $optionValue): ?><option value="<?php echo h($optionValue); ?>" <?php echo $columnFilterValue === $optionValue ? 'selected' : ''; ?>><?php echo h($optionValue); ?></option><?php endforeach; ?></select>
@@ -1577,7 +1606,7 @@ function url_without($keys) {
                 $reportComment=trim((string)($reportCommentRow['COMENTARIO']??$reportCommentRow['comentario']??''));
                 $reportColumns=[];
                 if($installationTypeEnabled)$reportColumns['Tipo de instalación']=$row['__TIPO_INSTALACION']??'';
-                foreach($sc['cols'] as $reportColumn)$reportColumns[(string)$reportColumn[1]]=$row[(string)$reportColumn[0]]??'';
+                foreach($displayCols as $reportColumn)$reportColumns[(string)$reportColumn[1]]=$row[(string)$reportColumn[0]]??'';
                 if($reportComment!=='')$reportColumns['Comentario']=$reportComment;
                 $reportPayload=ns_report_row_payload($reportColumns);
                 $reportKey=ns_report_key($key,[$rowActionTag,$rowActionTimestamp,$rowActionValue,$reportColumns]);
@@ -1590,7 +1619,7 @@ function url_without($keys) {
                   ?>
                     <td data-label="Tipo de instalación" data-raw-value="<?php echo h($rowInstallationType); ?>"><span class="installationTypeBadge installationTypeBadge--<?php echo h(clear_installation_type_class($rowInstallationType)); ?>"><?php echo h($installationTypeOptions[$rowInstallationType] ?? $rowInstallationType); ?></span></td>
                   <?php endif; ?>
-                  <?php foreach ($sc['cols'] as $c):
+                  <?php foreach ($displayCols as $c):
                     list($field, $label, $type) = $c;
                     $val = isset($row[$field]) ? $row[$field] : '';
                     $tdAttrs = ' data-label="' . h($label) . '" data-raw-value="' . h((string)$val) . '"';
