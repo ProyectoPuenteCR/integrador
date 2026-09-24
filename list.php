@@ -1575,7 +1575,7 @@ function url_without($keys) {
                 ?>
                   <th>
                     <?php if ($field === '__INSTALACION'): ?>
-                      <select name="instalacion" form="tableFilters" data-auto-submit="true" aria-label="Filtrar instalación"><option value="">Todas</option><?php foreach ($installations as $installationValue): ?><option value="<?php echo h($installationValue); ?>" <?php echo $filterInstallation === $installationValue ? 'selected' : ''; ?>><?php echo h($installationValue); ?></option><?php endforeach; ?></select>
+                      <select form="tableFilters" aria-label="Filtrar instalación" onchange="var f=document.getElementById('instalacion');if(f)f.value=this.value;var form=document.getElementById('tableFilters');if(form){if(form.requestSubmit)form.requestSubmit();else form.submit();}"><option value="">Todas</option><?php foreach ($installations as $installationValue): ?><option value="<?php echo h($installationValue); ?>" <?php echo $filterInstallation === $installationValue ? 'selected' : ''; ?>><?php echo h($installationValue); ?></option><?php endforeach; ?></select>
                     <?php elseif ($type === 'status' && $statuses): ?>
                       <select name="col[<?php echo h($field); ?>]" form="tableFilters" data-auto-submit="true" aria-label="Filtrar <?php echo h($label); ?>"><option value="">Todos</option><?php foreach ($statuses as $optionValue): ?><option value="<?php echo h($optionValue); ?>" <?php echo $columnFilterValue === $optionValue ? 'selected' : ''; ?>><?php echo h($optionValue); ?></option><?php endforeach; ?></select>
                     <?php elseif ($type === 'prio' && $priorities): ?>
