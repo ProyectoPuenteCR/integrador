@@ -194,16 +194,6 @@ if ($db->ok()) {
 $highPct = $total > 0 ? ($high * 100 / $total) : 0;
 $mediumPct = $total > 0 ? ($medium * 100 / $total) : 0;
 $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
-
-$allWellChartRows = [];
-foreach ($wellDetailRows as $chartRow) {
-    $chartWell = trim((string)($chartRow['pozo'] ?? $chartRow['POZO'] ?? ''));
-    if ($chartWell === '') continue;
-    $allWellChartRows[] = [
-        'pozo' => $chartWell,
-        'count' => (int)($chartRow['total_alarmas'] ?? $chartRow['TOTAL_ALARMAS'] ?? 0),
-    ];
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -235,9 +225,6 @@ foreach ($wellDetailRows as $chartRow) {
     .topTotalChart__head h3{font-family:var(--font-head);font-size:20px;color:var(--text);margin:0}
     .topTotalChart__hint{font-size:11px;color:var(--text-mut);border:1px solid var(--line-mid);border-radius:999px;padding:5px 9px;white-space:nowrap}
     .topTotalChart__canvas{height:300px;position:relative}
-    .topTotalChart--wide{grid-column:1/-1}
-    .topAllAlarmsScroll{max-height:650px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
-    .topAllAlarmsCanvas{position:relative;min-height:360px}
     .topTotalMeta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;color:var(--text-soft);font-size:12px}
     .topTotalMeta b{color:var(--petrol)}
     .tpDetailSummary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 10px;color:var(--text-soft);font-size:12px}
@@ -334,17 +321,6 @@ foreach ($wellDetailRows as $chartRow) {
         <article class="topTotalChart">
           <div class="topTotalChart__head"><div><small>Criticidad horaria</small><h3>Alta, media y baja</h3></div><span class="topTotalChart__hint"><?php echo $isDefault24h ? 'Comparación 24 hs' : 'Rango seleccionado'; ?></span></div>
           <div class="topTotalChart__canvas"><canvas id="tpHourlyPriority"></canvas></div>
-        </article>
-        <article class="topTotalChart topTotalChart--wide">
-          <div class="topTotalChart__head">
-            <div><small>Detalle completo</small><h3>Todas las alarmas por pozo</h3></div>
-            <span class="topTotalChart__hint"><?php echo tp_num(count($allWellChartRows)); ?> pozos · <?php echo tp_num($total); ?> alarmas</span>
-          </div>
-          <div class="topAllAlarmsScroll">
-            <div class="topAllAlarmsCanvas" style="height:<?php echo max(360, min(4200, count($allWellChartRows) * 28 + 80)); ?>px">
-              <canvas id="tpAllWells"></canvas>
-            </div>
-          </div>
         </article>
       </section>
 
@@ -486,27 +462,6 @@ foreach ($wellDetailRows as $chartRow) {
     {label:'Otra',data:<?php echo json_encode($hourlyOther); ?>,backgroundColor:'rgba(100,116,139,.55)',borderRadius:5}
   ]},options:Object.assign({},common,{scales:{x:{stacked:true,grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:12}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}}}})});
 
-  var allWellData=<?php echo json_encode($allWellChartRows, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
-  var allWellCanvas=document.getElementById('tpAllWells');
-  if(allWellCanvas&&allWellData.length){
-    new Chart(allWellCanvas,{
-      type:'bar',
-      data:{
-        labels:allWellData.map(function(item){return item.pozo;}),
-        datasets:[{label:'Alarmas',data:allWellData.map(function(item){return item.count;}),backgroundColor:'rgba(26,77,92,.82)',borderRadius:5,barThickness:18}]
-      },
-      options:{
-        responsive:true,
-        maintainAspectRatio:false,
-        indexAxis:'y',
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ' Alarmas: '+ctx.raw;}}}},
-        scales:{
-          x:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'},ticks:{color:'#607487',precision:0},title:{display:true,text:'Cantidad de alarmas'}},
-          y:{grid:{display:false},ticks:{color:'#334e5b',autoSkip:false}}
-        }
-      }
-    });
-  }
 })();
 </script>
 <script>
