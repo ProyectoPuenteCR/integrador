@@ -961,7 +961,7 @@ function url_without($keys) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?php echo $sc ? h($sc['titulo']) : 'No encontrado'; ?> · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260803-grid1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-columns-1">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
   <link rel="stylesheet" href="assets/css/installation_type.css?v=20260824-1">
   <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-select-all-1"><?php endif; ?>
@@ -1810,7 +1810,7 @@ function url_without($keys) {
 <?php if ($showWeeklyHmlSummary || $key === 'top20_24h'): ?>
 <script src="assets/js/chart.umd.js"></script>
 <?php endif; ?>
-<script src="assets/js/app.js?v=20260826-filtros-perf-safe-2"></script>
+<script src="assets/js/app.js?v=20260924-columns-1"></script>
 <script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260901-report-chart-2"></script><?php endif; ?>
 
