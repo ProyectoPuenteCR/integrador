@@ -222,9 +222,14 @@ function as_source_parts($type, array $filters, array $columns, array &$params)
         $conditions[] = "$well<>N''";
         $conditions[] = "UPPER($well) LIKE ?";
         $params[] = strtoupper($filters['prefix'] !== '' ? $filters['prefix'] : 'YPF.SC') . '%';
-    } elseif ($filters['installation'] !== '') {
-        $conditions[] = "$installation=?";
-        $params[] = $filters['installation'];
+    } else {
+        /* Instalaciones de superficie: excluir siempre las alarmas de pozos.
+           La separación debe ser real en SQL, no solamente visual en el menú. */
+        $conditions[] = "$installationType<>N'POZO'";
+        if ($filters['installation'] !== '') {
+            $conditions[] = "$installation=?";
+            $params[] = $filters['installation'];
+        }
     }
 
     if ($type === 'I' && $filters['installation_type'] !== '') {
@@ -292,6 +297,7 @@ function as_build_filters($type, array $query, array $week)
     $installation = $type === 'I' ? as_clean_text($query['instalacion'] ?? '', 100) : '';
     $installationType = $type === 'I' ? strtoupper(as_clean_text($query['tipo_instalacion'] ?? '', 30)) : '';
     if (!array_key_exists($installationType, as_installation_type_options())) $installationType = '';
+    if ($type === 'I' && $installationType === 'POZO') $installationType = '';
 
     $rangeStart = $day ?: $week['start'];
     $rangeEnd = $day ? $day->modify('+1 day') : $week['next'];
