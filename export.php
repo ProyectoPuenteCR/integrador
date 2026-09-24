@@ -31,6 +31,8 @@ $filterStatus       = trim($_GET['estado'] ?? '');
 $filterPriority     = trim($_GET['prioridad'] ?? '');
 $filterValue        = trim($_GET['valor'] ?? '');
 $filterInstallationType = trim($_GET['tipo_instalacion'] ?? '');
+$alarmScope = strtolower(trim((string)($_GET['scope'] ?? '')));
+if (!in_array($alarmScope, ['instalaciones','pozos'], true)) $alarmScope = '';
 $columnFiltersRaw = isset($_GET['col']) && is_array($_GET['col']) ? $_GET['col'] : [];
 $filterFrom     = trim($_GET['fecha_desde'] ?? '');
 $filterFromTime = trim($_GET['hora_desde'] ?? '');
@@ -156,14 +158,16 @@ $tagField = $sc['tag_col'] ?? '';
 $installationExpr = '';
 $installationTypeEnabled = !empty($sc['installation_type']);
 $installationTypeExpr = '';
+$installationTypeExternalField = '';
 if ($tagField !== '' && in_array($tagField, $validCols, true)) {
     $normalizedTagExpr = "LTRIM(RTRIM(CONVERT(nvarchar(255), [$tagField])))";
     $installationExpr = "LEFT($normalizedTagExpr, CHARINDEX('_', $normalizedTagExpr + '_') - 1)";
     if ($installationTypeEnabled) {
         $externalField = trim((string)($sc['installation_type_external_col'] ?? ''));
-        $externalExpr = ($externalField !== '' && preg_match('/^[A-Za-z0-9_]+$/', $externalField) && clear_installation_type_has_column($db, $table, $externalField))
-            ? '[' . $externalField . ']'
-            : "N''";
+        if ($externalField !== '' && preg_match('/^[A-Za-z0-9_]+$/', $externalField) && clear_installation_type_has_column($db, $table, $externalField)) {
+            $installationTypeExternalField = $externalField;
+        }
+        $externalExpr = $installationTypeExternalField !== '' ? '[' . $installationTypeExternalField . ']' : "N''";
         $installationTypeExpr = clear_installation_type_sql('[' . $tagField . ']', $externalExpr);
     }
 }
@@ -187,6 +191,11 @@ if ($filterZone !== '' && $installationExpr !== '') {
 if ($filterInstallation !== '' && $installationExpr !== '') {
     $conditions[] = "$installationExpr = ?";
     $params[] = $filterInstallation;
+}
+if ($alarmScope === 'instalaciones' && $installationTypeExpr !== '') {
+    $conditions[] = "$installationTypeExpr <> N'POZO'";
+} elseif ($alarmScope === 'pozos' && $installationTypeExpr !== '') {
+    $conditions[] = "$installationTypeExpr = N'POZO'";
 }
 if ($filterInstallationType !== '' && $installationTypeExpr !== '') {
     $conditions[] = "$installationTypeExpr = ?";
@@ -233,7 +242,9 @@ if ($dateField !== '') {
 $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
 // ORDER BY
-if ($sortCol === '__TIPO_INSTALACION' && $installationTypeExpr !== '') {
+if ($sortCol === '__INSTALACION' && $alarmScope === 'instalaciones' && $installationExpr !== '') {
+    $orderBy = "$installationExpr $sortDir";
+} elseif ($sortCol === '__TIPO_INSTALACION' && $installationTypeExpr !== '') {
     $orderBy = "$installationTypeExpr $sortDir";
 } elseif ($sortCol !== '' && in_array($sortCol, $validCols, true)) {
     $orderBy = "[$sortCol] $sortDir";
@@ -242,7 +253,11 @@ if ($sortCol === '__TIPO_INSTALACION' && $installationTypeExpr !== '') {
 }
 
 // Traer TODO (sin paginar) para el export
-$selectSql = $installationTypeExpr !== '' ? "$installationTypeExpr AS [__TIPO_INSTALACION], *" : '*';
+$selectParts = [];
+if ($installationTypeExpr !== '') $selectParts[] = "$installationTypeExpr AS [__TIPO_INSTALACION]";
+if ($alarmScope === 'instalaciones' && $installationExpr !== '') $selectParts[] = "$installationExpr AS [__INSTALACION]";
+$selectParts[] = '*';
+$selectSql = implode(', ', $selectParts);
 $sql = "SELECT $selectSql FROM $table $where ORDER BY $orderBy";
 $rows = $db->all($sql, $params);
 
@@ -285,17 +300,27 @@ echo "\xEF\xBB\xBF";
 
 $out = fopen('php://output', 'w');
 
-// Encabezados (las etiquetas legibles)
-$headers = array_map(function ($c) { return $c[1]; }, $sc['cols']);
+// Encabezados y columnas visibles: en superficie usamos la instalación real
+// derivada del TAG y ocultamos el campo externo que identifica pozos.
+$exportCols = $sc['cols'];
+if ($alarmScope === 'instalaciones' && $installationExpr !== '') {
+    $filteredCols = [];
+    foreach ($exportCols as $exportCol) {
+        if ($installationTypeExternalField !== '' && (string)($exportCol[0] ?? '') === $installationTypeExternalField) continue;
+        $filteredCols[] = $exportCol;
+    }
+    $exportCols = $filteredCols;
+    array_unshift($exportCols, ['__INSTALACION','Instalación','text']);
+}
+$headers = array_map(function ($c) { return $c[1]; }, $exportCols);
 if ($installationTypeExpr !== '') array_unshift($headers, 'Tipo de instalación');
 fputcsv($out, $headers, ';');
 
-// Filas (solo las columnas definidas, en orden)
 foreach ($rows as $row) {
     $line = [];
     if ($installationTypeExpr !== '') $line[] = $row['__TIPO_INSTALACION'] ?? 'SIN CLASIFICAR';
-    foreach ($sc['cols'] as $c) {
-        $field = $c[0];
+    foreach ($exportCols as $exportCol) {
+        $field = $exportCol[0];
         $line[] = isset($row[$field]) ? $row[$field] : '';
     }
     fputcsv($out, $line, ';');
