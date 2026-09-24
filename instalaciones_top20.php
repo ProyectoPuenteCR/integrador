@@ -170,7 +170,7 @@ if ($db->ok()) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Top 20 alarmas · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260811-it20">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-columns-1">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
   <link rel="stylesheet" href="assets/css/installation_type.css?v=20260824-1">
   <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-select-all-1"><?php endif; ?>
@@ -258,7 +258,7 @@ if ($db->ok()) {
 <?php clear_alarm_actions_modal(); ?>
 <div class="piModal__overlay" id="piModalOverlay" hidden></div>
 <section class="piModal" id="piModal" aria-hidden="true" aria-labelledby="piModalTitle"><div class="piModal__head"><div><div class="piModal__eyebrow">Vista rápida</div><h2 id="piModalTitle">PI Histórico</h2><p class="piModal__sub">Tendencia y referencias SQL existentes.</p></div><div class="piModal__actions"><a class="piModal__link" id="piModalOpenPage" href="pi_historico.php" target="_blank" rel="noopener">Abrir página completa</a><button type="button" class="piModal__close" id="piModalClose" aria-label="Cerrar PI Histórico">×</button></div></div><div class="piModal__body"><iframe id="piModalFrame" class="piModal__frame" src="about:blank" title="PI Histórico embebido" loading="lazy"></iframe></div></section>
-<script src="assets/js/app.js?v=20260811-it20"></script>
+<script src="assets/js/app.js?v=20260924-columns-1"></script>
 <script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260826-select-all-1"></script><?php endif; ?>
 <script>
