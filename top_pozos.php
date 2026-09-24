@@ -194,6 +194,16 @@ if ($db->ok()) {
 $highPct = $total > 0 ? ($high * 100 / $total) : 0;
 $mediumPct = $total > 0 ? ($medium * 100 / $total) : 0;
 $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
+
+$allWellChartRows = [];
+foreach ($wellDetailRows as $chartRow) {
+    $chartWell = trim((string)($chartRow['pozo'] ?? $chartRow['POZO'] ?? ''));
+    if ($chartWell === '') continue;
+    $allWellChartRows[] = [
+        'pozo' => $chartWell,
+        'count' => (int)($chartRow['total_alarmas'] ?? $chartRow['TOTAL_ALARMAS'] ?? 0),
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -203,6 +213,7 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
   <title>Top Pozos · CLEAR Plataforma</title>
   <link rel="stylesheet" href="assets/css/app.css?v=20260924-toppozos-grid-2">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
+  <link rel="stylesheet" href="assets/css/telemetry_modal.css?v=20260924-toppozos-1">
   <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-select-all-1"><?php endif; ?>
   <script src="assets/js/chart.umd.js"></script>
   <style>
@@ -224,6 +235,9 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     .topTotalChart__head h3{font-family:var(--font-head);font-size:20px;color:var(--text);margin:0}
     .topTotalChart__hint{font-size:11px;color:var(--text-mut);border:1px solid var(--line-mid);border-radius:999px;padding:5px 9px;white-space:nowrap}
     .topTotalChart__canvas{height:300px;position:relative}
+    .topTotalChart--wide{grid-column:1/-1}
+    .topAllAlarmsScroll{max-height:650px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+    .topAllAlarmsCanvas{position:relative;min-height:360px}
     .topTotalMeta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;color:var(--text-soft);font-size:12px}
     .topTotalMeta b{color:var(--petrol)}
     .tpDetailSummary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 10px;color:var(--text-soft);font-size:12px}
@@ -234,6 +248,10 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     .tpDetailTable thead tr:first-child th{color:var(--petrol);font-weight:800}
     .tpDetailTable .tpCommentCell{min-width:54px}
     .tpDetailTable .tpCommentCell .alarmCell{justify-content:center}
+    .tpAlarmBell{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:48px;height:31px;padding:0 9px;border:1px solid #f2c78c;border-radius:9px;background:#fff3df;color:#b96a09;font-weight:800;text-decoration:none;cursor:pointer}
+    .tpAlarmBell:hover,.tpAlarmBell:focus-visible{background:#ffe7bf;border-color:#e8a84d;outline:0}
+    .tpAlarmBell svg{width:15px;height:15px;flex:0 0 15px}
+    .tpAlarmBell span{font-variant-numeric:tabular-nums}
     @media(max-width:1100px){.topTotalKpis{grid-template-columns:repeat(2,1fr)}.topTotalCharts{grid-template-columns:1fr}}
     @media(max-width:900px){.topPozosDateRange{grid-template-columns:auto 1fr 1fr;flex-basis:100%}}
     @media(max-width:700px){.topTotalKpis{grid-template-columns:1fr}.topTotalFilter{width:100%}.topTotalFilter label{width:100%}.topTotalFilter select,.topTotalFilter input{flex:1;min-width:0}.topPozosDateRange{grid-template-columns:auto 1fr}}
@@ -317,6 +335,17 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
           <div class="topTotalChart__head"><div><small>Criticidad horaria</small><h3>Alta, media y baja</h3></div><span class="topTotalChart__hint"><?php echo $isDefault24h ? 'Comparación 24 hs' : 'Rango seleccionado'; ?></span></div>
           <div class="topTotalChart__canvas"><canvas id="tpHourlyPriority"></canvas></div>
         </article>
+        <article class="topTotalChart topTotalChart--wide">
+          <div class="topTotalChart__head">
+            <div><small>Detalle completo</small><h3>Todas las alarmas por pozo</h3></div>
+            <span class="topTotalChart__hint"><?php echo tp_num(count($allWellChartRows)); ?> pozos · <?php echo tp_num($total); ?> alarmas</span>
+          </div>
+          <div class="topAllAlarmsScroll">
+            <div class="topAllAlarmsCanvas" style="height:<?php echo max(360, min(4200, count($allWellChartRows) * 28 + 80)); ?>px">
+              <canvas id="tpAllWells"></canvas>
+            </div>
+          </div>
+        </article>
       </section>
 
       <div class="tpDetailSummary">
@@ -336,7 +365,7 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
               <tr>
                 <?php if($reportEnabled): ?><th>REPORTE</th><?php endif; ?>
                 <th>POZO ↕</th>
-                <th>TOTAL ALARMAS ↕</th>
+                <th>ALARMAS <?php echo $isDefault24h ? '24 H' : 'PERÍODO'; ?> ↕</th>
                 <th>PRIORIDAD ALTA ↕</th>
                 <th>PRIORIDAD MEDIA ↕</th>
                 <th>PRIORIDAD BAJA ↕</th>
@@ -371,6 +400,19 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
                 $uniqueDetailTags = (int)($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0);
                 $detailLastTs = $detailLast !== '' ? strtotime($detailLast) : false;
                 $displayLast = $detailLastTs !== false ? date('d/m/Y H:i:s', $detailLastTs) : '—';
+                $alarmPageParams = [
+                    'pozo'=>$detailWell,
+                    'prefijo_pozo'=>$prefix,
+                    'desde'=>$fromDate,
+                    'hora_desde'=>$fromTime,
+                    'hasta'=>$toDate,
+                    'hora_hasta'=>$toTime,
+                ];
+                $alarmEmbedParams = $alarmPageParams;
+                $alarmEmbedParams['embed'] = 1;
+                $alarmPageUrl = 'pozos_alarmas24.php?' . http_build_query($alarmPageParams);
+                $alarmEmbedUrl = 'pozos_alarmas24.php?' . http_build_query($alarmEmbedParams);
+                $alarmModalTitle = ($isDefault24h ? 'Alarmas 24 h · ' : 'Alarmas del período · ') . $detailWell;
                 $reportColumns = [
                     'Pozo'=>$detailWell,
                     'Total alarmas'=>$totalAlarms,
@@ -385,7 +427,18 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
               <tr>
                 <?php if($reportEnabled): ?><td><?php echo ns_report_pick(ns_report_key('top-pozos-24h',[$fromSql,$toSql,$detailWell]),'row','Top Pozos 24h · '.$detailWell,ns_report_row_payload($reportColumns),'Incluir'); ?></td><?php endif; ?>
                 <td data-column="pozo" data-raw-value="<?php echo h($detailWell); ?>"><?php echo h($detailWell !== '' ? $detailWell : '—'); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo $totalAlarms; ?>"><?php echo tp_num($totalAlarms); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo $totalAlarms; ?>">
+                  <a class="tpAlarmBell"
+                     href="<?php echo h($alarmPageUrl); ?>"
+                     data-telemetry-modal-url="<?php echo h($alarmEmbedUrl); ?>"
+                     data-telemetry-modal-open-url="<?php echo h($alarmPageUrl); ?>"
+                     data-telemetry-modal-title="<?php echo h($alarmModalTitle); ?>"
+                     data-telemetry-modal-subtitle="Consulta operativa de las alarmas del pozo"
+                     data-telemetry-modal-eyebrow="Alarmas de pozo"
+                     title="Ver historial de alarmas de <?php echo h($detailWell); ?>">
+                    <?php echo icon('bell'); ?><span><?php echo tp_num($totalAlarms); ?></span>
+                  </a>
+                </td>
                 <td class="cell-num" data-raw-value="<?php echo $priorityHigh; ?>"><?php echo tp_num($priorityHigh); ?></td>
                 <td class="cell-num" data-raw-value="<?php echo $priorityMedium; ?>"><?php echo tp_num($priorityMedium); ?></td>
                 <td class="cell-num" data-raw-value="<?php echo $priorityLow; ?>"><?php echo tp_num($priorityLow); ?></td>
@@ -415,8 +468,10 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
   </main>
 </div>
 <?php clear_alarm_actions_modal(); ?>
+<?php include __DIR__ . '/includes/telemetry_modal.php'; ?>
 <script src="assets/js/app.js?v=20260924-columns-1"></script>
 <script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
+<script src="assets/js/telemetry_modal.js?v=20260924-toppozos-1"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260826-select-all-1"></script><?php endif; ?>
 <script>
 (function(){
@@ -431,6 +486,27 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     {label:'Otra',data:<?php echo json_encode($hourlyOther); ?>,backgroundColor:'rgba(100,116,139,.55)',borderRadius:5}
   ]},options:Object.assign({},common,{scales:{x:{stacked:true,grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:12}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}}}})});
 
+  var allWellData=<?php echo json_encode($allWellChartRows, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+  var allWellCanvas=document.getElementById('tpAllWells');
+  if(allWellCanvas&&allWellData.length){
+    new Chart(allWellCanvas,{
+      type:'bar',
+      data:{
+        labels:allWellData.map(function(item){return item.pozo;}),
+        datasets:[{label:'Alarmas',data:allWellData.map(function(item){return item.count;}),backgroundColor:'rgba(26,77,92,.82)',borderRadius:5,barThickness:18}]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        indexAxis:'y',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ' Alarmas: '+ctx.raw;}}}},
+        scales:{
+          x:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'},ticks:{color:'#607487',precision:0},title:{display:true,text:'Cantidad de alarmas'}},
+          y:{grid:{display:false},ticks:{color:'#334e5b',autoSkip:false}}
+        }
+      }
+    });
+  }
 })();
 </script>
 <script>
