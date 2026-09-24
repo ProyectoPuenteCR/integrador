@@ -38,7 +38,7 @@ function dashboard_stats()
         'activas'     => $count('dbo.FIXALARMS_ONLY'),
         'reconocidas' => $count('dbo.FIXALARMS_RECONOCIDAS'),
         'suprimidas'  => $count('dbo.FIXALARMS_SUPRIMIDAS24H'),
-        'latest_alarm'=> $db->scalar("SELECT CONVERT(VARCHAR(19), MAX(ALM_NATIVETIMEIN), 120) FROM dbo.FIXALARMS"),
+        'latest_alarm'=> $db->scalar("SELECT CONVERT(VARCHAR(19), MAX(ALM_NATIVETIMEIN), 120) FROM dbo.FIXALARMS_24H"),
         'cache'       => false,
     ];
 }
@@ -77,26 +77,9 @@ function dashboard_module_metrics()
         return $data;
     }
 
-    $top = $db->all("SELECT TOP 5 ALM_TAGNAME,TOTAL_ALARMAS FROM dbo.FIXALARMS_TOP20_24H ORDER BY TOTAL_ALARMAS DESC");
-    if (!$top) $top = $db->all("SELECT TOP 5 ALM_TAGNAME,TOTAL_ALARMAS FROM dbo.FIXALARMS_TOP20_ALL ORDER BY TOTAL_ALARMAS DESC");
-    foreach ($top as $r) $data['top_alarmas'][] = ['label'=>trim((string)($r['ALM_TAGNAME'] ?? '—')), 'value'=>(int)($r['TOTAL_ALARMAS'] ?? 0)];
-
-    $trend = array_reverse($db->all("SELECT TOP 7 Fecha,Total_Alarmas FROM dbo.FIXALARMS_TENDENCIA_SEM ORDER BY Fecha DESC"));
-    foreach ($trend as $r) {
-        $raw = trim((string)($r['Fecha'] ?? ''));
-        $ts = $raw !== '' ? strtotime($raw) : false;
-        $data['tendencia'][] = ['label'=>$ts ? date('d/m', $ts) : '—', 'value'=>(int)($r['Total_Alarmas'] ?? 0)];
-    }
-    foreach ($db->all("SELECT ALM_ALMPRIORITY,TOTAL FROM dbo.FIXALARMS_PRIORITY") as $r) {
-        $p = strtoupper(trim((string)($r['ALM_ALMPRIORITY'] ?? 'INFO')));
-        if ($p === 'MED') $p = 'MEDIUM';
-        if (isset($data['prioridad'][$p])) $data['prioridad'][$p] += (int)($r['TOTAL'] ?? 0); else $data['prioridad']['INFO'] += (int)($r['TOTAL'] ?? 0);
-    }
-    $data['pozos']['total'] = (int)($db->scalar("SELECT COUNT(*) FROM dbo.POZOS") ?? 0);
-    foreach ($db->all("SELECT TOP 3 OPERADOR,SUM(CANTIDAD_RECONOCIMIENTOS) TOTAL FROM dbo.FIXALARMS_RECONOCIDAS_usr WHERE OPERADOR IS NOT NULL GROUP BY OPERADOR ORDER BY SUM(CANTIDAD_RECONOCIMIENTOS) DESC") as $r) {
-        $data['operadores'][] = ['label'=>trim((string)($r['OPERADOR'] ?? '—')), 'value'=>(int)($r['TOTAL'] ?? 0)];
-    }
-    $data['importadas']['total'] = (int)($db->scalar("SELECT COUNT(*) FROM dbo.ALM_Importadas") ?? 0);
+    /* Sin caché operativa no hacemos agregaciones en línea sobre FIXALARMS.
+       Esas consultas podían bloquear IIS/SQL durante la apertura del dashboard.
+       El job de caché completa estos indicadores sin afectar la navegación. */
     return $data;
 }
 
@@ -137,22 +120,8 @@ function dashboard_visual_metrics()
         $recognized = (int)clear_performance_cache_kpi('RECONOCIDAS', 0, $db);
         $commented = (int)clear_performance_cache_kpi('COMENTADAS', 0, $db);
     } else {
-        foreach ($db->all("SELECT DATEPART(HOUR,ALM_NATIVETIMEIN) HORA,SUM(CASE WHEN UPPER(ISNULL(ALM_ALMPRIORITY,''))='HIGH' THEN 1 ELSE 0 END) ALTA,SUM(CASE WHEN UPPER(ISNULL(ALM_ALMPRIORITY,'')) IN ('MED','MEDIUM') THEN 1 ELSE 0 END) MEDIA,SUM(CASE WHEN UPPER(ISNULL(ALM_ALMPRIORITY,'')) NOT IN ('HIGH','MED','MEDIUM') THEN 1 ELSE 0 END) BAJA FROM dbo.FIXALARMS_24H GROUP BY DATEPART(HOUR,ALM_NATIVETIMEIN) ORDER BY HORA") as $r) {
-            $data['hourly'][] = ['hour'=>(int)($r['HORA'] ?? 0),'high'=>(int)($r['ALTA'] ?? 0),'medium'=>(int)($r['MEDIA'] ?? 0),'low'=>(int)($r['BAJA'] ?? 0)];
-        }
-        foreach ($db->all("SELECT DATEPART(HOUR,ALM_NATIVETIMEIN) HORA,SUM(CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(ALM_VALUE,'')))) IN ('NORMAL','OK','HABILITADO') THEN 1 ELSE 0 END) NORMALIZADAS,SUM(CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(ALM_VALUE,'')))) NOT IN ('NORMAL','OK','HABILITADO') THEN 1 ELSE 0 END) ACTIVACIONES FROM dbo.FIXALARMS_24H GROUP BY DATEPART(HOUR,ALM_NATIVETIMEIN) ORDER BY HORA") as $r) {
-            $data['flow'][] = ['hour'=>(int)($r['HORA'] ?? 0),'active'=>(int)($r['ACTIVACIONES'] ?? 0),'normalized'=>(int)($r['NORMALIZADAS'] ?? 0)];
-        }
-        $paretoRows = $db->all("SELECT TOP 20 ALM_TAGNAME,TOTAL_ALARMAS FROM dbo.FIXALARMS_TOP20_24H ORDER BY TOTAL_ALARMAS DESC");
-        if (!$paretoRows) $paretoRows = $db->all("SELECT TOP 20 ALM_TAGNAME,TOTAL_ALARMAS FROM dbo.FIXALARMS_TOP20_ALL ORDER BY TOTAL_ALARMAS DESC");
-        $paretoTotal = 0; foreach ($paretoRows as $r) $paretoTotal += (int)($r['TOTAL_ALARMAS'] ?? 0);
-        $acc = 0; foreach ($paretoRows as $r) { $v=(int)($r['TOTAL_ALARMAS']??0);$acc+=$v;$data['pareto'][]=['tag'=>trim((string)($r['ALM_TAGNAME']??'—')),'value'=>$v,'cum'=>$paretoTotal>0?round(($acc/$paretoTotal)*100,1):0]; }
-        foreach ($db->all("SELECT CONVERT(date,ALM_NATIVETIMEIN) FECHA,DATEPART(HOUR,ALM_NATIVETIMEIN) HORA,COUNT(*) TOTAL FROM dbo.FIXALARMS WHERE ALM_NATIVETIMEIN>=DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(date,ALM_NATIVETIMEIN),DATEPART(HOUR,ALM_NATIVETIMEIN) ORDER BY FECHA,HORA") as $r) {
-            $data['heatmap'][]=['date'=>substr((string)($r['FECHA']??''),0,10),'hour'=>(int)($r['HORA']??0),'value'=>(int)($r['TOTAL']??0)];
-        }
-        foreach ($db->all("SELECT TOP 8 CASE WHEN CHARINDEX('_',ALM_TAGNAME)>0 THEN LEFT(ALM_TAGNAME,CHARINDEX('_',ALM_TAGNAME)-1) ELSE ALM_TAGNAME END INSTALACION,COUNT(*) TOTAL,SUM(CASE WHEN UPPER(ISNULL(ALM_ALMPRIORITY,''))='HIGH' THEN 1 ELSE 0 END) CRITICAS FROM dbo.FIXALARMS_24H WHERE ALM_TAGNAME IS NOT NULL AND LTRIM(RTRIM(ALM_TAGNAME))<>'' GROUP BY CASE WHEN CHARINDEX('_',ALM_TAGNAME)>0 THEN LEFT(ALM_TAGNAME,CHARINDEX('_',ALM_TAGNAME)-1) ELSE ALM_TAGNAME END ORDER BY COUNT(*) DESC") as $r) {
-            $data['installations'][]=['name'=>trim((string)($r['INSTALACION']??'—')),'total'=>(int)($r['TOTAL']??0),'critical'=>(int)($r['CRITICAS']??0)];
-        }
+        /* Modo seguro sin caché: solo tablas acotadas. Nunca agrupar FIXALARMS
+           desde una petición web porque puede bloquear el dashboard. */
         $recognized=(int)($db->scalar("SELECT COUNT(*) FROM dbo.FIXALARMS_RECONOCIDAS")??0);
         $commented=(int)($db->scalar("SELECT COUNT(*) FROM dbo.FIXALARMS_COMENTARIOS WHERE ACTIVO=1 AND COMENTARIO IS NOT NULL AND LTRIM(RTRIM(COMENTARIO))<>''")??0);
     }
@@ -160,7 +129,9 @@ function dashboard_visual_metrics()
     $pending = max(0, $recognized - $commented);
     $data['recognition'] = ['total'=>$recognized,'commented'=>$commented,'pending'=>$pending,'coverage'=>$recognized>0?round(($commented/$recognized)*100,1):0];
 
-    foreach ($db->all("SELECT TOP 20 R.TAG_FIX,R.OPERADOR,CONVERT(varchar(19),R.ALM_NATIVETIMEIN,120) FECHA,R.ALM_DESCR,R.ALM_ALMPRIORITY FROM dbo.FIXALARMS_RECONOCIDAS R WHERE NOT EXISTS (SELECT 1 FROM dbo.FIXALARMS_COMENTARIOS C WHERE C.ACTIVO=1 AND C.TAG_FIX=R.TAG_FIX AND C.OPERADOR=R.OPERADOR AND C.FECHA_RECONOCIMIENTO=R.ALM_NATIVETIMEIN) ORDER BY CASE WHEN UPPER(ISNULL(R.ALM_ALMPRIORITY,''))='HIGH' THEN 0 ELSE 1 END,R.ALM_NATIVETIMEIN DESC") as $r) {
+    /* La lista detallada se carga solo cuando existe caché operativa; sin ella
+       evitamos el NOT EXISTS masivo al abrir la portada. */
+    if ($cache !== null) foreach ($db->all("SELECT TOP 20 R.TAG_FIX,R.OPERADOR,CONVERT(varchar(19),R.ALM_NATIVETIMEIN,120) FECHA,R.ALM_DESCR,R.ALM_ALMPRIORITY FROM dbo.FIXALARMS_RECONOCIDAS R WHERE NOT EXISTS (SELECT 1 FROM dbo.FIXALARMS_COMENTARIOS C WHERE C.ACTIVO=1 AND C.TAG_FIX=R.TAG_FIX AND C.OPERADOR=R.OPERADOR AND C.FECHA_RECONOCIMIENTO=R.ALM_NATIVETIMEIN) ORDER BY CASE WHEN UPPER(ISNULL(R.ALM_ALMPRIORITY,''))='HIGH' THEN 0 ELSE 1 END,R.ALM_NATIVETIMEIN DESC") as $r) {
         $data['pending_comments'][]=['tag'=>trim((string)($r['TAG_FIX']??'')),'operator'=>trim((string)($r['OPERADOR']??'')),'date'=>trim((string)($r['FECHA']??'')),'description'=>trim((string)($r['ALM_DESCR']??'')),'priority'=>trim((string)($r['ALM_ALMPRIORITY']??''))];
     }
     return $data;
