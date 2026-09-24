@@ -33,16 +33,24 @@ $inyeccionAgua = [
     'url' => 'inyeccion_agua.php',
 ];
 
+$alarmasPozos = [
+    ['key' => 'pozos_alarmas24',        'label' => 'Alarmas 24h',             'icon' => 'bell',  'url' => 'pozos_alarmas24.php'],
+    ['key' => 'pozos_alarmas_semanal',  'label' => 'Alarmas semanal',         'icon' => 'chart', 'url' => 'pozos_alarmas_semanal.php'],
+    ['key' => 'pozos_todas_alarmas',    'label' => 'Alarmas por Históricos',  'icon' => 'wave',  'url' => 'pozos_todas_alarmas.php'],
+    ['key' => 'top_pozos',              'label' => 'Top Pozos 24h',           'icon' => 'chart', 'url' => 'top_pozos.php'],
+    ['key' => 'pozos_top20',            'label' => 'Top 20 alarmas',          'icon' => 'chart', 'url' => 'pozos_top20.php'],
+];
+
 $alarmasInstalaciones = [
-    ['key' => 'alarmas24h',      'label' => 'Alarmas 24h',            'icon' => 'bell',  'url' => 'list.php?s=alarmas24h'],
+    ['key' => 'alarmas24h',      'label' => 'Alarmas 24h',            'icon' => 'bell',  'url' => 'list.php?s=alarmas24h&scope=instalaciones'],
     ['key' => 'instalaciones_alarmas_semanal', 'label' => 'Alarmas semanal', 'icon' => 'chart', 'url' => 'instalaciones_alarmas_semanal.php'],
-    ['key' => 'alarmas_activas', 'label' => 'Alarmas por Históricos', 'icon' => 'wave',  'url' => 'list.php?s=alarmas_activas'],
+    ['key' => 'alarmas_activas', 'label' => 'Alarmas por Históricos', 'icon' => 'wave',  'url' => 'list.php?s=alarmas_activas&scope=instalaciones'],
     ['key' => 'pi_historico',    'label' => 'PI Histórico',            'icon' => 'trend', 'url' => 'pi_historico.php'],
-    ['key' => 'suprimidas',      'label' => 'Suprimidas',              'icon' => 'shield','url' => 'list.php?s=suprimidas'],
-    ['key' => 'reconocidas',     'label' => 'Reconocidas',             'icon' => 'check', 'url' => 'list.php?s=reconocidas'],
+    ['key' => 'suprimidas',      'label' => 'Suprimidas',              'icon' => 'shield','url' => 'list.php?s=suprimidas&scope=instalaciones'],
+    ['key' => 'reconocidas',     'label' => 'Reconocidas',             'icon' => 'check', 'url' => 'list.php?s=reconocidas&scope=instalaciones'],
     ['key' => 'reconocidas_usr', 'label' => 'Reconocidas usuario',     'icon' => 'check', 'url' => 'list.php?s=reconocidas_usr'],
     ['key' => 'top20_all',       'label' => 'Top 20 alarmas',          'icon' => 'chart', 'url' => 'instalaciones_top20.php'],
-    ['key' => 'top20_24h',       'label' => 'Top 20 24h',              'icon' => 'chart', 'url' => 'list.php?s=top20_24h'],
+    ['key' => 'top20_24h',       'label' => 'Top 20 24h',              'icon' => 'chart', 'url' => 'list.php?s=top20_24h&scope=instalaciones'],
     ['key' => 'ranking24h',      'label' => 'Ranking 24h',             'icon' => 'chart', 'url' => 'list.php?s=ranking24h'],
     ['key' => 'tendencia_sem',   'label' => 'Tendencia semanal',       'icon' => 'trend', 'url' => 'list.php?s=tendencia_sem'],
     ['key' => 'tend_sem_tags',   'label' => 'Tendencia por tag',       'icon' => 'trend', 'url' => 'list.php?s=tend_sem_tags'],
@@ -76,7 +84,8 @@ $menuItems = [
     ['key'=>'grupo_novedades_semanales','label'=>'Novedades semanales','icon'=>'calendar','children'=>$novedadesSemanales],
     ['key'=>'reportes_guardados','label'=>'REPORTES','icon'=>'file','url'=>'reportes_guardados.php'],
     ['key'=>'comentarios','label'=>'Comentarios','icon'=>'message','url'=>'comentarios.php'],
-    ['key'=>'grupo_instalaciones','label'=>'Alarmas','icon'=>'bell','children'=>$alarmasInstalaciones],
+    ['key'=>'grupo_alarmas_pozos','label'=>'Alarmas de Pozos','icon'=>'oil','children'=>$alarmasPozos],
+    ['key'=>'grupo_instalaciones','label'=>'Alarmas Instalaciones de superficie','icon'=>'bell','children'=>$alarmasInstalaciones],
 ];
 
 $favKeys = json_decode((string)user_pref_get('favorite_pages','[]'), true);
@@ -90,7 +99,7 @@ $favCatalog = [
     'reportes_guardados'=>['REPORTES','file','reportes_guardados.php'],
     'comentarios'=>['Comentarios','message','comentarios.php']
 ];
-foreach (array_merge($telemetriaPozos, $novedadesSemanales, $alarmasInstalaciones) as $n) {
+foreach (array_merge($telemetriaPozos, $novedadesSemanales, $alarmasPozos, $alarmasInstalaciones) as $n) {
     $favCatalog[$n['key']] = [$n['label'], $n['icon'], $n['url']];
 }
 $favCatalog[$inyeccionAgua['key']] = [$inyeccionAgua['label'], $inyeccionAgua['icon'], $inyeccionAgua['url']];
