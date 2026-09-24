@@ -54,6 +54,13 @@ $tagColumn = 'ALM_TAGNAME';
 $descColumn = 'ALM_DESCR';
 $wellColumn = 'ALM_ALMEXTFLD2';
 $dateColumn = 'ALM_NATIVETIMEIN';
+$priorityColumn = 'ALM_ALMPRIORITY';
+$dailyLabels = [];
+$dailyTotals = [];
+$dailyHigh = [];
+$dailyMedium = [];
+$dailyLow = [];
+$dailyOther = [];
 
 if ($db->ok()) {
     $metaRows = $db->all("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='FIXALARMS'");
@@ -66,10 +73,18 @@ if ($db->ok()) {
     $descColumn = $lookup['ALM_DESCR'] ?? ($lookup['ALM_TAGDESC'] ?? $descColumn);
     $wellColumn = $lookup['ALM_ALMEXTFLD2'] ?? $wellColumn;
     $dateColumn = $lookup['ALM_NATIVETIMEIN'] ?? $dateColumn;
+    $priorityColumn = $lookup['ALM_ALMPRIORITY'] ?? $priorityColumn;
 
     $tagExpr = "LTRIM(RTRIM(CONVERT(nvarchar(255), [$tagColumn])))";
     $wellExpr = "LTRIM(RTRIM(CONVERT(nvarchar(255), [$wellColumn])))";
     $descExpr = "LTRIM(RTRIM(CONVERT(nvarchar(1000), [$descColumn])))";
+    $priorityExpr = "UPPER(LTRIM(RTRIM(CONVERT(nvarchar(100), [$priorityColumn]))))";
+    $priorityClass = "CASE
+        WHEN $priorityExpr LIKE '%CRIT%' OR $priorityExpr IN ('HIGH','HI','ALTA') THEN 'Alta'
+        WHEN $priorityExpr IN ('MEDIUM','MED','MEDIA') THEN 'Media'
+        WHEN $priorityExpr IN ('LOW','LO','BAJA','INFO') THEN 'Baja'
+        ELSE 'Otra'
+    END";
     $conditions = ["[$tagColumn] IS NOT NULL", "$tagExpr <> ''", "[$wellColumn] IS NOT NULL", "$wellExpr <> ''", "[$dateColumn] >= CONVERT(datetime2, ?, 126)", "[$dateColumn] < CONVERT(datetime2, ?, 126)"];
     $params = [$fromSql, $toSqlExclusive];
     if ($prefix !== '') {
@@ -102,6 +117,39 @@ if ($db->ok()) {
     }
     if ($total > 0) $top5Pct = $top5Count * 100 / $total;
 
+    /* Equivalente semanal de los gráficos de Top Pozos 24h:
+       volumen por día y criticidad por día para la semana miércoles-martes. */
+    $dayNames = [1=>'Lun',2=>'Mar',3=>'Mié',4=>'Jue',5=>'Vie',6=>'Sáb',7=>'Dom'];
+    $dayMap = [];
+    for ($dayOffset = 0; $dayOffset < 7; $dayOffset++) {
+        $dayDate = $selectedWeek['start']->modify('+' . $dayOffset . ' days');
+        $dayKey = $dayDate->format('Y-m-d');
+        $dayMap[$dayKey] = ['Alta'=>0,'Media'=>0,'Baja'=>0,'Otra'=>0,'Total'=>0];
+        $dailyLabels[] = ($dayNames[(int)$dayDate->format('N')] ?? $dayDate->format('D')) . ' ' . $dayDate->format('d/m');
+    }
+    $dailyRows = $db->all(
+        "SELECT CONVERT(varchar(10),CONVERT(date,[$dateColumn]),23) AS fecha, $priorityClass AS clase, COUNT(*) AS cantidad " .
+        "FROM $table $where " .
+        "GROUP BY CONVERT(date,[$dateColumn]), $priorityClass ORDER BY CONVERT(date,[$dateColumn])",
+        $params
+    );
+    foreach ($dailyRows as $dailyRow) {
+        $dayKey = trim((string)($dailyRow['fecha'] ?? $dailyRow['FECHA'] ?? ''));
+        if (!isset($dayMap[$dayKey])) continue;
+        $class = trim((string)($dailyRow['clase'] ?? $dailyRow['CLASE'] ?? 'Otra'));
+        if (!isset($dayMap[$dayKey][$class])) $class = 'Otra';
+        $count = (int)($dailyRow['cantidad'] ?? $dailyRow['CANTIDAD'] ?? 0);
+        $dayMap[$dayKey][$class] += $count;
+        $dayMap[$dayKey]['Total'] += $count;
+    }
+    foreach ($dayMap as $dayCounts) {
+        $dailyTotals[] = $dayCounts['Total'];
+        $dailyHigh[] = $dayCounts['Alta'];
+        $dailyMedium[] = $dayCounts['Media'];
+        $dailyLow[] = $dayCounts['Baja'];
+        $dailyOther[] = $dayCounts['Otra'];
+    }
+
     if (($canViewComments || $canCreateComments) && $rows) {
         $commentSubjects = [];
         foreach ($rows as $commentSourceRow) {
@@ -118,17 +166,25 @@ if ($db->ok()) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Top 20 Pozos · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260924-pozos-top20-comment-1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-pozos-top20-charts-1">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
+  <script src="assets/js/chart.umd.js"></script>
   <style>
     .pt20Toolbar{display:grid;grid-template-columns:minmax(170px,.4fr) minmax(300px,.8fr) minmax(270px,.62fr) auto auto auto;gap:12px;align-items:center;margin-bottom:15px}
     .pt20Input{display:flex;align-items:center;gap:9px;background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:10px;min-height:42px;padding:0 12px;overflow:hidden}.pt20Input svg{width:16px!important;height:16px!important;min-width:16px!important;max-width:16px!important;display:block!important}.pt20Input span{font-size:10px;font-weight:800;letter-spacing:.7px;color:var(--text-mut);text-transform:uppercase}.pt20Input input,.pt20Input select{border:0;outline:0;background:transparent;color:var(--text);font:inherit;min-width:0;flex:1}
     .pt20Week{display:flex;align-items:center;gap:9px;background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:10px;min-height:42px;padding:0 12px}.pt20Week span{font-size:9px;font-weight:800;letter-spacing:.7px;color:var(--text-mut);text-transform:uppercase}.pt20Week select{border:0;outline:0;background:transparent;color:var(--text);font:inherit;min-width:190px;flex:1}.pt20Cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}
+    .pt20Charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
+    .pt20Chart{background:#fff;border:1px solid var(--line-mid);border-top:3px solid var(--petrol);border-radius:14px;padding:16px;min-width:0}
+    .pt20Chart__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .pt20Chart__head small{display:block;color:var(--text-mut);font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;margin-bottom:4px}
+    .pt20Chart__head h3{font-family:var(--font-head);font-size:20px;color:var(--text);margin:0}
+    .pt20Chart__hint{font-size:11px;color:var(--text-mut);border:1px solid var(--line-mid);border-radius:999px;padding:5px 9px;white-space:nowrap}
+    .pt20Chart__canvas{height:300px;position:relative}
     .pt20Table .tagAnchor{font-weight:700;color:var(--petrol);text-decoration:underline;text-decoration-color:rgba(26,77,92,.28);text-underline-offset:3px}
     .pt20CommentButton{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:38px;height:31px;padding:0 10px;border:1px solid var(--line-mid);border-radius:8px;background:var(--surface,#fff);color:var(--petrol);cursor:pointer}.pt20CommentButton svg{width:15px;height:15px}.pt20CommentButton:hover,.pt20CommentButton:focus-visible{border-color:var(--petrol);background:var(--petrol-soft);outline:0}.pt20CommentButton.has-comment{background:var(--petrol);border-color:var(--petrol);color:#fff}.pt20CommentButton__dot{display:none;width:7px;height:7px;border-radius:50%;background:#38d58b}.pt20CommentButton.has-comment .pt20CommentButton__dot{display:block}
     .pt20CommentCell{display:flex;align-items:center;gap:9px;min-width:280px;max-width:520px}.pt20CommentCell__text{flex:1;min-width:0;white-space:normal;line-height:1.35;color:var(--text-soft)}.pt20CommentCell__text.has-comment{color:var(--text);font-weight:600}.pt20CommentCell .alarmCell{flex:0 0 auto}.pt20CommentCell .alarmCell__actions{margin-left:0}
     .pt20CommentOverlay{position:fixed;inset:0;z-index:151;background:rgba(12,35,44,.45);backdrop-filter:blur(3px)}.pt20CommentModal{position:fixed;z-index:152;left:50%;top:50%;width:min(590px,calc(100vw - 28px));transform:translate(-50%,-46%) scale(.985);background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:18px;box-shadow:0 28px 72px rgba(12,35,44,.32);opacity:0;pointer-events:none;transition:.17s ease;overflow:hidden}.pt20CommentModal.is-open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}.pt20CommentModal__head{display:flex;justify-content:space-between;gap:18px;padding:20px 22px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(26,77,92,.08),transparent)}.pt20CommentModal__eyebrow{margin-bottom:4px;color:var(--text-mut);font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase}.pt20CommentModal h2{margin:0;color:var(--petrol);font-family:var(--font-head);font-size:26px}.pt20CommentModal__head p{margin:5px 0 0;color:var(--text-soft);font-size:12px}.pt20CommentModal__close{width:38px;height:38px;border:1px solid var(--line-mid);border-radius:10px;background:var(--surface,#fff);color:var(--text-soft);font-size:24px;cursor:pointer}.pt20CommentModal__body{padding:18px 22px}.pt20CommentModal__body label{display:block;margin-bottom:7px;color:var(--text-soft);font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}.pt20CommentModal textarea{width:100%;min-height:145px;resize:vertical;border:1px solid var(--line-mid);border-radius:11px;padding:11px 13px;background:var(--surface,#fff);color:var(--text);font:inherit;line-height:1.5;outline:0}.pt20CommentModal textarea:focus{border-color:var(--petrol);box-shadow:0 0 0 3px var(--petrol-soft)}.pt20CommentModal__previous,.pt20CommentModal__status{margin-bottom:12px;padding:10px 12px;border-radius:10px;font-size:12px}.pt20CommentModal__previous{border:1px solid #cae4d6;background:#f2fbf6;color:var(--green-tx)}.pt20CommentModal__status{margin:10px 0 0;background:#eef6f9;color:var(--petrol)}.pt20CommentModal__status.is-error{background:#fff1ef;color:var(--red)}.pt20CommentModal__status.is-ok{background:#edf9f3;color:var(--green-tx)}.pt20CommentModal__foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 20px}.pt20CommentModal__foot button{min-height:40px;padding:0 15px;border-radius:10px;font:inherit;cursor:pointer}.pt20CommentModal__cancel{border:1px solid var(--line-mid);background:var(--surface,#fff);color:var(--text)}.pt20CommentModal__save{border:0;background:var(--petrol);color:#fff;font-weight:700}.pt20CommentModal__save:disabled{opacity:.58;cursor:wait}body.has-pt20-comment{overflow:hidden}
-    @media(max-width:1200px){.pt20Toolbar{grid-template-columns:1fr 1fr}.pt20Cards{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:1200px){.pt20Toolbar{grid-template-columns:1fr 1fr}.pt20Cards{grid-template-columns:repeat(2,1fr)}.pt20Charts{grid-template-columns:1fr}}
     @media(max-width:700px){.pt20Toolbar,.pt20Cards{grid-template-columns:1fr}}
   </style>
 </head>
@@ -163,6 +219,23 @@ if ($db->ok()) {
         <article class="stat acc-red"><div class="stat__label">TAG más frecuente</div><div class="stat__value is-red" style="font-size:18px"><?php echo h($topTag !== '' ? $topTag : 'Sin datos'); ?></div><div class="stat__detail"><b><?php echo pt20_num($topTagCount); ?></b> alarmas.</div></article>
         <article class="stat acc-green"><div class="stat__label">Pozo principal</div><div class="stat__value is-green" style="font-size:18px"><?php echo h($topWell !== '' ? $topWell : 'Sin datos'); ?></div><div class="stat__detail"><b><?php echo pt20_num($topWellCount); ?></b> registros.</div></article>
         <article class="stat acc-amber"><div class="stat__label">Concentración del Top 5</div><div class="stat__value is-amber"><?php echo pt20_pct($top5Pct); ?></div><div class="stat__detail">Los cinco TAG principales concentran <b><?php echo pt20_num($top5Count); ?></b> alarmas.</div></article>
+      </section>
+
+      <section class="pt20Charts" aria-label="Gráficos semanales de alarmas de pozos">
+        <article class="pt20Chart">
+          <div class="pt20Chart__head">
+            <div><small>Volumen diario</small><h3>Total de alarmas por día</h3></div>
+            <span class="pt20Chart__hint"><?php echo h(date('d/m', strtotime($fromDate))); ?> — <?php echo h(date('d/m', strtotime($toDate))); ?></span>
+          </div>
+          <div class="pt20Chart__canvas"><canvas id="pt20DailyTotal"></canvas></div>
+        </article>
+        <article class="pt20Chart">
+          <div class="pt20Chart__head">
+            <div><small>Criticidad diaria</small><h3>Alta, media y baja</h3></div>
+            <span class="pt20Chart__hint">Comparación semanal</span>
+          </div>
+          <div class="pt20Chart__canvas"><canvas id="pt20DailyPriority"></canvas></div>
+        </article>
       </section>
 
       <div class="tablewrap">
@@ -205,5 +278,49 @@ if ($db->ok()) {
 <section class="piModal" id="piModal" aria-hidden="true" aria-labelledby="piModalTitle"><div class="piModal__head"><div><div class="piModal__eyebrow">Vista rápida</div><h2 id="piModalTitle">PI Histórico</h2><p class="piModal__sub">Tendencia y referencias SQL existentes.</p></div><div class="piModal__actions"><a class="piModal__link" id="piModalOpenPage" href="pi_historico.php" target="_blank" rel="noopener">Abrir página completa</a><button type="button" class="piModal__close" id="piModalClose" aria-label="Cerrar PI Histórico">×</button></div></div><div class="piModal__body"><iframe id="piModalFrame" class="piModal__frame" src="about:blank" title="PI Histórico embebido" loading="lazy"></iframe></div></section>
 <script src="assets/js/app.js?v=20260924-columns-1"></script>
 <script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
+<script>
+(function(){
+  if(typeof Chart==='undefined')return;
+  var labels=<?php echo json_encode($dailyLabels, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+  var common={
+    responsive:true,
+    maintainAspectRatio:false,
+    plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}}},
+    scales:{
+      x:{grid:{color:'rgba(26,77,92,.06)'},ticks:{color:'#607487'}},
+      y:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'},ticks:{color:'#607487',precision:0}}
+    }
+  };
+  var totalCanvas=document.getElementById('pt20DailyTotal');
+  if(totalCanvas)new Chart(totalCanvas,{
+    type:'line',
+    data:{labels:labels,datasets:[{
+      label:'Total por día',
+      data:<?php echo json_encode($dailyTotals); ?>,
+      borderColor:'#1a4d5c',
+      backgroundColor:'rgba(26,77,92,.12)',
+      borderWidth:3,
+      pointRadius:4,
+      tension:.28,
+      fill:true
+    }]},
+    options:common
+  });
+  var priorityCanvas=document.getElementById('pt20DailyPriority');
+  if(priorityCanvas)new Chart(priorityCanvas,{
+    type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'Alta',data:<?php echo json_encode($dailyHigh); ?>,backgroundColor:'rgba(239,68,68,.78)',borderRadius:5},
+      {label:'Media',data:<?php echo json_encode($dailyMedium); ?>,backgroundColor:'rgba(245,158,11,.78)',borderRadius:5},
+      {label:'Baja',data:<?php echo json_encode($dailyLow); ?>,backgroundColor:'rgba(16,185,129,.72)',borderRadius:5},
+      {label:'Otra',data:<?php echo json_encode($dailyOther); ?>,backgroundColor:'rgba(100,116,139,.55)',borderRadius:5}
+    ]},
+    options:Object.assign({},common,{scales:{
+      x:{stacked:true,grid:{display:false},ticks:{color:'#607487'}},
+      y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'},ticks:{color:'#607487',precision:0}}
+    }})
+  });
+})();
+</script>
 </body>
 </html>
