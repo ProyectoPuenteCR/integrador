@@ -17,17 +17,14 @@ $db=clear_db();
 $reportReady=$db->ok()&&ns_report_ready($db)&&permissions_can_menu('novedades_semanales_reporte');
 
 $defs=[
-    'BM'=>['view'=>'BM_RTQP','well'=>'POZO','battery'=>'BATERIA','comm'=>null,'date'=>'Fecha','state'=>'ESTADO','general'=>'ESTADO-GRAL','url'=>'monitoreo_pozos.php'],
-    'PCP'=>['view'=>'PCP_RTQP','well'=>'POZO','battery'=>'BATERIA','comm'=>'YAT:COM','date'=>null,'state'=>'YT:POZO','general'=>null,'url'=>'telemetria_pcp.php'],
-    'BES'=>['view'=>'BES_RTQP','well'=>'POZO','battery'=>'BATERIA','comm'=>'YAT:COM','date'=>'FEHA','state'=>'ESTADO','general'=>null,'url'=>'telemetria_bes.php'],
-    'TECCS'=>['view'=>'TECSS_RTQP','well'=>'POZO','battery'=>'BATERIA','comm'=>'YAT:COM','date'=>'HOY','state'=>'ESTADO','general'=>null,'url'=>'telemetria_tecss.php']
+    'SCADA'=>['url'=>'telemetria_general.php?tipo=SCADA'],
+    'TECSS'=>['url'=>'telemetria_tecss.php']
 ];
 
-function dp_q($x){return '['.str_replace(']',']]', $x).']';}
 function dp_comm($v){
     $x=strtoupper(trim((string)$v));
     if($x==='')return 'Sin dato';
-    if(preg_match('/BAD|FALL|NO DATA|DESC|ERROR/',$x)||$x==='0')return 'Sin comunicación';
+    if(preg_match('/BAD|FALL|NO DATA|DESC|ERROR|SIN COM|NO COM/',$x)||$x==='0')return 'Sin comunicación';
     if(preg_match('/INTER|DEMOR/',$x))return 'Intermitente';
     return 'Comunicando';
 }
@@ -44,43 +41,10 @@ function dp_prod($value){
 }
 function dp_clean_error($value){
     $text=html_entity_decode((string)$value,ENT_QUOTES|ENT_HTML5,'UTF-8');
-    $text=preg_replace('~<br\s*/?>~i',' · ',$text);
+    $text=preg_replace('~<br\\s*/?>~i',' · ',$text);
     $text=strip_tags($text);
-    $text=preg_replace('/\s+/u',' ',$text);
+    $text=preg_replace('/\\s+/u',' ',$text);
     return trim($text);
-}
-function dp_pcp_rows($db,&$error=''){
-    /*
-     * Bypass exclusivo para la pantalla: la vista local dbo.PCP_RTQP solicita
-     * PANTALLA, pero la vista RTQP unificada ya no publica esa columna.
-     * Se consulta el linked server directamente sin modificar SQL persistente.
-     */
-    $sql=<<<'SQL'
-SELECT TOP (2000)
-    POZO,
-    BATERIA,
-    [YAT:COM],
-    [YT:POZO]
-FROM OPENQUERY([RTQP_IUP], '
-    SELECT
-        POZO,
-        BATERIA,
-        [YAT:COM],
-        [YT:POZO]
-    FROM [IUP].[pozos_IUP].[PCP]
-')
-SQL;
-    $rows=$db->all($sql);
-    if($rows)return $rows;
-
-    $primaryError=dp_clean_error($db->error());
-
-    /* Respaldo visual con la caché general, si todavía contiene datos PCP. */
-    $fallback=$db->all("SELECT TOP (2000) [POZO],[BATERIA],[COMUNICACION] AS [YAT:COM],[ESTADO] AS [YT:POZO] FROM dbo.TELEMETRIA_POZOS_GENERAL_CACHE WHERE UPPER(LTRIM(RTRIM(CONVERT(nvarchar(50),[TIPO]))))='PCP'");
-    if($fallback)return $fallback;
-
-    if($primaryError!==''&&preg_match('/PISQLClient|OPENQUERY|OLE DB|linked server|RTQP/i',$primaryError))$error=$primaryError;
-    return [];
 }
 
 $summary=[];
@@ -88,44 +52,52 @@ $all=[];
 $bats=[];
 $last=null;
 $errors=[];
-
 foreach($defs as $type=>$d){
-    $fields=[$d['well'],$d['battery']];
-    foreach(['comm','date','state','general'] as $k)if(!empty($d[$k]))$fields[]=$d[$k];
-    $fields=array_values(array_unique($fields));
-
-    if($type==='PCP'){
-        $pcpError='';
-        $rows=dp_pcp_rows($db,$pcpError);
-        if(!$rows&&$pcpError!=='')$errors[$type]=$pcpError;
-    }else{
-        $sql='SELECT TOP (2000) '.implode(',',array_map('dp_q',$fields)).' FROM dbo.'.$d['view'];
-        $rows=$db->all($sql);
-        if(!$rows&&$db->error())$errors[$type]=dp_clean_error($db->error());
-    }
-
-    $w=[];
-    $comm=['Comunicando'=>0,'Intermitente'=>0,'Sin comunicación'=>0,'Sin dato'=>0];
-    $st=['En marcha'=>0,'Parado'=>0,'En falla'=>0,'Desconocido'=>0];
-
-    foreach($rows as $r){
-        $pozo=trim((string)($r[$d['well']]??''));
-        if($pozo==='')continue;
-        $w[$pozo]=1;
-        $bat=trim((string)($r[$d['battery']]??''));
-        if($bat!=='')$bats[$bat]=1;
-        $cv=$d['comm']?dp_comm($r[$d['comm']]??''):'Comunicando';
-        $sv=dp_state($r[$d['general']??'']??($r[$d['state']]??''));
-        $comm[$cv]++;
-        $st[$sv]++;
-        $dt=$d['date']?strtotime((string)($r[$d['date']]??'')):0;
-        if($dt&&(!$last||$dt>$last))$last=$dt;
-        $all[]=['pozo'=>$pozo,'tipo'=>$type,'bateria'=>$bat,'comm'=>$cv,'state'=>$sv,'date'=>$dt];
-    }
-    $summary[$type]=['count'=>count($w),'comm'=>$comm,'state'=>$st,'url'=>$d['url']];
+    $summary[$type]=[
+        'count'=>0,
+        'comm'=>['Comunicando'=>0,'Intermitente'=>0,'Sin comunicación'=>0,'Sin dato'=>0],
+        'state'=>['En marcha'=>0,'Parado'=>0,'En falla'=>0,'Desconocido'=>0],
+        'url'=>$d['url']
+    ];
 }
 
-$total=array_sum(array_column($summary,'count'));
+$cacheReady=$db->ok() && (int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.TELEMETRIA_POZOS_GENERAL_CACHE',N'U') IS NULL THEN 0 ELSE 1 END")===1;
+$telemetryRows=[];
+if($cacheReady){
+    $telemetryRows=$db->all(
+        "SELECT TOP (5000) POZO,BATERIA,TIPO,COMUNICACION,ESTADO,FECHA_CACHE " .
+        "FROM dbo.TELEMETRIA_POZOS_GENERAL_CACHE WHERE POZO IS NOT NULL AND LTRIM(RTRIM(CONVERT(nvarchar(255),POZO)))<>'' " .
+        "ORDER BY POZO"
+    );
+}else{
+    $errors['CACHE']='No está disponible TELEMETRIA_POZOS_GENERAL_CACHE. Se evitó consultar RTQP/OPENQUERY desde el dashboard para no bloquear la página.';
+}
+
+$seenByType=[];
+$seenAll=[];
+foreach($telemetryRows as $r){
+    $pozo=trim((string)($r['POZO']??''));
+    if($pozo==='')continue;
+    $rawType=strtoupper(trim((string)($r['TIPO']??'')));
+    $type=in_array($rawType,['TECSS','TECCS'],true)?'TECSS':'SCADA';
+    $key=strtoupper($pozo);
+    if(isset($seenByType[$type][$key]))continue;
+    $seenByType[$type][$key]=1;
+    $seenAll[$key]=1;
+
+    $bat=trim((string)($r['BATERIA']??''));
+    if($bat!=='')$bats[$bat]=1;
+    $cv=dp_comm($r['COMUNICACION']??'');
+    $sv=dp_state($r['ESTADO']??'');
+    $summary[$type]['count']++;
+    $summary[$type]['comm'][$cv]++;
+    $summary[$type]['state'][$sv]++;
+    $dt=strtotime((string)($r['FECHA_CACHE']??''))?:0;
+    if($dt&&(!$last||$dt>$last))$last=$dt;
+    $all[]=['pozo'=>$pozo,'tipo'=>$type,'bateria'=>$bat,'comm'=>$cv,'state'=>$sv,'date'=>$dt];
+}
+
+$total=count($seenAll);
 $commTot=['Comunicando'=>0,'Intermitente'=>0,'Sin comunicación'=>0,'Sin dato'=>0];
 $stateTot=['En marcha'=>0,'Parado'=>0,'En falla'=>0,'Desconocido'=>0];
 foreach($summary as $s){
@@ -311,7 +283,7 @@ if($reportReady){
 <main class="main">
 <?php include __DIR__.'/includes/topbar.php';?>
 <div class="page__head">
-    <div><h1 class="page__title">Dashboard Pozos</h1><div class="page__sub">Resumen general de telemetría de pozos</div></div>
+    <div><h1 class="page__title">Dashboard Pozos</h1><div class="page__sub">Resumen general desde caché local de telemetría · sin consultas RTQP en línea</div></div>
     <div class="dashboardReportHead"><div class="page__live"><span class="dot"></span>Actualización automática · 30 s</div><?php if($reportReady): ?><div class="dashboardReportTools"><label class="dashboardReportToggle"><input type="checkbox" data-dashboard-report-toggle><span data-dashboard-report-label>Incluir resumen completo</span></label><button type="button" class="nsButton is-secondary" data-ns-report-open>Ver reporte <span data-ns-report-count class="nsReportCount" hidden>0</span></button></div><small class="dashboardReportStatus" data-dashboard-report-status></small><?php endif; ?></div>
 </div>
 <section class="dp">
@@ -319,7 +291,7 @@ if($reportReady){
 
 <div class="dp-kpis">
     <a class="dp-card" style="--accent:#1683e2" href="monitoreo_pozos.php"><span>Total de pozos</span><b><?php echo $total;?></b><small>Pozos con telemetría</small></a>
-    <?php $colors=['BM'=>'#1683e2','PCP'=>'#32ad4c','BES'=>'#ef8b00','TECCS'=>'#805ad5'];foreach($summary as $t=>$s):?>
+    <?php $colors=['SCADA'=>'#1683e2','TECSS'=>'#805ad5'];foreach($summary as $t=>$s):?>
     <a class="dp-card" style="--accent:<?php echo $colors[$t];?>" href="<?php echo h($s['url']);?>"><span>Pozos <?php echo h($t);?></span><b><?php echo $s['count'];?></b><small><?php echo $total?round($s['count']*100/$total,1):0;?>% del total</small></a>
     <?php endforeach;?>
     <a class="dp-card" style="--accent:#ef4444" href="monitoreo_pozos.php?comunicacion=Sin%20comunicaci%C3%B3n"><span>Sin comunicación</span><b><?php echo $commTot['Sin comunicación'];?></b><small><?php echo round($commTot['Sin comunicación']*100/$den,1);?>% de registros</small></a>
@@ -359,8 +331,8 @@ if($reportReady){
 <div class="dp-bottom">
     <div class="dp-card dp-mini"><span>Baterías activas</span><b><?php echo count($bats);?></b><small>Con al menos un pozo</small></div>
     <div class="dp-card dp-mini" style="--accent:#35b45a"><span>Comunicación promedio</span><b><?php echo $pComm;?>%</b><small>Disponibilidad general</small></div>
-    <div class="dp-card dp-mini"><span>Última actualización</span><b style="font-size:20px"><?php echo $last?date('d/m H:i:s',$last):'Sin fecha';?></b><small>Datos RTQP</small></div>
-    <div class="dp-card dp-mini" style="--accent:#805ad5"><span>Registros procesados</span><b><?php echo count($all);?></b><small>Vistas RTQP</small></div>
+    <div class="dp-card dp-mini"><span>Última actualización</span><b style="font-size:20px"><?php echo $last?date('d/m H:i:s',$last):'Sin fecha';?></b><small>Caché SQL local</small></div>
+    <div class="dp-card dp-mini" style="--accent:#805ad5"><span>Registros procesados</span><b><?php echo count($all);?></b><small>Caché de telemetría</small></div>
 </div>
 </section>
 </main>
