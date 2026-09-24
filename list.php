@@ -1194,6 +1194,7 @@ function url_without($keys) {
           </div>
           <?php if (auth_es_admin()):
             $exportParams = ['s' => $key];
+            if ($alarmScope !== '') $exportParams['scope'] = $alarmScope;
             if ($q !== '') $exportParams['q'] = $q;
             if ($filterZone !== '') $exportParams['zona'] = $filterZone;
             if ($filterInstallation !== '') $exportParams['instalacion'] = $filterInstallation;
