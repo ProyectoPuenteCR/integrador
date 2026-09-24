@@ -53,6 +53,8 @@ $filterStatus       = trim($_GET['estado'] ?? '');
 $filterPriority     = trim($_GET['prioridad'] ?? '');
 $filterValue        = trim($_GET['valor'] ?? '');
 $filterInstallationType = trim($_GET['tipo_instalacion'] ?? '');
+$alarmScope = strtolower(trim((string)($_GET['scope'] ?? '')));
+if (!in_array($alarmScope, ['instalaciones','pozos'], true)) $alarmScope = '';
 $columnFiltersRaw = isset($_GET['col']) && is_array($_GET['col']) ? $_GET['col'] : [];
 $filterFrom     = trim($_GET['fecha_desde'] ?? '');
 $filterFromTime = trim($_GET['hora_desde'] ?? '');
@@ -382,7 +384,7 @@ if ($sc) {
             $q, $sc, $filterZone, $filterInstallation, $installationExpr, $filterValue, $valueField,
             $filterStatus, $statusField, $filterPriority, $priorityField,
             $dateField, $filterFrom, $filterFromTime, $filterTo, $filterToTime,
-            $filterInstallationType, $installationTypeExpr, $columnFilters
+            $filterInstallationType, $installationTypeExpr, $columnFilters, $alarmScope
         ) {
             $localConditions = [];
             $localParams = [];
@@ -404,6 +406,14 @@ if ($sc) {
             if ($filterInstallation !== '' && $installationExpr !== '') {
                 $localConditions[] = "$installationExpr = ?";
                 $localParams[] = $filterInstallation;
+            }
+
+            if ($alarmScope !== '' && $installationTypeExpr !== '') {
+                if ($alarmScope === 'pozos') {
+                    $localConditions[] = "$installationTypeExpr = N'POZO'";
+                } else {
+                    $localConditions[] = "$installationTypeExpr <> N'POZO'";
+                }
             }
 
             if ($filterInstallationType !== '' && $installationTypeExpr !== '') {
@@ -460,7 +470,7 @@ if ($sc) {
         $conditions = $mainFilterSql['conditions'];
         $params = $mainFilterSql['params'];
         $where = $mainFilterSql['where'];
-        $useAlarmas24CacheSummary = $key === 'alarmas24h' && $performanceCacheAvailable &&
+        $useAlarmas24CacheSummary = $key === 'alarmas24h' && $performanceCacheAvailable && $alarmScope === '' &&
             $q === '' && $filterZone === '' && $filterInstallation === '' && $filterStatus === '' &&
             $filterPriority === '' && $filterValue === '' && $filterInstallationType === '' && !$columnFilters && $filterFrom === '' && $filterTo === '';
 
