@@ -112,7 +112,7 @@ $pComm=round($commTot['Comunicando']*100/$den,1);
    Se cruza por nombre de POZO y se evita duplicar pozos que aparezcan en
    mas de un tipo de telemetria.
 ============================================================= */
-$productionMap=clear_q164_latest_map($db);
+$productionMap=$all ? clear_q164_latest_map($db) : [];
 $telemetryWells=[];
 foreach($all as $row){
     $key=clear_q164_well_key($row['pozo']);
