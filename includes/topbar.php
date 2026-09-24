@@ -9,7 +9,7 @@ require_once __DIR__ . '/permissions.php';
 ?>
 <link rel="stylesheet" href="assets/css/print.css?v=20260824-pdf1" media="all">
 <link rel="stylesheet" href="assets/css/chart_preferences.css?v=20260826-chartprefs-2" media="all">
-<link rel="stylesheet" href="assets/css/grid_tools.css?v=20260826-gridtools-1" media="all">
+<link rel="stylesheet" href="assets/css/grid_tools.css?v=20260924-columns-1" media="all">
 <div class="topbar">
   <div class="topbar__spacer"></div>
   <a class="topmenu__btn topmenu__btn--link" href="inicio.php" title="Ir a la pantalla principal" style="margin-right:8px"><?php echo icon('home'); ?><span>Inicio</span></a>
@@ -74,7 +74,7 @@ require_once __DIR__ . '/permissions.php';
 (function(){var b=document.getElementById('favoritePageBtn');if(!b)return;var active=<?php echo json_encode($ACTIVE ?? ''); ?>;var favs=<?php echo json_encode(array_values($favList)); ?>;b.onclick=function(){var i=favs.indexOf(active);if(i>=0)favs.splice(i,1);else favs.push(active);var fd=new FormData();fd.append('key','favorite_pages');fd.append('value',JSON.stringify(favs));fetch('user_prefs_api.php',{method:'POST',body:fd}).then(function(){document.getElementById('favoritePageIcon').textContent=favs.indexOf(active)>=0?'★':'☆';});};})();
 </script>
 <script src="assets/js/chart_preferences.js?v=20260826-chartprefs-perf-safe-3"></script>
-<script src="assets/js/grid_tools.js?v=20260826-gridtools-perf-safe-2" defer></script>
+<script src="assets/js/grid_tools.js?v=20260924-columns-1" defer></script>
 <script>
 (function(){var b=document.getElementById('densityBtn'),l=document.getElementById('densityLabel');if(!b)return;var modes=['normal','compact','comfortable'];var names={normal:'Normal',compact:'Compacta',comfortable:'Ampliada'};var mode=localStorage.getItem('clear_table_density')||'normal';function apply(){document.documentElement.setAttribute('data-density',mode);if(l)l.textContent=names[mode]||'Vista';}apply();b.addEventListener('click',function(){mode=modes[(modes.indexOf(mode)+1)%modes.length];localStorage.setItem('clear_table_density',mode);apply();});})();
 </script>
