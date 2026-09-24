@@ -228,7 +228,7 @@ $hasFilters = $tagSearch !== '' || $descSearch !== '' || $dateFrom !== '' || $da
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Todas las alarmas · Instalaciones · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260803-grid1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-columns-1">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
   <link rel="stylesheet" href="assets/css/installation_type.css?v=20260824-2">
   <style>
@@ -407,7 +407,7 @@ $hasFilters = $tagSearch !== '' || $descSearch !== '' || $dateFrom !== '' || $da
 <script>
 window.CLEAR_ALL_ALARMS_COLUMNS = <?php echo json_encode(array_map(function($column){return $column==='__TIPO_INSTALACION'?'TIPO DE INSTALACIÓN':$column;},$displayColumns), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
-<script src="assets/js/app.js?v=20260716-msgfilters1"></script>
+<script src="assets/js/app.js?v=20260924-columns-1"></script>
 <script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
 <script src="assets/js/todas_alarmas.js?v=20260716-msgfilters1"></script>
 <script>
