@@ -37,7 +37,9 @@ $nextWeekDate = $week['start']->modify('+7 days')->format('Y-m-d');
 $canGoNextWeek = $week['start'] < $currentWeek['start'];
 $filters = as_build_filters($AS_TYPE, $_GET, $week);
 $installationTypeOptions = as_installation_type_options();
+if (!$isWells) unset($installationTypeOptions['POZO']);
 if ($AS_UNIFIED && $isWells) $filters['installation_type'] = 'POZO';
+if (!$isWells && $filters['installation_type'] === 'POZO') $filters['installation_type'] = '';
 $selectedInstallationTypeLabel = $filters['installation_type'] !== '' ? ($installationTypeOptions[$filters['installation_type']] ?? '') : '';
 $historyRangeStart = $filters['range_from'];
 $historyRangeEnd = (new DateTimeImmutable($filters['range_to']))->modify('-1 second')->format('Y-m-d\TH:i:s');
@@ -82,8 +84,10 @@ if (!$cacheSupportsInstallationType) {
 }
 
 if ($db->ok() && $cacheReady) {
+    $surfaceCacheCondition = (!$isWells && $cacheSupportsInstallationType) ? "UPPER(ISNULL(TIPO_INSTALACION,N''))<>N'POZO'" : '';
     $params = [];
     $conditions = as_cache_conditions($AS_TYPE, $chartFilters, $params);
+    if ($surfaceCacheCondition !== '') $conditions[] = $surfaceCacheCondition;
     $where = 'WHERE ' . implode(' AND ', $conditions);
 
     foreach ($db->all("SELECT CONVERT(varchar(10),FECHA,23) AS FECHA,SUM(TOTAL) AS TOTAL FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE $where GROUP BY FECHA ORDER BY FECHA", $params) as $row) {
@@ -98,7 +102,8 @@ if ($db->ok() && $cacheReady) {
     $cacheUpdated = (string)$db->scalar("SELECT CONVERT(varchar(19),MAX(FECHA_ACTUALIZACION),120) FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE WHERE TIPO=?", [$AS_TYPE]);
 
     $entityParams = [$AS_TYPE, $filters['from'], $filters['to_exclusive']];
-    foreach ($db->all("SELECT DISTINCT ENTIDAD FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE WHERE TIPO=? AND FECHA>=CONVERT(date,?,23) AND FECHA<CONVERT(date,?,23) AND ENTIDAD<>N'' ORDER BY ENTIDAD", $entityParams) as $row) {
+    $entitySurfaceSql = $surfaceCacheCondition !== '' ? " AND $surfaceCacheCondition" : '';
+    foreach ($db->all("SELECT DISTINCT ENTIDAD FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE WHERE TIPO=? AND FECHA>=CONVERT(date,?,23) AND FECHA<CONVERT(date,?,23) AND ENTIDAD<>N''$entitySurfaceSql ORDER BY ENTIDAD", $entityParams) as $row) {
         $entity = trim((string)as_value($row, 'ENTIDAD'));
         if ($entity !== '') $entities[] = $entity;
     }
@@ -117,6 +122,7 @@ if ($db->ok() && $cacheReady) {
         } else {
             $countParams = [];
             $countConditions = as_cache_conditions($AS_TYPE, $cacheFilters, $countParams);
+            if ($surfaceCacheCondition !== '') $countConditions[] = $surfaceCacheCondition;
             $gridTotal = (int)$db->scalar("SELECT COALESCE(SUM(TOTAL),0) FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE WHERE " . implode(' AND ', $countConditions), $countParams);
         }
 
@@ -148,6 +154,7 @@ if ($db->ok() && $cacheReady) {
         if ($visibleTags) {
             $repeatParams = [];
             $repeatConditions = as_cache_conditions($AS_TYPE, $cacheFilters, $repeatParams);
+            if ($surfaceCacheCondition !== '') $repeatConditions[] = $surfaceCacheCondition;
             $placeholders = implode(',', array_fill(0, count($visibleTags), '?'));
             foreach (array_keys($visibleTags) as $visibleTag) $repeatParams[] = $visibleTag;
             foreach ($db->all("SELECT TAG,SUM(TOTAL) AS REPETICIONES FROM dbo.CLEAR_ALARMAS_SEMANA_CACHE WHERE " . implode(' AND ', $repeatConditions) . " AND TAG IN ($placeholders) GROUP BY TAG", $repeatParams) as $repeatRow) {
