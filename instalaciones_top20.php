@@ -270,7 +270,8 @@ if ($db->ok()) {
     Array.prototype.forEach.call(rows,function(row){
       var visible=filters.every(function(filter){
         var needle=(filter.value||'').trim().toLocaleLowerCase('es');if(!needle)return true;
-        var index=parseInt(filter.getAttribute('data-it20-column-filter'),10);
+        var holder=filter.closest?filter.closest('th'):null;
+        var index=holder&&typeof holder.cellIndex==='number'?holder.cellIndex:parseInt(filter.getAttribute('data-it20-column-filter'),10);
         var cell=row.cells[index];return cell&&(cell.textContent||'').toLocaleLowerCase('es').indexOf(needle)!==-1;
       });
       row.hidden=!visible;
