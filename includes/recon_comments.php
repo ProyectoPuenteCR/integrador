@@ -114,6 +114,40 @@ function clear_recon_comments_load_all()
     return $result;
 }
 
+/* Lecturas livianas para dashboards: evitan el OUTER APPLY contra todo FIXALARMS. */
+function clear_recon_comments_count()
+{
+    $db = clear_db();
+    if (!$db->ok()) return 0;
+    return (int)($db->scalar(
+        "SELECT COUNT(*) FROM dbo.FIXALARMS_COMENTARIOS " .
+        "WHERE ACTIVO=1 AND COMENTARIO IS NOT NULL AND LTRIM(RTRIM(COMENTARIO))<>''"
+    ) ?? 0);
+}
+
+function clear_recon_comments_load_recent($limit = 200)
+{
+    $db = clear_db();
+    if (!$db->ok()) return [];
+    $limit = max(1, min(500, (int)$limit));
+
+    $rows = $db->all(
+        "SELECT TOP " . $limit . " ID, ID_RECONOCIMIENTO, TAG_FIX, OPERADOR, " .
+        "CONVERT(varchar(19), FECHA_RECONOCIMIENTO, 120) AS FECHA_RECONOCIMIENTO, " .
+        "MOTIVO, COMENTARIO, USUARIO_CARGA, " .
+        "CONVERT(varchar(19), FECHA_CARGA, 120) AS FECHA_CARGA, " .
+        "CONVERT(varchar(19), FECHA_MODIFICACION, 120) AS FECHA_MODIFICACION, ACTIVO, " .
+        "CAST(N'' AS nvarchar(1)) AS DESCRIPCION_ALARMA " .
+        "FROM dbo.FIXALARMS_COMENTARIOS " .
+        "WHERE ACTIVO=1 AND COMENTARIO IS NOT NULL AND LTRIM(RTRIM(COMENTARIO))<>'' " .
+        "ORDER BY COALESCE(FECHA_MODIFICACION,FECHA_CARGA) DESC, ID DESC"
+    );
+
+    $result = [];
+    foreach ($rows as $row) $result[] = clear_recon_comment_map_sql_row($row);
+    return $result;
+}
+
 function clear_recon_comment_counts_by_group()
 {
     $db = clear_db();
