@@ -46,7 +46,9 @@ $installations = [];
 $zone = '';
 $installationFilter = '';
 $installationTypeFilter = clear_installation_type_normalize($_GET['tipo_instalacion'] ?? '');
+if ($installationTypeFilter === 'POZO') $installationTypeFilter = '';
 $installationTypeOptions = clear_installation_type_options();
+unset($installationTypeOptions['POZO']);
 $total = 0;
 $topTag = '';
 $topTagCount = 0;
@@ -87,6 +89,7 @@ if ($db->ok()) {
     $baseConditions = [
         "[$tagColumn] IS NOT NULL",
         "$tagExpr<>''",
+        "$installationTypeExpr<>N'POZO'",
         "[$dateColumn]>=CONVERT(datetime2,?,126)",
         "[$dateColumn]<CONVERT(datetime2,?,126)",
     ];
@@ -181,7 +184,7 @@ if ($db->ok()) {
   <main class="main">
     <?php include __DIR__ . '/includes/topbar.php'; ?>
     <div class="page__head">
-      <div><h1 class="page__title">Top 20 alarmas · Semanal</h1><div class="page__sub">Alarmas de pozos e instalaciones agrupadas por entidad y TAG · semanas fijas de miércoles a martes</div></div>
+      <div><h1 class="page__title">Top 20 alarmas · Instalaciones</h1><div class="page__sub">Alarmas de instalaciones de superficie agrupadas por entidad y TAG · semanas fijas de miércoles a martes</div></div>
       <div class="page__live"><span class="dot"></span><?php echo $dbError ? 'Sin conexión' : 'En vivo'; ?></div>
     </div>
 
