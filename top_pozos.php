@@ -3,6 +3,8 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/icons.php';
 require_once __DIR__ . '/includes/permissions.php';
+require_once __DIR__ . '/includes/alarm_actions.php';
+require_once __DIR__ . '/includes/novedades_semanales_common.php';
 
 auth_require();
 permissions_require_menu('top_pozos');
@@ -58,6 +60,10 @@ $hourlyMedium = [];
 $hourlyLow = [];
 $hourlyOther = [];
 $wellDetailRows = [];
+$wellComments = [];
+$canViewComments = permissions_can('comments.view');
+$canCreateComments = permissions_can('comments.create');
+$reportEnabled = permissions_can_menu('novedades_semanales_reporte');
 
 $now = new DateTimeImmutable('now');
 $defaultFrom = $now->sub(new DateInterval('PT24H'));
@@ -170,10 +176,19 @@ if ($db->ok()) {
         "SUM(CASE WHEN $priorityClass='Baja' THEN 1 ELSE 0 END) AS prioridad_baja, " .
         "SUM(CASE WHEN $priorityClass='Otra' THEN 1 ELSE 0 END) AS prioridad_otra, " .
         "COUNT(DISTINCT CASE WHEN [$tagColumn] IS NOT NULL AND $tagText<>'' THEN $tagText END) AS tags_unicos, " .
-        "MAX([$dateColumn]) AS ultima_alarma " .
+        "CONVERT(varchar(19),MAX([$dateColumn]),120) AS ultima_alarma " .
         "FROM $table $where GROUP BY $wellText ORDER BY COUNT(*) DESC, $wellText ASC",
         $params
     );
+
+    if (($canViewComments || $canCreateComments) && $wellDetailRows) {
+        $commentSubjects = [];
+        foreach ($wellDetailRows as $commentSourceRow) {
+            $commentWell = trim((string)($commentSourceRow['pozo'] ?? $commentSourceRow['POZO'] ?? ''));
+            if ($commentWell !== '') $commentSubjects[] = clear_alarm_comment_subject($commentWell, 'pozo');
+        }
+        $wellComments = clear_alarm_comments_load_subjects_sql($commentSubjects);
+    }
 }
 
 $highPct = $total > 0 ? ($high * 100 / $total) : 0;
@@ -186,7 +201,9 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Top Pozos · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260924-toppozos-grid-1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-toppozos-grid-2">
+  <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
+  <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-select-all-1"><?php endif; ?>
   <script src="assets/js/chart.umd.js"></script>
   <style>
     .topTotalFilters{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
@@ -209,14 +226,14 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     .topTotalChart__canvas{height:300px;position:relative}
     .topTotalMeta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;color:var(--text-soft);font-size:12px}
     .topTotalMeta b{color:var(--petrol)}
-    .topPozosDetail{background:#fff;border:1px solid var(--line-mid);border-radius:14px;overflow:hidden;margin-bottom:18px}
-    .topPozosDetail__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 17px;border-bottom:1px solid var(--line)}
-    .topPozosDetail__head small{display:block;color:var(--text-mut);font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;margin-bottom:3px}
-    .topPozosDetail__head h3{font-family:var(--font-head);font-size:20px;color:var(--text);margin:0}
-    .topPozosDetail__meta{font-size:11px;color:var(--text-mut);border:1px solid var(--line-mid);border-radius:999px;padding:6px 10px;white-space:nowrap}
-    .tpDetailTable td:first-child{font-weight:800;color:var(--petrol)}
+    .tpDetailSummary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 10px;color:var(--text-soft);font-size:12px}
+    .tpDetailSummary b{color:var(--petrol)}
+    .tpDetailTable td[data-column="pozo"]{font-weight:800;color:var(--petrol)}
     .tpDetailTable .cell-num{text-align:right;font-variant-numeric:tabular-nums}
-    .tpDetailTable .gridFilterRow input{width:100%;min-width:90px}
+    .tpDetailTable .gridFilterRow input{width:100%;min-width:90px;height:34px;border:1px solid var(--line-mid);border-radius:8px;padding:0 10px;background:#fff;color:var(--text)}
+    .tpDetailTable thead tr:first-child th{color:var(--petrol);font-weight:800}
+    .tpDetailTable .tpCommentCell{min-width:54px}
+    .tpDetailTable .tpCommentCell .alarmCell{justify-content:center}
     @media(max-width:1100px){.topTotalKpis{grid-template-columns:repeat(2,1fr)}.topTotalCharts{grid-template-columns:1fr}}
     @media(max-width:900px){.topPozosDateRange{grid-template-columns:auto 1fr 1fr;flex-basis:100%}}
     @media(max-width:700px){.topTotalKpis{grid-template-columns:1fr}.topTotalFilter{width:100%}.topTotalFilter label{width:100%}.topTotalFilter select,.topTotalFilter input{flex:1;min-width:0}.topPozosDateRange{grid-template-columns:auto 1fr}}
@@ -302,11 +319,14 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
         </article>
       </section>
 
-      <section class="topPozosDetail">
-        <div class="topPozosDetail__head">
-          <div><small>Detalle operativo</small><h3>Detalle de pozos</h3></div>
-          <span class="topPozosDetail__meta"><?php echo tp_num(count($wellDetailRows)); ?> pozos en la selección</span>
-        </div>
+      <div class="tpDetailSummary">
+        <span><b>Detalle de pozos</b> · mismo formato operativo que las grillas de alarmas.</span>
+        <span><b><?php echo tp_num(count($wellDetailRows)); ?></b> pozos en la selección</span>
+      </div>
+
+      <?php if($reportEnabled): ?><div class="nsReportTools"><button class="nsButton" type="button" data-clear-report-add-selected>Agregar seleccionadas al reporte</button><button class="nsButton is-secondary" type="button" data-ns-report-open>Ver y enviar reporte <span class="nsReportCount" data-ns-report-count hidden>0</span></button></div><?php endif; ?>
+
+      <div class="tablewrap">
         <?php if (!$wellDetailRows): ?>
           <div class="empty"><p>No se encontraron pozos para el rango y los filtros seleccionados.</p></div>
         <?php else: ?>
@@ -314,46 +334,89 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
           <table class="grid grid--sortable js-sortable tpDetailTable" id="topPozosDetailTable">
             <thead>
               <tr>
+                <?php if($reportEnabled): ?><th>REPORTE</th><?php endif; ?>
                 <th>POZO ↕</th>
                 <th>TOTAL ALARMAS ↕</th>
-                <th>ALTA ↕</th>
-                <th>MEDIA ↕</th>
-                <th>BAJA ↕</th>
-                <th>OTRA ↕</th>
+                <th>PRIORIDAD ALTA ↕</th>
+                <th>PRIORIDAD MEDIA ↕</th>
+                <th>PRIORIDAD BAJA ↕</th>
                 <th>TAGS ÚNICOS ↕</th>
                 <th>ÚLTIMA ALARMA ↕</th>
+                <th>COMENTARIO</th>
               </tr>
               <tr class="gridFilterRow" aria-label="Filtros del detalle de pozos">
-                <?php for($filterIndex=0;$filterIndex<8;$filterIndex++): ?>
-                  <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar columna"></th>
-                <?php endfor; ?>
+                <?php if($reportEnabled): ?><th class="gridFilterRow__empty"></th><?php endif; ?>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar pozo" aria-label="Filtrar pozo"></th>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar total de alarmas"></th>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar prioridad alta"></th>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar prioridad media"></th>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar prioridad baja"></th>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar tags únicos"></th>
+                <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar fecha" aria-label="Filtrar última alarma"></th>
+                <th class="gridFilterRow__empty"></th>
               </tr>
             </thead>
             <tbody>
               <?php foreach ($wellDetailRows as $detailRow):
                 $detailWell = trim((string)($detailRow['pozo'] ?? $detailRow['POZO'] ?? ''));
                 $detailLast = trim((string)($detailRow['ultima_alarma'] ?? $detailRow['ULTIMA_ALARMA'] ?? ''));
+                $commentSubject = clear_alarm_comment_subject($detailWell, 'pozo');
+                $commentRow = $wellComments[strtoupper($commentSubject)] ?? [];
+                $commentText = trim((string)($commentRow['COMENTARIO'] ?? $commentRow['comentario'] ?? ''));
+                $hasComment = $commentText !== '';
+                $totalAlarms = (int)($detailRow['total_alarmas'] ?? $detailRow['TOTAL_ALARMAS'] ?? 0);
+                $priorityHigh = (int)($detailRow['prioridad_alta'] ?? $detailRow['PRIORIDAD_ALTA'] ?? 0);
+                $priorityMedium = (int)($detailRow['prioridad_media'] ?? $detailRow['PRIORIDAD_MEDIA'] ?? 0);
+                $priorityLow = (int)($detailRow['prioridad_baja'] ?? $detailRow['PRIORIDAD_BAJA'] ?? 0);
+                $uniqueDetailTags = (int)($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0);
+                $displayLast = $detailLast !== '' ? date('d/m/Y H:i:s', strtotime($detailLast)) : '—';
+                $reportColumns = [
+                    'Pozo'=>$detailWell,
+                    'Total alarmas'=>$totalAlarms,
+                    'Prioridad alta'=>$priorityHigh,
+                    'Prioridad media'=>$priorityMedium,
+                    'Prioridad baja'=>$priorityLow,
+                    'Tags únicos'=>$uniqueDetailTags,
+                    'Última alarma'=>$displayLast,
+                    'Comentario'=>$commentText,
+                ];
               ?>
               <tr>
-                <td data-raw-value="<?php echo h($detailWell); ?>"><?php echo h($detailWell !== '' ? $detailWell : '—'); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['total_alarmas'] ?? $detailRow['TOTAL_ALARMAS'] ?? 0); ?>"><?php echo tp_num($detailRow['total_alarmas'] ?? $detailRow['TOTAL_ALARMAS'] ?? 0); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_alta'] ?? $detailRow['PRIORIDAD_ALTA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_alta'] ?? $detailRow['PRIORIDAD_ALTA'] ?? 0); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_media'] ?? $detailRow['PRIORIDAD_MEDIA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_media'] ?? $detailRow['PRIORIDAD_MEDIA'] ?? 0); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_baja'] ?? $detailRow['PRIORIDAD_BAJA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_baja'] ?? $detailRow['PRIORIDAD_BAJA'] ?? 0); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_otra'] ?? $detailRow['PRIORIDAD_OTRA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_otra'] ?? $detailRow['PRIORIDAD_OTRA'] ?? 0); ?></td>
-                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0); ?>"><?php echo tp_num($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0); ?></td>
-                <td data-raw-value="<?php echo h($detailLast); ?>"><?php echo $detailLast !== '' ? h(date('d/m/Y H:i:s', strtotime($detailLast))) : '—'; ?></td>
+                <?php if($reportEnabled): ?><td><?php echo ns_report_pick(ns_report_key('top-pozos-24h',[$fromSql,$toSql,$detailWell]),'row','Top Pozos 24h · '.$detailWell,ns_report_row_payload($reportColumns),'Incluir'); ?></td><?php endif; ?>
+                <td data-column="pozo" data-raw-value="<?php echo h($detailWell); ?>"><?php echo h($detailWell !== '' ? $detailWell : '—'); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo $totalAlarms; ?>"><?php echo tp_num($totalAlarms); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo $priorityHigh; ?>"><?php echo tp_num($priorityHigh); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo $priorityMedium; ?>"><?php echo tp_num($priorityMedium); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo $priorityLow; ?>"><?php echo tp_num($priorityLow); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo $uniqueDetailTags; ?>"><?php echo tp_num($uniqueDetailTags); ?></td>
+                <td data-raw-value="<?php echo h($detailLast); ?>"><?php echo h($displayLast); ?></td>
+                <td class="tpCommentCell" data-comment-subject="<?php echo h($commentSubject); ?>" title="<?php echo h($commentText); ?>">
+                  <?php echo clear_alarm_actions_cell([
+                    'display'=>'Comentario',
+                    'subject'=>$commentSubject,
+                    'subject_label'=>'Pozo '.$detailWell,
+                    'context'=>'top_pozos',
+                    'preserve_pi_link'=>false,
+                    'show_history'=>false,
+                    'show_comment'=>true,
+                    'has_comment'=>$hasComment,
+                    'icon_only'=>true
+                  ]); ?>
+                </td>
               </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
         </div>
         <?php endif; ?>
-      </section>
+      </div>
     <?php endif; ?>
   </main>
 </div>
+<?php clear_alarm_actions_modal(); ?>
 <script src="assets/js/app.js?v=20260924-columns-1"></script>
+<script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
+<?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260826-select-all-1"></script><?php endif; ?>
 <script>
 (function(){
   if(typeof Chart==='undefined') return;
