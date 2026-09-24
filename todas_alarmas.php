@@ -34,7 +34,9 @@ $dateTo = trim((string)($_GET['fecha_hasta'] ?? ''));
 $timeFrom = trim((string)($_GET['hora_desde'] ?? ''));
 $timeTo = trim((string)($_GET['hora_hasta'] ?? ''));
 $installationTypeFilter = clear_installation_type_normalize($_GET['tipo_instalacion'] ?? '');
+if ($installationTypeFilter === 'POZO') $installationTypeFilter = '';
 $installationTypeOptions = clear_installation_type_options();
+unset($installationTypeOptions['POZO']);
 
 $allowedMsgTypes = ['OPERATOR','TEXT','ALARM','NETWORK'];
 $msgTypeParamPresent = array_key_exists('msgtype', $_GET);
@@ -146,6 +148,9 @@ if ($db->ok()) {
     }
 
     $conditions = [];
+    if ($installationTypeExpr !== '') {
+        $conditions[] = "$installationTypeExpr <> N'POZO'";
+    }
     if ($tagSearch !== '' && in_array($tagColumn, $columns, true)) {
         foreach (ta_terms($tagSearch) as $term) {
             $conditions[] = "(CONVERT(nvarchar(4000), [$tagColumn]) LIKE ? OR REPLACE(REPLACE(REPLACE(CONVERT(nvarchar(4000), [$tagColumn]), '_', ''), '-', ''), ' ', '') LIKE ?)";
@@ -222,7 +227,7 @@ $hasFilters = $tagSearch !== '' || $descSearch !== '' || $dateFrom !== '' || $da
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Todas las alarmas · CLEAR Plataforma</title>
+  <title>Todas las alarmas · Instalaciones · CLEAR Plataforma</title>
   <link rel="stylesheet" href="assets/css/app.css?v=20260803-grid1">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
   <link rel="stylesheet" href="assets/css/installation_type.css?v=20260824-2">
@@ -242,7 +247,7 @@ $hasFilters = $tagSearch !== '' || $descSearch !== '' || $dateFrom !== '' || $da
     <?php include __DIR__ . '/includes/topbar.php'; ?>
     <div class="page__head">
       <div>
-        <h1 class="page__title">Todas las alarmas</h1>
+        <h1 class="page__title">Todas las alarmas · Instalaciones</h1>
         <div class="page__sub">Histórico completo de dbo.FIXALARMS · más nuevas primero</div>
       </div>
       <div class="page__live"><span class="dot"></span><?php echo $dbError ? 'Sin conexión' : 'En vivo'; ?></div>
