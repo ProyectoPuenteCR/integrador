@@ -57,8 +57,7 @@ $hourlyHigh = [];
 $hourlyMedium = [];
 $hourlyLow = [];
 $hourlyOther = [];
-$topWells = [];
-$topTags = [];
+$wellDetailRows = [];
 
 $now = new DateTimeImmutable('now');
 $defaultFrom = $now->sub(new DateInterval('PT24H'));
@@ -162,21 +161,19 @@ if ($db->ok()) {
         $hourlyOther[] = $counts['Otra'];
     }
 
-    $topWellRows = $db->all("SELECT TOP 10 $wellText AS pozo, COUNT(*) AS cantidad FROM $table $where GROUP BY $wellText ORDER BY COUNT(*) DESC", $params);
-    foreach ($topWellRows as $row) {
-        $topWells[] = [
-            'pozo' => trim((string)($row['pozo'] ?? $row['POZO'] ?? '')),
-            'count' => (int)($row['cantidad'] ?? $row['CANTIDAD'] ?? 0),
-        ];
-    }
-
-    $topTagRows = $db->all("SELECT TOP 10 $tagText AS tag, COUNT(*) AS cantidad FROM $table $where AND [$tagColumn] IS NOT NULL AND $tagText <> '' GROUP BY $tagText ORDER BY COUNT(*) DESC", $params);
-    foreach ($topTagRows as $row) {
-        $topTags[] = [
-            'tag' => trim((string)($row['tag'] ?? $row['TAG'] ?? '')),
-            'count' => (int)($row['cantidad'] ?? $row['CANTIDAD'] ?? 0),
-        ];
-    }
+    /* Detalle agregado por pozo para la grilla operativa. */
+    $wellDetailRows = $db->all(
+        "SELECT $wellText AS pozo, " .
+        "COUNT(*) AS total_alarmas, " .
+        "SUM(CASE WHEN $priorityClass='Alta' THEN 1 ELSE 0 END) AS prioridad_alta, " .
+        "SUM(CASE WHEN $priorityClass='Media' THEN 1 ELSE 0 END) AS prioridad_media, " .
+        "SUM(CASE WHEN $priorityClass='Baja' THEN 1 ELSE 0 END) AS prioridad_baja, " .
+        "SUM(CASE WHEN $priorityClass='Otra' THEN 1 ELSE 0 END) AS prioridad_otra, " .
+        "COUNT(DISTINCT CASE WHEN [$tagColumn] IS NOT NULL AND $tagText<>'' THEN $tagText END) AS tags_unicos, " .
+        "MAX([$dateColumn]) AS ultima_alarma " .
+        "FROM $table $where GROUP BY $wellText ORDER BY COUNT(*) DESC, $wellText ASC",
+        $params
+    );
 }
 
 $highPct = $total > 0 ? ($high * 100 / $total) : 0;
@@ -189,7 +186,7 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Top Pozos · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260716-toppozos1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-toppozos-grid-1">
   <script src="assets/js/chart.umd.js"></script>
   <style>
     .topTotalFilters{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
@@ -203,7 +200,7 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     .topPozosDateRange span{font-size:9px;font-weight:800;color:var(--text-mut);letter-spacing:.7px;text-transform:uppercase}
     .topPozosDateRange input{min-width:0;border:0;background:transparent;color:var(--text);font:inherit;outline:0}
     .topTotalKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}
-    .topTotalCharts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .topTotalCharts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
     .topTotalChart{background:#fff;border:1px solid var(--line-mid);border-top:3px solid var(--petrol);border-radius:14px;padding:16px;min-width:0}
     .topTotalChart__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
     .topTotalChart__head small{display:block;color:var(--text-mut);font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;margin-bottom:4px}
@@ -212,6 +209,14 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     .topTotalChart__canvas{height:300px;position:relative}
     .topTotalMeta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;color:var(--text-soft);font-size:12px}
     .topTotalMeta b{color:var(--petrol)}
+    .topPozosDetail{background:#fff;border:1px solid var(--line-mid);border-radius:14px;overflow:hidden;margin-bottom:18px}
+    .topPozosDetail__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 17px;border-bottom:1px solid var(--line)}
+    .topPozosDetail__head small{display:block;color:var(--text-mut);font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;margin-bottom:3px}
+    .topPozosDetail__head h3{font-family:var(--font-head);font-size:20px;color:var(--text);margin:0}
+    .topPozosDetail__meta{font-size:11px;color:var(--text-mut);border:1px solid var(--line-mid);border-radius:999px;padding:6px 10px;white-space:nowrap}
+    .tpDetailTable td:first-child{font-weight:800;color:var(--petrol)}
+    .tpDetailTable .cell-num{text-align:right;font-variant-numeric:tabular-nums}
+    .tpDetailTable .gridFilterRow input{width:100%;min-width:90px}
     @media(max-width:1100px){.topTotalKpis{grid-template-columns:repeat(2,1fr)}.topTotalCharts{grid-template-columns:1fr}}
     @media(max-width:900px){.topPozosDateRange{grid-template-columns:auto 1fr 1fr;flex-basis:100%}}
     @media(max-width:700px){.topTotalKpis{grid-template-columns:1fr}.topTotalFilter{width:100%}.topTotalFilter label{width:100%}.topTotalFilter select,.topTotalFilter input{flex:1;min-width:0}.topPozosDateRange{grid-template-columns:auto 1fr}}
@@ -295,18 +300,60 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
           <div class="topTotalChart__head"><div><small>Criticidad horaria</small><h3>Alta, media y baja</h3></div><span class="topTotalChart__hint"><?php echo $isDefault24h ? 'Comparación 24 hs' : 'Rango seleccionado'; ?></span></div>
           <div class="topTotalChart__canvas"><canvas id="tpHourlyPriority"></canvas></div>
         </article>
-        <article class="topTotalChart">
-          <div class="topTotalChart__head"><div><small>Frecuencia</small><h3>Top 10 pozos</h3></div><span class="topTotalChart__hint"><?php echo $isDefault24h ? 'Últimas 24 hs' : 'Rango seleccionado'; ?></span></div>
-          <div class="topTotalChart__canvas"><canvas id="tpTopWells"></canvas></div>
-        </article>
-        <article class="topTotalChart">
-          <div class="topTotalChart__head"><div><small>Frecuencia</small><h3>Top 10 TAG</h3></div><span class="topTotalChart__hint"><?php echo $isDefault24h ? 'Últimas 24 hs' : 'Rango seleccionado'; ?></span></div>
-          <div class="topTotalChart__canvas"><canvas id="tpTopTags"></canvas></div>
-        </article>
+      </section>
+
+      <section class="topPozosDetail">
+        <div class="topPozosDetail__head">
+          <div><small>Detalle operativo</small><h3>Detalle de pozos</h3></div>
+          <span class="topPozosDetail__meta"><?php echo tp_num(count($wellDetailRows)); ?> pozos en la selección</span>
+        </div>
+        <?php if (!$wellDetailRows): ?>
+          <div class="empty"><p>No se encontraron pozos para el rango y los filtros seleccionados.</p></div>
+        <?php else: ?>
+        <div class="tablescroll">
+          <table class="grid grid--sortable js-sortable tpDetailTable" id="topPozosDetailTable">
+            <thead>
+              <tr>
+                <th>POZO ↕</th>
+                <th>TOTAL ALARMAS ↕</th>
+                <th>ALTA ↕</th>
+                <th>MEDIA ↕</th>
+                <th>BAJA ↕</th>
+                <th>OTRA ↕</th>
+                <th>TAGS ÚNICOS ↕</th>
+                <th>ÚLTIMA ALARMA ↕</th>
+              </tr>
+              <tr class="gridFilterRow" aria-label="Filtros del detalle de pozos">
+                <?php for($filterIndex=0;$filterIndex<8;$filterIndex++): ?>
+                  <th><input type="text" data-tp-detail-filter="true" placeholder="Filtrar" aria-label="Filtrar columna"></th>
+                <?php endfor; ?>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($wellDetailRows as $detailRow):
+                $detailWell = trim((string)($detailRow['pozo'] ?? $detailRow['POZO'] ?? ''));
+                $detailLast = trim((string)($detailRow['ultima_alarma'] ?? $detailRow['ULTIMA_ALARMA'] ?? ''));
+              ?>
+              <tr>
+                <td data-raw-value="<?php echo h($detailWell); ?>"><?php echo h($detailWell !== '' ? $detailWell : '—'); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['total_alarmas'] ?? $detailRow['TOTAL_ALARMAS'] ?? 0); ?>"><?php echo tp_num($detailRow['total_alarmas'] ?? $detailRow['TOTAL_ALARMAS'] ?? 0); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_alta'] ?? $detailRow['PRIORIDAD_ALTA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_alta'] ?? $detailRow['PRIORIDAD_ALTA'] ?? 0); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_media'] ?? $detailRow['PRIORIDAD_MEDIA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_media'] ?? $detailRow['PRIORIDAD_MEDIA'] ?? 0); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_baja'] ?? $detailRow['PRIORIDAD_BAJA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_baja'] ?? $detailRow['PRIORIDAD_BAJA'] ?? 0); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['prioridad_otra'] ?? $detailRow['PRIORIDAD_OTRA'] ?? 0); ?>"><?php echo tp_num($detailRow['prioridad_otra'] ?? $detailRow['PRIORIDAD_OTRA'] ?? 0); ?></td>
+                <td class="cell-num" data-raw-value="<?php echo (int)($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0); ?>"><?php echo tp_num($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0); ?></td>
+                <td data-raw-value="<?php echo h($detailLast); ?>"><?php echo $detailLast !== '' ? h(date('d/m/Y H:i:s', strtotime($detailLast))) : '—'; ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php endif; ?>
       </section>
     <?php endif; ?>
   </main>
 </div>
+<script src="assets/js/app.js?v=20260924-columns-1"></script>
 <script>
 (function(){
   if(typeof Chart==='undefined') return;
@@ -319,10 +366,32 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
     {label:'Baja',data:<?php echo json_encode($hourlyLow); ?>,backgroundColor:'rgba(16,185,129,.72)',borderRadius:5},
     {label:'Otra',data:<?php echo json_encode($hourlyOther); ?>,backgroundColor:'rgba(100,116,139,.55)',borderRadius:5}
   ]},options:Object.assign({},common,{scales:{x:{stacked:true,grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:12}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}}}})});
-  var topWells=<?php echo json_encode($topWells, JSON_UNESCAPED_UNICODE); ?>;
-  new Chart(document.getElementById('tpTopWells'),{type:'bar',data:{labels:topWells.map(function(x){return x.pozo;}),datasets:[{label:'Alarmas',data:topWells.map(function(x){return x.count;}),backgroundColor:'rgba(26,77,92,.82)',borderRadius:5}]},options:Object.assign({},common,{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}},y:{grid:{display:false},ticks:{color:'#334e5b',callback:function(value){var s=this.getLabelForValue(value);return s.length>28?s.slice(0,28)+'…':s;}}}}})});
-  var topTags=<?php echo json_encode($topTags, JSON_UNESCAPED_UNICODE); ?>;
-  new Chart(document.getElementById('tpTopTags'),{type:'bar',data:{labels:topTags.map(function(x){return x.tag;}),datasets:[{label:'Alarmas',data:topTags.map(function(x){return x.count;}),backgroundColor:'rgba(14,116,144,.68)',borderRadius:5}]},options:Object.assign({},common,{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}},y:{grid:{display:false},ticks:{color:'#334e5b',callback:function(value){var s=this.getLabelForValue(value);return s.length>28?s.slice(0,28)+'…':s;}}}}})});
+
+})();
+</script>
+<script>
+(function(){
+  var table=document.getElementById('topPozosDetailTable');
+  if(!table)return;
+  var filters=Array.prototype.slice.call(table.querySelectorAll('[data-tp-detail-filter="true"]'));
+  function apply(){
+    var rows=table.tBodies[0]?table.tBodies[0].rows:[];
+    Array.prototype.forEach.call(rows,function(row){
+      var visible=filters.every(function(filter){
+        var needle=(filter.value||'').trim().toLocaleLowerCase('es-AR');
+        if(!needle)return true;
+        var th=filter.closest?filter.closest('th'):null;
+        var index=th&&typeof th.cellIndex==='number'?th.cellIndex:0;
+        var cell=row.cells[index];
+        return cell&&(cell.textContent||'').toLocaleLowerCase('es-AR').indexOf(needle)!==-1;
+      });
+      row.hidden=!visible;
+    });
+  }
+  filters.forEach(function(filter){
+    filter.addEventListener('input',apply);
+    filter.addEventListener('click',function(event){event.stopPropagation();});
+  });
 })();
 </script>
 </body>
