@@ -218,7 +218,7 @@ if ($db->ok()) {
             <tr><th>TIPO DE INSTALACIÓN ↕</th><th>INSTALACIÓN ↕</th><th>TAG ↕</th><th>DESCRIPCIÓN ↕</th><th>TOTAL ALARMAS ↕</th><th>CAMPO EXT.</th><th>COMENTARIO</th><?php if($reportEnabled): ?><th>REPORTE</th><?php endif; ?></tr>
             <tr class="gridFilterRow" aria-label="Filtros por columna">
               <th><select data-it20-column-filter="0" aria-label="Filtrar tipo"><option value="">Todos</option><?php foreach ($installationTypeOptions as $typeLabel): ?><option value="<?php echo h($typeLabel); ?>"><?php echo h($typeLabel); ?></option><?php endforeach; ?></select></th>
-              <th><input type="text" data-it20-column-filter="1" placeholder="Filtrar instalación" aria-label="Filtrar instalación"></th>
+              <th><select aria-label="Filtrar instalación" onchange="var f=document.querySelector('#instalacionesTop20Filters select[name=instalacion]');if(f){f.value=this.value;f.form.submit();}"><option value="">Todas</option><?php foreach($installations as $installationValue): ?><option value="<?php echo h($installationValue); ?>" <?php echo $installationFilter===$installationValue?'selected':''; ?>><?php echo h($installationValue); ?></option><?php endforeach; ?></select></th>
               <th><input type="text" data-it20-column-filter="2" placeholder="Filtrar" aria-label="Filtrar TAG"></th>
               <th><input type="text" data-it20-column-filter="3" placeholder="Filtrar" aria-label="Filtrar descripción"></th>
               <th><input type="text" data-it20-column-filter="4" placeholder="Filtrar" aria-label="Filtrar cantidad"></th>
