@@ -165,6 +165,13 @@ $installations = [];
 $statuses = [];
 $priorities = [];
 $installationTypeOptions = clear_installation_type_options();
+if ($alarmScope === 'instalaciones') {
+    unset($installationTypeOptions['POZO']);
+    if ($filterInstallationType === 'POZO') $filterInstallationType = '';
+} elseif ($alarmScope === 'pozos') {
+    $installationTypeOptions = ['POZO' => 'Pozo'];
+    $filterInstallationType = 'POZO';
+}
 $installationTypeEnabled = false;
 $installationTypeExpr = '';
 $installationTypeExternalField = '';
@@ -295,7 +302,7 @@ if ($sc) {
         if (!in_array($valueField, $validCols, true)) $valueField = '';
 
         // Cargar valores únicos para los combos Estado y Prioridad.
-        if ($statusField !== '' && $key === 'alarmas24h' && $performanceCacheAvailable) {
+        if ($statusField !== '' && $key === 'alarmas24h' && $performanceCacheAvailable && $alarmScope === '') {
             foreach (clear_performance_cache_metric('FILTRO_ESTADO', $db) as $statusRow) {
                 $value = trim((string)($statusRow['DIMENSION1'] ?? ''));
                 if ($value !== '' && ($showCfnStatus || strtoupper($value) !== 'CFN')) $statuses[] = $value;
@@ -313,7 +320,7 @@ if ($sc) {
                 if ($value !== '' && ($showCfnStatus || strtoupper($value) !== 'CFN')) $statuses[] = $value;
             }
         }
-        if ($priorityField !== '' && $key === 'alarmas24h' && $performanceCacheAvailable) {
+        if ($priorityField !== '' && $key === 'alarmas24h' && $performanceCacheAvailable && $alarmScope === '') {
             foreach (clear_performance_cache_metric('FILTRO_PRIORIDAD', $db) as $priorityRow) {
                 $value = trim((string)($priorityRow['DIMENSION1'] ?? ''));
                 if ($value !== '') $priorities[] = $value;
@@ -357,16 +364,22 @@ if ($sc) {
                 $installationZoneSql = " AND EXISTS (SELECT 1 FROM [CLEAR].[ZONAS] Z WHERE LTRIM(RTRIM(Z.ZONA)) COLLATE DATABASE_DEFAULT = ? COLLATE DATABASE_DEFAULT AND LTRIM(RTRIM(Z.BATERIA)) COLLATE DATABASE_DEFAULT = $installationExpr COLLATE DATABASE_DEFAULT)";
                 $installationZoneParams[] = $filterZone;
             }
-            if ($key === 'alarmas24h' && $performanceCacheAvailable && $filterZone === '') {
+            if ($key === 'alarmas24h' && $performanceCacheAvailable && $filterZone === '' && $alarmScope === '') {
                 $installationRows = [];
                 foreach (clear_performance_cache_metric('FILTRO_INSTALACION', $db) as $cachedInstallation) {
                     $installationRows[] = ['instalacion' => $cachedInstallation['DIMENSION1'] ?? ''];
                 }
             } else {
+                $installationScopeSql = '';
+                if ($alarmScope === 'instalaciones' && $installationTypeExpr !== '') {
+                    $installationScopeSql = " AND $installationTypeExpr <> N'POZO'";
+                } elseif ($alarmScope === 'pozos' && $installationTypeExpr !== '') {
+                    $installationScopeSql = " AND $installationTypeExpr = N'POZO'";
+                }
                 $installationRows = $db->all(
                     "SELECT DISTINCT $installationExpr AS instalacion " .
                     "FROM $table " .
-                    "WHERE [$tagField] IS NOT NULL AND $normalizedTagExpr <> '' $installationZoneSql " .
+                    "WHERE [$tagField] IS NOT NULL AND $normalizedTagExpr <> '' $installationZoneSql $installationScopeSql " .
                     "ORDER BY instalacion",
                     $installationZoneParams
                 );
