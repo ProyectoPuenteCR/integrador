@@ -22,15 +22,10 @@ $moduleMetrics = dashboard_module_metrics();
 $visualMetrics = dashboard_visual_metrics();
 $ACTIVE = 'dashboard_inst_sup';
 
-$dashboardComments = array_values(array_filter(clear_recon_comments_load_all(), function ($item) {
+$dashboardComments = array_values(array_filter(clear_recon_comments_load_recent(200), function ($item) {
     return is_array($item) && trim((string)($item['comment'] ?? '')) !== '';
 }));
-usort($dashboardComments, function ($a, $b) {
-    $aDate = strtotime((string)($a['updated_at'] ?? $a['created_at'] ?? '')) ?: 0;
-    $bDate = strtotime((string)($b['updated_at'] ?? $b['created_at'] ?? '')) ?: 0;
-    return $bDate <=> $aDate;
-});
-$dashboardCommentCount = count($dashboardComments);
+$dashboardCommentCount = clear_recon_comments_count();
 $dashboardCanViewComments = permissions_can('comments.view');
 $dashboardCanDeleteComments = auth_es_admin() || permissions_can('comments.disable');
 $db = clear_db();
@@ -484,7 +479,7 @@ if($reportReady){
     <div>
       <div class="dashboardCommentsModal__eyebrow">Historial</div>
       <h2 id="dashboardCommentsTitle">Comentarios de reconocimientos</h2>
-      <p><span id="dashboardCommentsCount"><?php echo fmt_num($dashboardCommentCount); ?></span> comentarios cargados</p>
+      <p><span id="dashboardCommentsCount"><?php echo fmt_num($dashboardCommentCount); ?></span> comentarios cargados · mostrando los 200 más recientes</p>
     </div>
     <div class="dashboardCommentsModal__actions">
       <label class="dashboardCommentsFilter" for="dashboardCommentsTagFilter">
