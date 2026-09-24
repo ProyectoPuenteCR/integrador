@@ -166,7 +166,7 @@ if ($db->ok()) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Top 20 Pozos · CLEAR Plataforma</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260924-pozos-top20-charts-1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260924-pozos-top20-filters-1">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260807-2">
   <script src="assets/js/chart.umd.js"></script>
   <style>
@@ -182,7 +182,14 @@ if ($db->ok()) {
     .pt20Chart__canvas{height:300px;position:relative}
     .pt20Table .tagAnchor{font-weight:700;color:var(--petrol);text-decoration:underline;text-decoration-color:rgba(26,77,92,.28);text-underline-offset:3px}
     .pt20CommentButton{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:38px;height:31px;padding:0 10px;border:1px solid var(--line-mid);border-radius:8px;background:var(--surface,#fff);color:var(--petrol);cursor:pointer}.pt20CommentButton svg{width:15px;height:15px}.pt20CommentButton:hover,.pt20CommentButton:focus-visible{border-color:var(--petrol);background:var(--petrol-soft);outline:0}.pt20CommentButton.has-comment{background:var(--petrol);border-color:var(--petrol);color:#fff}.pt20CommentButton__dot{display:none;width:7px;height:7px;border-radius:50%;background:#38d58b}.pt20CommentButton.has-comment .pt20CommentButton__dot{display:block}
-    .pt20CommentCell{display:flex;align-items:center;gap:9px;min-width:280px;max-width:520px}.pt20CommentCell__text{flex:1;min-width:0;white-space:normal;line-height:1.35;color:var(--text-soft)}.pt20CommentCell__text.has-comment{color:var(--text);font-weight:600}.pt20CommentCell .alarmCell{flex:0 0 auto}.pt20CommentCell .alarmCell__actions{margin-left:0}
+    .pt20CommentTd{min-width:360px!important;width:420px}
+    .pt20CommentCell{display:flex;align-items:center;gap:9px;min-width:340px;max-width:520px}
+    .pt20CommentCell__text{flex:1;min-width:0;line-height:1.35;color:var(--text-soft);white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .pt20CommentCell__text.has-comment{color:var(--text);font-weight:600}
+    .pt20CommentCell .alarmCell{flex:0 0 auto}.pt20CommentCell .alarmCell__actions{margin-left:0}
+    .pt20Table .gridFilterRow input{width:100%;min-width:90px;height:34px;border:1px solid var(--line-mid);border-radius:8px;padding:0 10px;background:#fff;color:var(--text)}
+    .pt20Table .gridFilterRow th{padding:6px 8px;background:var(--surface-soft,#f7fafb)}
+    .pt20Table .gridFilterRow input:focus{outline:0;border-color:var(--petrol);box-shadow:0 0 0 2px var(--petrol-soft)}
     .pt20CommentOverlay{position:fixed;inset:0;z-index:151;background:rgba(12,35,44,.45);backdrop-filter:blur(3px)}.pt20CommentModal{position:fixed;z-index:152;left:50%;top:50%;width:min(590px,calc(100vw - 28px));transform:translate(-50%,-46%) scale(.985);background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:18px;box-shadow:0 28px 72px rgba(12,35,44,.32);opacity:0;pointer-events:none;transition:.17s ease;overflow:hidden}.pt20CommentModal.is-open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}.pt20CommentModal__head{display:flex;justify-content:space-between;gap:18px;padding:20px 22px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(26,77,92,.08),transparent)}.pt20CommentModal__eyebrow{margin-bottom:4px;color:var(--text-mut);font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase}.pt20CommentModal h2{margin:0;color:var(--petrol);font-family:var(--font-head);font-size:26px}.pt20CommentModal__head p{margin:5px 0 0;color:var(--text-soft);font-size:12px}.pt20CommentModal__close{width:38px;height:38px;border:1px solid var(--line-mid);border-radius:10px;background:var(--surface,#fff);color:var(--text-soft);font-size:24px;cursor:pointer}.pt20CommentModal__body{padding:18px 22px}.pt20CommentModal__body label{display:block;margin-bottom:7px;color:var(--text-soft);font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}.pt20CommentModal textarea{width:100%;min-height:145px;resize:vertical;border:1px solid var(--line-mid);border-radius:11px;padding:11px 13px;background:var(--surface,#fff);color:var(--text);font:inherit;line-height:1.5;outline:0}.pt20CommentModal textarea:focus{border-color:var(--petrol);box-shadow:0 0 0 3px var(--petrol-soft)}.pt20CommentModal__previous,.pt20CommentModal__status{margin-bottom:12px;padding:10px 12px;border-radius:10px;font-size:12px}.pt20CommentModal__previous{border:1px solid #cae4d6;background:#f2fbf6;color:var(--green-tx)}.pt20CommentModal__status{margin:10px 0 0;background:#eef6f9;color:var(--petrol)}.pt20CommentModal__status.is-error{background:#fff1ef;color:var(--red)}.pt20CommentModal__status.is-ok{background:#edf9f3;color:var(--green-tx)}.pt20CommentModal__foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 20px}.pt20CommentModal__foot button{min-height:40px;padding:0 15px;border-radius:10px;font:inherit;cursor:pointer}.pt20CommentModal__cancel{border:1px solid var(--line-mid);background:var(--surface,#fff);color:var(--text)}.pt20CommentModal__save{border:0;background:var(--petrol);color:#fff;font-weight:700}.pt20CommentModal__save:disabled{opacity:.58;cursor:wait}body.has-pt20-comment{overflow:hidden}
     @media(max-width:1200px){.pt20Toolbar{grid-template-columns:1fr 1fr}.pt20Cards{grid-template-columns:repeat(2,1fr)}.pt20Charts{grid-template-columns:1fr}}
     @media(max-width:700px){.pt20Toolbar,.pt20Cards{grid-template-columns:1fr}}
@@ -241,7 +248,22 @@ if ($db->ok()) {
       <div class="tablewrap">
         <?php if (!$rows): ?><div class="empty"><p>No se encontraron datos para el prefijo y búsqueda seleccionados.</p></div><?php else: ?>
         <div class="tablescroll"><table class="grid grid--sortable js-sortable pt20Table" id="pozosTop20Table">
-          <thead><tr><th>POZO ↕</th><th>TAG ↕</th><th>DESCRIPCIÓN ↕</th><th>TOTAL ALARMAS ↕</th><th>COMENTARIO</th></tr></thead>
+          <thead>
+            <tr>
+              <th data-column-key="pozo">POZO ↕</th>
+              <th data-column-key="tag">TAG ↕</th>
+              <th data-column-key="descripcion">DESCRIPCIÓN ↕</th>
+              <th data-column-key="total_alarmas">TOTAL ALARMAS ↕</th>
+              <th data-column-key="comentario" class="no-sort pt20CommentTd" data-sortable="false">COMENTARIO</th>
+            </tr>
+            <tr class="gridFilterRow" aria-label="Filtros del Top 20 Pozos semanal">
+              <th><input type="text" data-pt20-column-filter="true" placeholder="Filtrar pozo" aria-label="Filtrar pozo"></th>
+              <th><input type="text" data-pt20-column-filter="true" placeholder="Filtrar TAG" aria-label="Filtrar TAG"></th>
+              <th><input type="text" data-pt20-column-filter="true" placeholder="Filtrar descripción" aria-label="Filtrar descripción"></th>
+              <th><input type="text" data-pt20-column-filter="true" placeholder="Filtrar total" aria-label="Filtrar total de alarmas"></th>
+              <th class="pt20CommentTd"><input type="text" data-pt20-column-filter="true" placeholder="Filtrar comentario" aria-label="Filtrar comentario"></th>
+            </tr>
+          </thead>
           <tbody>
           <?php foreach ($rows as $row):
             $tag = (string)($row['tag'] ?? $row['TAG'] ?? '');
@@ -252,11 +274,11 @@ if ($db->ok()) {
             $hasWeeklyComment = $commentText !== '';
           ?>
             <tr>
-              <td><?php echo h($well); ?></td>
-              <td><?php echo clear_alarm_actions_cell(['display'=>$tag,'tag'=>$tag,'preserve_pi_link'=>true,'show_comment'=>false]); ?></td>
-              <td><?php echo h((string)($row['descripcion']??$row['DESCRIPCION']??'')); ?></td>
-              <td><?php echo pt20_num($row['total_alarmas']??$row['TOTAL_ALARMAS']??0); ?></td>
-              <td>
+              <td data-column="pozo"><?php echo h($well); ?></td>
+              <td data-column="tag"><?php echo clear_alarm_actions_cell(['display'=>$tag,'tag'=>$tag,'preserve_pi_link'=>true,'show_comment'=>false]); ?></td>
+              <td data-column="descripcion"><?php echo h((string)($row['descripcion']??$row['DESCRIPCION']??'')); ?></td>
+              <td data-column="total_alarmas" data-raw-value="<?php echo (int)($row['total_alarmas']??$row['TOTAL_ALARMAS']??0); ?>"><?php echo pt20_num($row['total_alarmas']??$row['TOTAL_ALARMAS']??0); ?></td>
+              <td class="pt20CommentTd" data-column="comentario">
                 <div class="pt20CommentCell">
                   <div class="pt20CommentCell__text<?php echo $hasWeeklyComment ? ' has-comment' : ''; ?>" title="<?php echo h($commentText); ?>">
                     <?php echo $hasWeeklyComment ? nl2br(h($commentText)) : '—'; ?>
@@ -320,6 +342,46 @@ if ($db->ok()) {
       y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'},ticks:{color:'#607487',precision:0}}
     }})
   });
+})();
+</script>
+<script>
+(function(){
+  var table=document.getElementById('pozosTop20Table');
+  if(!table)return;
+  var filters=Array.prototype.slice.call(table.querySelectorAll('[data-pt20-column-filter="true"]'));
+
+  function normalize(value){
+    return String(value||'').toLocaleLowerCase('es-AR').trim();
+  }
+
+  function applyFilters(){
+    var body=table.tBodies[0];
+    if(!body)return;
+    Array.prototype.forEach.call(body.rows,function(row){
+      var visible=filters.every(function(filter){
+        var needle=normalize(filter.value);
+        if(!needle)return true;
+        var th=filter.closest?filter.closest('th'):null;
+        var index=th&&typeof th.cellIndex==='number'?th.cellIndex:-1;
+        if(index<0)return true;
+        var cell=row.cells[index];
+        if(!cell)return true;
+        var raw=cell.getAttribute('data-raw-value');
+        var haystack=normalize(raw!==null?raw:cell.textContent);
+        return haystack.indexOf(needle)!==-1;
+      });
+      row.hidden=!visible;
+    });
+  }
+
+  filters.forEach(function(filter){
+    filter.addEventListener('input',applyFilters);
+    filter.addEventListener('change',applyFilters);
+    filter.addEventListener('click',function(event){event.stopPropagation();});
+    filter.addEventListener('mousedown',function(event){event.stopPropagation();});
+  });
+
+  document.addEventListener('clear-grid-columns-reordered',applyFilters);
 })();
 </script>
 </body>
