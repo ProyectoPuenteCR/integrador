@@ -891,18 +891,12 @@ if ($sc) {
    ALM_ALMEXTFLD2 corresponde a la referencia de pozo; en este módulo se
    reemplaza por la instalación real derivada del prefijo del TAG. */
 if ($sc && $surfaceInstallationColumn) {
-    $displayCols = $sc['cols'];
-    $replacedInstallationField = false;
-    foreach ($displayCols as &$displayCol) {
-        if ($installationTypeExternalField !== '' && (string)($displayCol[0] ?? '') === $installationTypeExternalField) {
-            $displayCol = ['__INSTALACION', 'Instalación', 'text'];
-            $replacedInstallationField = true;
-        }
+    $displayCols = [];
+    foreach ($sc['cols'] as $displayCol) {
+        if ($installationTypeExternalField !== '' && (string)($displayCol[0] ?? '') === $installationTypeExternalField) continue;
+        $displayCols[] = $displayCol;
     }
-    unset($displayCol);
-    if (!$replacedInstallationField) {
-        array_unshift($displayCols, ['__INSTALACION', 'Instalación', 'text']);
-    }
+    array_unshift($displayCols, ['__INSTALACION', 'Instalación', 'text']);
 }
 
 if ($CAN_VIEW_COMMENTS && in_array($key, ['reconocidas_usr', 'reconocidas'], true)) {
