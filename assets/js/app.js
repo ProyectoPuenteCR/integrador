@@ -1151,6 +1151,167 @@
     });
   })();
 
+  // Orden de columnas ajustable y persistente.
+  // Arrastrá el control de cada encabezado; el orden se conserva por pantalla.
+  (function initReorderableGrids() {
+    var SAVE_PREFIX = 'clear:grid-column-order:v1:';
+
+    function clean(value) {
+      return String(value || '').replace(/[↕▲▼]/g, '').replace(/\s+/g, ' ').trim();
+    }
+    function safeKey(value) {
+      return (value || 'columna').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'columna';
+    }
+    function storageKey(table, index) {
+      var identity = table.id || table.getAttribute('data-grid-key') || ('grid_' + index);
+      return SAVE_PREFIX + window.location.pathname + ':' + identity;
+    }
+    function headerRow(table) {
+      return table.tHead && table.tHead.rows && table.tHead.rows[0] ? table.tHead.rows[0] : null;
+    }
+    function assignKeys(table) {
+      var row = headerRow(table);
+      if (!row) return [];
+      var used = {};
+      return Array.prototype.slice.call(row.cells).map(function (th, index) {
+        var label = clean(th.getAttribute('data-column-label') || th.textContent) || ('Columna ' + (index + 1));
+        var base = th.getAttribute('data-column-key') || safeKey(label);
+        used[base] = (used[base] || 0) + 1;
+        var key = used[base] > 1 ? base + '_' + used[base] : base;
+        th.setAttribute('data-column-key', key);
+        return key;
+      });
+    }
+    function moveColumn(table, fromIndex, toIndex) {
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+      var row = headerRow(table);
+      if (!row) return;
+      var expected = row.cells.length;
+      Array.prototype.forEach.call(table.rows, function (tr) {
+        if (tr.cells.length !== expected) return;
+        var cell = tr.cells[fromIndex];
+        if (!cell) return;
+        if (fromIndex < toIndex) {
+          var after = tr.cells[toIndex];
+          tr.insertBefore(cell, after ? after.nextSibling : null);
+        } else {
+          tr.insertBefore(cell, tr.cells[toIndex] || null);
+        }
+      });
+      refreshSortIndexes(table);
+    }
+    function refreshSortIndexes(table) {
+      var row = headerRow(table);
+      if (!row) return;
+      Array.prototype.forEach.call(row.cells, function (th, index) {
+        th.querySelectorAll('[data-sort-column]').forEach(function (button) {
+          button.setAttribute('data-sort-column', String(index));
+        });
+      });
+    }
+    function currentOrder(table) {
+      var row = headerRow(table);
+      if (!row) return [];
+      return Array.prototype.slice.call(row.cells).map(function (th) {
+        return th.getAttribute('data-column-key') || '';
+      }).filter(Boolean);
+    }
+    function readOrder(key) {
+      try {
+        var parsed = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) { return []; }
+    }
+    function saveOrder(key, order) {
+      try { localStorage.setItem(key, JSON.stringify(order)); } catch (e) {}
+    }
+    function applyStored(table, key) {
+      var desired = readOrder(key);
+      if (!desired.length) return;
+      desired.forEach(function (columnKey, targetIndex) {
+        var row = headerRow(table);
+        if (!row || targetIndex >= row.cells.length) return;
+        var currentIndex = Array.prototype.findIndex.call(row.cells, function (th) {
+          return th.getAttribute('data-column-key') === columnKey;
+        });
+        if (currentIndex >= 0 && currentIndex !== targetIndex) moveColumn(table, currentIndex, targetIndex);
+      });
+    }
+    function initTable(table, tableIndex) {
+      if (table.getAttribute('data-column-order-ready') === 'true') return;
+      var row = headerRow(table);
+      if (!row || row.cells.length < 2) return;
+      table.setAttribute('data-column-order-ready', 'true');
+      assignKeys(table);
+      var key = storageKey(table, tableIndex);
+      applyStored(table, key);
+      refreshSortIndexes(table);
+
+      var draggingKey = '';
+      Array.prototype.slice.call(row.cells).forEach(function (th) {
+        if (th.querySelector(':scope > .column-drag-handle')) return;
+        var handle = document.createElement('span');
+        handle.className = 'column-drag-handle';
+        handle.draggable = true;
+        handle.setAttribute('role', 'button');
+        handle.setAttribute('tabindex', '0');
+        handle.setAttribute('aria-label', 'Mover columna ' + clean(th.textContent));
+        handle.title = 'Arrastrá para mover esta columna';
+        th.appendChild(handle);
+
+        handle.addEventListener('dragstart', function (event) {
+          draggingKey = th.getAttribute('data-column-key') || '';
+          th.classList.add('is-dragging-column');
+          document.body.classList.add('is-dragging-grid-column');
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', draggingKey);
+          }
+          event.stopPropagation();
+        });
+        handle.addEventListener('dragend', function () {
+          draggingKey = '';
+          th.classList.remove('is-dragging-column');
+          document.body.classList.remove('is-dragging-grid-column');
+          Array.prototype.forEach.call(row.cells, function (cell) { cell.classList.remove('is-column-drop-target'); });
+        });
+        handle.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        th.addEventListener('dragover', function (event) {
+          if (!draggingKey) return;
+          event.preventDefault();
+          th.classList.add('is-column-drop-target');
+          if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+        });
+        th.addEventListener('dragleave', function () {
+          th.classList.remove('is-column-drop-target');
+        });
+        th.addEventListener('drop', function (event) {
+          if (!draggingKey) return;
+          event.preventDefault();
+          event.stopPropagation();
+          var currentRow = headerRow(table);
+          if (!currentRow) return;
+          var fromIndex = Array.prototype.findIndex.call(currentRow.cells, function (cell) {
+            return cell.getAttribute('data-column-key') === draggingKey;
+          });
+          var toIndex = th.cellIndex;
+          th.classList.remove('is-column-drop-target');
+          if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
+            moveColumn(table, fromIndex, toIndex);
+            saveOrder(key, currentOrder(table));
+            document.dispatchEvent(new CustomEvent('clear-grid-columns-reordered', { detail: { table: table } }));
+          }
+        });
+      });
+    }
+
+    document.querySelectorAll('table.grid').forEach(initTable);
+  })();
+
   // Ancho ajustable y persistente para todas las grillas.
   // Se guarda en localStorage por ruta, tabla y nombre de columna.
   (function initResizableGrids() {
@@ -1281,9 +1442,12 @@
         function onMove(event) {
           moved = true;
           var clientX = event.touches && event.touches[0] ? event.touches[0].clientX : event.clientX;
-          var width = setColumnWidth(table, headers, index, startWidth + (clientX - startX));
+          var liveHeaders = Array.prototype.slice.call(headerRow.cells);
+          var liveIndex = Array.prototype.indexOf.call(headerRow.cells, th);
+          if (liveIndex < 0) return;
+          var width = setColumnWidth(table, liveHeaders, liveIndex, startWidth + (clientX - startX));
           widths[columnKeys[index]] = width;
-          updateTableWidth(table, headers);
+          updateTableWidth(table, liveHeaders);
           event.preventDefault();
         }
 
@@ -1323,13 +1487,19 @@
           event.preventDefault();
           event.stopPropagation();
           delete widths[columnKeys[index]];
-          clearColumnWidth(table, headers, index);
+          var liveHeaders = Array.prototype.slice.call(headerRow.cells);
+          var liveIndex = Array.prototype.indexOf.call(headerRow.cells, th);
+          if (liveIndex < 0) return;
+          clearColumnWidth(table, liveHeaders, liveIndex);
           saveWidths(storageKey, widths);
           // Volver a medir el ancho natural de la columna.
           window.requestAnimationFrame(function () {
+            var currentHeaders = Array.prototype.slice.call(headerRow.cells);
+            var currentIndex = Array.prototype.indexOf.call(headerRow.cells, th);
+            if (currentIndex < 0) return;
             var natural = Math.max(MIN_WIDTH, Math.ceil(th.getBoundingClientRect().width));
-            setColumnWidth(table, headers, index, natural);
-            updateTableWidth(table, headers);
+            setColumnWidth(table, currentHeaders, currentIndex, natural);
+            updateTableWidth(table, currentHeaders);
           });
         });
       });
