@@ -415,7 +415,7 @@ window.CLEAR_ALL_ALARMS_COLUMNS = <?php echo json_encode(array_map(function($col
   var table=document.getElementById('allAlarmsTable');if(!table)return;
   var filters=Array.prototype.slice.call(table.querySelectorAll('[data-ta-column-filter]'));
   Array.prototype.forEach.call(table.querySelectorAll('.gridFilterRow select'),function(control){control.addEventListener('click',function(e){e.stopPropagation()})});
-  function apply(){var rows=table.tBodies[0]?table.tBodies[0].rows:[];Array.prototype.forEach.call(rows,function(row){row.hidden=!filters.every(function(filter){var value=(filter.value||'').trim().toLocaleLowerCase('es');if(!value)return true;var cell=row.cells[parseInt(filter.getAttribute('data-ta-column-filter'),10)];return cell&&(cell.textContent||'').toLocaleLowerCase('es').indexOf(value)!==-1})})}
+  function apply(){var rows=table.tBodies[0]?table.tBodies[0].rows:[];Array.prototype.forEach.call(rows,function(row){row.hidden=!filters.every(function(filter){var value=(filter.value||'').trim().toLocaleLowerCase('es');if(!value)return true;var holder=filter.closest?filter.closest('th'):null;var index=holder&&typeof holder.cellIndex==='number'?holder.cellIndex:parseInt(filter.getAttribute('data-ta-column-filter'),10);var cell=row.cells[index];return cell&&(cell.textContent||'').toLocaleLowerCase('es').indexOf(value)!==-1})})}
   filters.forEach(function(filter){filter.addEventListener('input',apply);filter.addEventListener('click',function(e){e.stopPropagation()})});
 })();
 </script>
