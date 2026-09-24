@@ -342,7 +342,7 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
                 <th>PRIORIDAD BAJA ↕</th>
                 <th>TAGS ÚNICOS ↕</th>
                 <th>ÚLTIMA ALARMA ↕</th>
-                <th>COMENTARIO</th>
+                <th class="no-sort" data-sortable="false">COMENTARIO</th>
               </tr>
               <tr class="gridFilterRow" aria-label="Filtros del detalle de pozos">
                 <?php if($reportEnabled): ?><th class="gridFilterRow__empty"></th><?php endif; ?>
@@ -369,7 +369,8 @@ $lowPct = $total > 0 ? ($low * 100 / $total) : 0;
                 $priorityMedium = (int)($detailRow['prioridad_media'] ?? $detailRow['PRIORIDAD_MEDIA'] ?? 0);
                 $priorityLow = (int)($detailRow['prioridad_baja'] ?? $detailRow['PRIORIDAD_BAJA'] ?? 0);
                 $uniqueDetailTags = (int)($detailRow['tags_unicos'] ?? $detailRow['TAGS_UNICOS'] ?? 0);
-                $displayLast = $detailLast !== '' ? date('d/m/Y H:i:s', strtotime($detailLast)) : '—';
+                $detailLastTs = $detailLast !== '' ? strtotime($detailLast) : false;
+                $displayLast = $detailLastTs !== false ? date('d/m/Y H:i:s', $detailLastTs) : '—';
                 $reportColumns = [
                     'Pozo'=>$detailWell,
                     'Total alarmas'=>$totalAlarms,
