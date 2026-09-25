@@ -52,12 +52,15 @@ try {
             'HORARIOS'=>trim($_POST['horarios']??'08:00')
         ];
         $next=report_next_run($r)->format('Y-m-d H:i:s');
-        $p=[trim($_POST['nombre']??''),$screens[0],$screensCsv,trim($_POST['destinatarios']??''),trim($_POST['cc']??''),trim($_POST['cco']??''),trim($_POST['asunto']??''),trim($_POST['cuerpo']??''),$r['FRECUENCIA'],$days,$r['HORARIOS'],(int)($_POST['activo']??1),$r['ZONA_HORARIA'],$next,auth_user()];
+        $owner=auth_user();
+        $p=[trim($_POST['nombre']??''),$screens[0],$screensCsv,trim($_POST['destinatarios']??''),trim($_POST['cc']??''),trim($_POST['cco']??''),trim($_POST['asunto']??''),trim($_POST['cuerpo']??''),$r['FRECUENCIA'],$days,$r['HORARIOS'],(int)($_POST['activo']??1),$r['ZONA_HORARIA'],$next];
         if(!$p[0]||!$p[3]||!$p[6]) throw new Exception('Completá nombre, destinatarios y asunto.');
         if($id){
-            $db->execute("UPDATE dbo.CLEAR_REPORT_SCHEDULES SET NOMBRE=?,TIPO_REPORTE=?,PANTALLAS=?,DESTINATARIOS=?,CC=?,CCO=?,ASUNTO=?,CUERPO=?,FRECUENCIA=?,DIAS_SEMANA=?,HORARIOS=?,ACTIVO=?,ZONA_HORARIA=?,PROXIMA_EJECUCION=?,FECHA_MODIFICACION=SYSDATETIME(),USUARIO_CARGA=? WHERE ID=?",array_merge($p,[$id]));
+            /* El administrador puede mantener programaciones de usuarios, pero
+               editar una no debe cambiar su propietario ni ampliar sus permisos. */
+            $db->execute("UPDATE dbo.CLEAR_REPORT_SCHEDULES SET NOMBRE=?,TIPO_REPORTE=?,PANTALLAS=?,DESTINATARIOS=?,CC=?,CCO=?,ASUNTO=?,CUERPO=?,FRECUENCIA=?,DIAS_SEMANA=?,HORARIOS=?,ACTIVO=?,ZONA_HORARIA=?,PROXIMA_EJECUCION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=?",array_merge($p,[$id]));
         } else {
-            $db->execute("INSERT INTO dbo.CLEAR_REPORT_SCHEDULES(NOMBRE,TIPO_REPORTE,PANTALLAS,DESTINATARIOS,CC,CCO,ASUNTO,CUERPO,FRECUENCIA,DIAS_SEMANA,HORARIOS,ACTIVO,ZONA_HORARIA,PROXIMA_EJECUCION,USUARIO_CARGA) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",$p);
+            $db->execute("INSERT INTO dbo.CLEAR_REPORT_SCHEDULES(NOMBRE,TIPO_REPORTE,PANTALLAS,DESTINATARIOS,CC,CCO,ASUNTO,CUERPO,FRECUENCIA,DIAS_SEMANA,HORARIOS,ACTIVO,ZONA_HORARIA,PROXIMA_EJECUCION,USUARIO_CARGA) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",array_merge($p,[$owner]));
         }
         audit_log('REPORT_SCHEDULE_SAVE','reportes',$p[0].' | '.$screensCsv);
         clear_report_json_response(['ok'=>true,'message'=>'Programación guardada.']);
