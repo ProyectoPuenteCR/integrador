@@ -22,15 +22,17 @@ function dashboard_surface_cache_metric($surfaceName, $fallbackName, $db)
 
 function dashboard_surface_cache_kpi($surfaceName, $fallbackName, $default, $db)
 {
-    $value = clear_performance_cache_kpi($surfaceName, null, $db);
-    if ($value !== null) return $value;
+    if (dashboard_surface_cache_ready($db)) {
+        return clear_performance_cache_kpi($surfaceName, $default, $db);
+    }
     return clear_performance_cache_kpi($fallbackName, $default, $db);
 }
 
 function dashboard_surface_cache_text($surfaceName, $fallbackName, $default, $db)
 {
-    $value = clear_performance_cache_text($surfaceName, null, $db);
-    if ($value !== null && trim((string)$value) !== '') return $value;
+    if (dashboard_surface_cache_ready($db)) {
+        return clear_performance_cache_text($surfaceName, $default, $db);
+    }
     return clear_performance_cache_text($fallbackName, $default, $db);
 }
 
@@ -156,28 +158,10 @@ function dashboard_visual_metrics()
     $pending = max(0, $recognized - $commented);
     $data['recognition'] = ['total'=>$recognized,'commented'=>$commented,'pending'=>$pending,'coverage'=>$recognized>0?round(($commented/$recognized)*100,1):0];
 
-    /* La lista detallada se carga solo cuando existe caché operativa; sin ella
-       evitamos el NOT EXISTS masivo al abrir la portada. */
-    if ($cache !== null) {
-        $hasReconExternal = (int)($db->scalar(
-            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='FIXALARMS_RECONOCIDAS' AND COLUMN_NAME='ALM_ALMEXTFLD2'"
-        ) ?? 0) > 0;
-        $reconTagExpr = "UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(255),R.TAG_FIX),N''))))";
-        $reconInstExpr = "LEFT($reconTagExpr,CHARINDEX(N'_',$reconTagExpr+N'_')-1)";
-        $surfaceReconSql = $hasReconExternal
-            ? " AND ($reconInstExpr=N'PIALH3' OR NOT (UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),R.ALM_ALMEXTFLD2),N'')))) LIKE N'YPF.SC%' OR $reconTagExpr LIKE N'YPF.SC%'))"
-            : " AND ($reconInstExpr=N'PIALH3' OR ($reconTagExpr NOT LIKE N'YPF.SC%' AND NOT EXISTS (SELECT 1 FROM dbo.CLEAR_F_FIXALARMS A WHERE UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(255),A.ALM_TAGNAME),N'')))) COLLATE DATABASE_DEFAULT=$reconTagExpr COLLATE DATABASE_DEFAULT AND UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_ALMEXTFLD2),N'')))) LIKE N'YPF.SC%')))";
-
-        foreach ($db->all(
-            "SELECT TOP 20 R.TAG_FIX,R.OPERADOR,CONVERT(varchar(19),R.ALM_NATIVETIMEIN,120) FECHA,R.ALM_DESCR,R.ALM_ALMPRIORITY " .
-            "FROM dbo.FIXALARMS_RECONOCIDAS R " .
-            "WHERE NOT EXISTS (SELECT 1 FROM dbo.FIXALARMS_COMENTARIOS C WHERE C.ACTIVO=1 AND C.TAG_FIX=R.TAG_FIX AND C.OPERADOR=R.OPERADOR AND C.FECHA_RECONOCIMIENTO=R.ALM_NATIVETIMEIN)" .
-            $surfaceReconSql .
-            " ORDER BY CASE WHEN UPPER(ISNULL(R.ALM_ALMPRIORITY,''))='HIGH' THEN 0 ELSE 1 END,R.ALM_NATIVETIMEIN DESC"
-        ) as $r) {
-            $data['pending_comments'][]=['tag'=>trim((string)($r['TAG_FIX']??'')),'operator'=>trim((string)($r['OPERADOR']??'')),'date'=>trim((string)($r['FECHA']??'')),'description'=>trim((string)($r['ALM_DESCR']??'')),'priority'=>trim((string)($r['ALM_ALMPRIORITY']??''))];
-        }
-    }
+    /* El detalle de pendientes NO se consulta contra FIXALARMS/FIXALARMS_RECONOCIDAS
+       durante la apertura del dashboard. Esa búsqueda histórica puede recorrer
+       millones de filas y provocar timeout/FastCGI 500. El contador sigue
+       saliendo de la caché INST_*; el detalle se revisa desde la grilla. */
     return $data;
 }
 
