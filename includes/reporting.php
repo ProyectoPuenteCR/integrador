@@ -213,7 +213,7 @@ function report_generate_pdf($id,$screen,$outfile){
      * El pequeño presupuesto virtual permite que gráficos y grillas terminen
      * de pintar antes de imprimir, sin dejar procesos de Chrome abiertos.
      */
-    $cmd='"'.$chrome.'" --headless --disable-gpu --no-sandbox --run-all-compositor-stages-before-draw --virtual-time-budget=2500 --print-to-pdf="'.$outfile.'" --print-to-pdf-no-header "'.$url.'" 2>&1';
+    $cmd='"'.$chrome.'" --headless --disable-gpu --no-sandbox --window-size=1600,1000 --force-device-scale-factor=1 --run-all-compositor-stages-before-draw --virtual-time-budget=5000 --no-pdf-header-footer --print-to-pdf-no-header --print-to-pdf="'.$outfile.'" "'.$url.'" 2>&1';
     exec($cmd,$out,$code);
     if($code!==0||!is_file($outfile))return [false,implode("\n",$out)?:'Chrome no generó el PDF'];
     return [true,''];
