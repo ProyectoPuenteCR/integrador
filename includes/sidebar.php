@@ -82,6 +82,7 @@ $menuItems = [
     ['key'=>'grupo_telemetria','label'=>'Telemetría de Pozos','icon'=>'monitor','children'=>$telemetriaPozos],
     $inyeccionAgua,
     ['key'=>'grupo_novedades_semanales','label'=>'Novedades semanales','icon'=>'calendar','children'=>$novedadesSemanales],
+    ['key'=>'mis_reportes','label'=>'Mis Reportes','icon'=>'file','url'=>'mis_reportes.php'],
     ['key'=>'reportes_guardados','label'=>'REPORTES','icon'=>'file','url'=>'reportes_guardados.php'],
     ['key'=>'comentarios','label'=>'Comentarios','icon'=>'message','url'=>'comentarios.php'],
     ['key'=>'grupo_alarmas_pozos','label'=>'Alarmas de Pozos','icon'=>'oil','children'=>$alarmasPozos],
@@ -96,6 +97,7 @@ $favCatalog = [
     'pozos_por_baterias'=>['Pozos por Baterías','grid','pozos_por_baterias.php'],
     'scada_realtime'=>['SCADA Real time','monitor','scada_realtime.php'],
     'reportes'=>['Reportes por correo','file','reportes.php'],
+    'mis_reportes'=>['Mis Reportes','file','mis_reportes.php'],
     'reportes_guardados'=>['REPORTES','file','reportes_guardados.php'],
     'comentarios'=>['Comentarios','message','comentarios.php']
 ];
