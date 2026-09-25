@@ -63,6 +63,10 @@ function mr_freq_label($value, $days = '')
     }
     return $value !== '' ? $value : '—';
 }
+function mr_num($value)
+{
+    return number_format((int)$value,0,',','.');
+}
 function mr_datetime($value)
 {
     $value = trim((string)$value);
@@ -139,9 +143,9 @@ function mr_screen_summary($value, $catalog)
 <div id="mrMessage"></div>
 
 <section class="mrKpis">
-  <article class="mrKpi"><div class="mrKpi__icon"><?php echo icon('file'); ?></div><div><b><?php echo fmt_num($programmed); ?></b><span>Programados</span></div></article>
-  <article class="mrKpi"><div class="mrKpi__icon"><?php echo icon('check'); ?></div><div><b><?php echo fmt_num($activeCount); ?></b><span>Activos</span></div></article>
-  <article class="mrKpi"><div class="mrKpi__icon"><?php echo icon('clock'); ?></div><div><b><?php echo fmt_num($executedToday); ?></b><span>Ejecutados hoy</span></div></article>
+  <article class="mrKpi"><div class="mrKpi__icon"><?php echo icon('file'); ?></div><div><b><?php echo mr_num($programmed); ?></b><span>Programados</span></div></article>
+  <article class="mrKpi"><div class="mrKpi__icon"><?php echo icon('check'); ?></div><div><b><?php echo mr_num($activeCount); ?></b><span>Activos</span></div></article>
+  <article class="mrKpi"><div class="mrKpi__icon"><?php echo icon('history'); ?></div><div><b><?php echo mr_num($executedToday); ?></b><span>Ejecutados hoy</span></div></article>
 </section>
 
 <section class="mrPanel">
@@ -219,9 +223,9 @@ function mr_screen_summary($value, $catalog)
           <td title="<?php echo h(mr_screen_summary($r['PANTALLAS']??$r['TIPO_REPORTE']??'', $catalog)); ?>"><?php echo h(mr_screen_summary($r['PANTALLAS']??$r['TIPO_REPORTE']??'', $catalog)); ?></td>
           <td><?php if($lastState==='ERROR'): ?><span class="mrBadge err">Error</span><?php elseif($lastState!==''): ?><span class="mrBadge"><?php echo h($lastState); ?></span><?php else: ?><span class="mrMuted">Sin envíos</span><?php endif; ?></td>
           <td><div class="mrRowActions">
-            <button type="button" class="mrIconBtn" title="Editar" onclick='mrEdit(<?php echo $rowJson; ?>)'><?php echo icon('edit'); ?></button>
-            <button type="button" class="mrIconBtn" title="Ejecutar ahora" onclick="mrSend(<?php echo (int)$r['ID']; ?>)"><?php echo icon('play'); ?></button>
-            <button type="button" class="mrIconBtn" title="Duplicar" onclick="mrDuplicate(<?php echo (int)$r['ID']; ?>)"><?php echo icon('copy'); ?></button>
+            <button type="button" class="mrIconBtn" title="Editar" onclick='mrEdit(<?php echo $rowJson; ?>)'><?php echo icon('tools'); ?></button>
+            <button type="button" class="mrIconBtn" title="Ejecutar ahora" onclick="mrSend(<?php echo (int)$r['ID']; ?>)"><?php echo icon('check'); ?></button>
+            <button type="button" class="mrIconBtn" title="Duplicar" onclick="mrDuplicate(<?php echo (int)$r['ID']; ?>)"><?php echo icon('plus'); ?></button>
             <button type="button" class="mrIconBtn danger" title="Eliminar" onclick="mrDelete(<?php echo (int)$r['ID']; ?>)"><?php echo icon('trash'); ?></button>
           </div></td>
         </tr>
