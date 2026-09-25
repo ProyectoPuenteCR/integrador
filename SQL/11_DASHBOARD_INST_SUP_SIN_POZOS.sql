@@ -17,6 +17,8 @@ GO
       * El resto pertenece al universo de instalaciones de superficie.
   - PC10, PC12, PC14, SR5, SB7, etc. no se hardcodean: si el campo externo
     los identifica como YPF.SC quedan automaticamente fuera del dashboard.
+  - Las métricas de 24 h usan dbo.FIXALARMS_24H, igual que la pantalla
+    "Alarmas 24h", para que el total del Dashboard coincida con la grilla.
 */
 
 CREATE OR ALTER PROCEDURE dbo.SP_CLEAR_ACTUALIZAR_CACHE_INST_SUP
@@ -81,10 +83,37 @@ BEGIN
 
     CREATE CLUSTERED INDEX IX_CLEAR_INST_BASE7I_FECHA ON #BASE7_INST(ALM_NATIVETIMEIN);
 
-    SELECT *
+    /* IMPORTANTE:
+       Las métricas de 24 h del Dashboard Inst Sup deben usar la MISMA fuente
+       que la pantalla "Alarmas 24h" (dbo.FIXALARMS_24H). Antes se reconstruían
+       desde FIXALARMS histórico por fecha y eso podía contar muchos más eventos
+       que la grilla de 24 h. */
+    SELECT
+        A.ALM_NATIVETIMEIN,
+        LTRIM(RTRIM(CONVERT(nvarchar(500),A.ALM_TAGNAME))) TAG,
+        UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_ALMEXTFLD2),N'')))) CAMPO_EXT,
+        UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(100),A.ALM_ALMPRIORITY),N'')))) PRIORIDAD,
+        UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(255),A.ALM_ALMSTATUS),N'')))) ESTADO,
+        UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_VALUE),N'')))) VALOR
     INTO #BASE24_INST
-    FROM #BASE7_INST
-    WHERE ALM_NATIVETIMEIN>=DATEADD(hour,-24,@ahora);
+    FROM dbo.FIXALARMS_24H A
+    CROSS APPLY
+    (
+        SELECT UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_TAGNAME),N'')))) TAG_NORM
+    ) T
+    CROSS APPLY
+    (
+        SELECT LEFT(T.TAG_NORM,CHARINDEX(N'_',T.TAG_NORM+N'_')-1) INST
+    ) I
+    WHERE
+        I.INST=N'PIALH3'
+        OR NOT
+        (
+            UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_ALMEXTFLD2),N'')))) LIKE N'YPF.SC%'
+            OR T.TAG_NORM LIKE N'YPF.SC%'
+        );
+
+    CREATE CLUSTERED INDEX IX_CLEAR_INST_BASE24_FECHA ON #BASE24_INST(ALM_NATIVETIMEIN);
 
     /* El TAG se acota a 255 caracteres para que la clave del índice quede
        muy por debajo del límite de 900 bytes de SQL Server. */
@@ -480,4 +509,31 @@ WHERE METRICA IN
        N'HORARIA_INST',N'FLUJO_INST',N'HEATMAP_INST',N'OPERADORES_INST',N'INSTALACIONES_INST')
    OR (METRICA=N'KPI' AND DIMENSION1 LIKE N'INST_%')
 ORDER BY METRICA,ORDEN;
+GO
+
+/* Validación rápida: ambos valores deben coincidir.
+   CACHE_DASHBOARD = tarjeta del Dashboard Inst Sup.
+   FUENTE_ALARMAS24H = misma fuente y clasificación que list.php?s=alarmas24h&scope=instalaciones. */
+SELECT
+    CAST(MAX(CASE WHEN METRICA=N'KPI' AND DIMENSION1=N'INST_TOTAL24H' THEN VALOR1 END) AS bigint) AS CACHE_DASHBOARD,
+    (
+        SELECT COUNT_BIG(*)
+        FROM dbo.FIXALARMS_24H A
+        CROSS APPLY
+        (
+            SELECT UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_TAGNAME),N'')))) TAG_NORM
+        ) T
+        CROSS APPLY
+        (
+            SELECT LEFT(T.TAG_NORM,CHARINDEX(N'_',T.TAG_NORM+N'_')-1) INST
+        ) I
+        WHERE
+            I.INST=N'PIALH3'
+            OR NOT
+            (
+                UPPER(LTRIM(RTRIM(COALESCE(CONVERT(nvarchar(500),A.ALM_ALMEXTFLD2),N'')))) LIKE N'YPF.SC%'
+                OR T.TAG_NORM LIKE N'YPF.SC%'
+            )
+    ) AS FUENTE_ALARMAS24H
+FROM dbo.CLEAR_CACHE_OPERATIVA;
 GO
