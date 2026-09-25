@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 const screenSearch=document.getElementById('reportScreenSearch');
-if(screenSearch){screenSearch.addEventListener('input',function(){var q=this.value.trim().toLowerCase();document.querySelectorAll('.reportScreens label').forEach(function(l){l.style.display=!q||String(l.dataset.screenLabel||'').includes(q)?'flex':'none';});});}
+if(screenSearch){screenSearch.addEventListener('input',function(){var q=this.value.trim().toLowerCase();document.querySelectorAll('.reportScreens label').forEach(function(l){l.style.display=!q||String(l.dataset.screenLabel||'').includes(q)?'grid':'none';});});}
 document.getElementById('selectAllScreens')?.addEventListener('click',function(){document.querySelectorAll('.reportScreens input[type=checkbox]').forEach(function(x){if(x.closest('label').style.display!=='none')x.checked=true;});});
 document.getElementById('clearAllScreens')?.addEventListener('click',function(){document.querySelectorAll('.reportScreens input[type=checkbox]').forEach(function(x){if(x.closest('label').style.display!=='none')x.checked=false;});});
 
