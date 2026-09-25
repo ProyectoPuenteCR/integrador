@@ -7,10 +7,16 @@
 
 require_once __DIR__ . '/performance_cache.php';
 
+function dashboard_surface_cache_ready($db)
+{
+    return clear_performance_cache_kpi('INST_TOTAL24H', null, $db) !== null;
+}
+
 function dashboard_surface_cache_metric($surfaceName, $fallbackName, $db)
 {
-    $rows = clear_performance_cache_metric($surfaceName, $db);
-    if (!empty($rows)) return $rows;
+    if (dashboard_surface_cache_ready($db)) {
+        return clear_performance_cache_metric($surfaceName, $db) ?: [];
+    }
     return clear_performance_cache_metric($fallbackName, $db) ?: [];
 }
 
@@ -135,7 +141,7 @@ function dashboard_visual_metrics()
         foreach (dashboard_surface_cache_metric('HEATMAP_INST', 'HEATMAP', $db) as $r) {
             $data['heatmap'][] = ['date'=>substr((string)($r['DIMENSION1'] ?? ''),0,10), 'hour'=>(int)($r['DIMENSION2'] ?? 0), 'value'=>(int)($r['VALOR1'] ?? 0)];
         }
-        foreach (clear_performance_cache_metric('INSTALACIONES', $db) as $r) {
+        foreach (dashboard_surface_cache_metric('INSTALACIONES_INST', 'INSTALACIONES', $db) as $r) {
             $data['installations'][] = ['name'=>trim((string)($r['DIMENSION1'] ?? '—')), 'total'=>(int)($r['VALOR1'] ?? 0), 'critical'=>(int)($r['VALOR2'] ?? 0)];
         }
         $recognized = (int)dashboard_surface_cache_kpi('INST_RECONOCIDAS', 'RECONOCIDAS', 0, $db);
