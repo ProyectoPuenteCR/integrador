@@ -19,7 +19,6 @@ $requestedScreen = trim((string)($_GET['pantalla'] ?? ''));
 if ($requestedScreen !== '' && !isset($screenDefs[$requestedScreen])) $requestedScreen = '';
 
 $rows = [];
-$logs = [];
 $programmed = 0;
 $activeCount = 0;
 $executedToday = 0;
@@ -35,12 +34,6 @@ if ($db->ok() && $tablesReady) {
         "WHERE S.USUARIO_CARGA=? AND L.ESTADO=N'ENVIADO' AND L.FECHA_EJECUCION>=CONVERT(date,SYSDATETIME())",
         [$APP_USER]
     ) ?? 0);
-    $logs = $db->all(
-        "SELECT TOP 20 L.FECHA_EJECUCION,L.ESTADO,L.DESTINATARIOS,L.ERROR,S.NOMBRE " .
-        "FROM dbo.CLEAR_REPORT_LOG L INNER JOIN dbo.CLEAR_REPORT_SCHEDULES S ON S.ID=L.ID_REPORTE " .
-        "WHERE S.USUARIO_CARGA=? ORDER BY L.FECHA_EJECUCION DESC",
-        [$APP_USER]
-    );
 }
 
 $schedulerLast = $tablesReady ? report_setting('SCHEDULER_LAST_RUN','') : '';
@@ -74,10 +67,14 @@ function mr_datetime($value)
     $ts = strtotime($value);
     return $ts ? date('d/m/Y H:i', $ts) : $value;
 }
-function mr_screen_summary($value, $catalog)
+function mr_screen_summary($value, $catalog, $allowedDefs)
 {
     $labels = [];
-    foreach (report_parse_screens($value) as $key) $labels[] = $catalog[$key] ?? $key;
+    foreach (report_parse_screens($value) as $key) {
+        if (!isset($allowedDefs[$key])) continue;
+        $labels[] = $catalog[$key] ?? $key;
+    }
+    if (!$labels) return 'Sin pantallas habilitadas';
     if (count($labels) > 3) return implode(', ', array_slice($labels, 0, 3)) . ' +' . (count($labels) - 3);
     return implode(', ', $labels);
 }
@@ -87,7 +84,7 @@ function mr_screen_summary($value, $catalog)
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mis Reportes · CLEAR Plataforma</title>
-<link rel="stylesheet" href="assets/css/app.css?v=20260925-mis-reportes-1">
+<link rel="stylesheet" href="assets/css/app.css?v=20260925-mis-reportes-2">
 <style>
 .mrKpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .mrKpi{background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:14px;padding:15px 17px;display:flex;align-items:center;gap:13px}
@@ -195,8 +192,7 @@ function mr_screen_summary($value, $catalog)
     <div class="mrMuted" style="margin-top:7px">Solo aparecen pantallas habilitadas para tu usuario. Si perdés acceso a una pantalla, el informe no la podrá ejecutar.</div>
 
     <div class="mrActions">
-      <button class="mrBtn primary" type="submit"><?php echo icon('check'); ?> Guardar programación</button>
-      <button class="mrBtn" type="button" id="mrReset">Limpiar</button>
+      <button class="mrBtn primary" type="submit">Guardar programación</button>
     </div>
   </form>
 </section>
@@ -220,7 +216,7 @@ function mr_screen_summary($value, $catalog)
           <td><?php echo h(mr_freq_label($r['FRECUENCIA']??'', $r['DIAS_SEMANA']??'')); ?><div class="mrMuted"><?php echo h($r['HORARIOS']??''); ?></div></td>
           <td><?php echo h(mr_datetime($r['PROXIMA_EJECUCION']??'')); ?></td>
           <td><span class="mrBadge <?php echo !empty($r['ACTIVO'])?'':'off'; ?>"><?php echo !empty($r['ACTIVO'])?'Activo':'Pausado'; ?></span></td>
-          <td title="<?php echo h(mr_screen_summary($r['PANTALLAS']??$r['TIPO_REPORTE']??'', $catalog)); ?>"><?php echo h(mr_screen_summary($r['PANTALLAS']??$r['TIPO_REPORTE']??'', $catalog)); ?></td>
+          <td title="<?php echo h(mr_screen_summary($r['PANTALLAS']??$r['TIPO_REPORTE']??'', $catalog, $screenDefs)); ?>"><?php echo h(mr_screen_summary($r['PANTALLAS']??$r['TIPO_REPORTE']??'', $catalog, $screenDefs)); ?></td>
           <td><?php if($lastState==='ERROR'): ?><span class="mrBadge err">Error</span><?php elseif($lastState!==''): ?><span class="mrBadge"><?php echo h($lastState); ?></span><?php else: ?><span class="mrMuted">Sin envíos</span><?php endif; ?></td>
           <td><div class="mrRowActions">
             <button type="button" class="mrIconBtn" title="Editar" onclick='mrEdit(<?php echo $rowJson; ?>)'><?php echo icon('tools'); ?></button>
@@ -235,17 +231,10 @@ function mr_screen_summary($value, $catalog)
   </div>
 </section>
 
-<section class="mrPanel">
-  <div class="mrPanel__head"><div><h2>Historial reciente</h2><p>Últimas ejecuciones de tus informes.</p></div></div>
-  <div class="mrTableWrap"><table class="mrTable"><thead><tr><th>Fecha</th><th>Informe</th><th>Estado</th><th>Destinatarios</th><th>Detalle</th></tr></thead><tbody>
-  <?php if(!$logs): ?><tr><td colspan="5" class="mrMuted">Todavía no hay ejecuciones registradas.</td></tr><?php endif; ?>
-  <?php foreach($logs as $log): ?><tr><td><?php echo h(mr_datetime($log['FECHA_EJECUCION']??'')); ?></td><td><?php echo h($log['NOMBRE']??'—'); ?></td><td><?php echo h($log['ESTADO']??'—'); ?></td><td><?php echo h($log['DESTINATARIOS']??''); ?></td><td class="mrMuted"><?php echo h($log['ERROR']??''); ?></td></tr><?php endforeach; ?>
-  </tbody></table></div>
-</section>
 
 </main>
 </div>
-<script src="assets/js/app.js?v=20260925-mis-reportes-1"></script>
+<script src="assets/js/app.js?v=20260925-mis-reportes-2"></script>
 <script>
 (function(){
   var form=document.getElementById('mrForm');
@@ -275,11 +264,6 @@ function mr_screen_summary($value, $catalog)
       .catch(function(e){note(e.message,false);button.disabled=false;});
   });
 
-  document.getElementById('mrReset').addEventListener('click',function(){
-    form.reset();document.getElementById('mrId').value='';document.getElementById('mrFormTitle').textContent='Nuevo informe programado';
-    var checked=document.querySelectorAll('.mrScreens input[type=checkbox]:checked');checked.forEach(function(x){x.checked=false;});
-    var first=document.querySelector('.mrScreens input[type=checkbox]');if(first)first.checked=true;
-  });
   if(screenSearch)screenSearch.addEventListener('input',function(){
     var q=this.value.trim().toLowerCase();
     document.querySelectorAll('.mrScreen').forEach(function(row){row.style.display=!q||String(row.dataset.search||'').includes(q)?'flex':'none';});
