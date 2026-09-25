@@ -144,6 +144,26 @@ function report_screen_catalog(){
 function report_screen_picker_definitions(){
     return array_filter(report_screen_definitions(),static function($def){return empty($def['hidden']);});
 }
+function report_screen_allowed_for_user($screen,$usuario=null){
+    $screen=trim((string)$screen);
+    if($usuario===null && function_exists('auth_user')) $usuario=auth_user();
+    $usuario=trim((string)$usuario);
+    if($screen==='' || $usuario==='') return false;
+
+    if($screen==='inicio') return true;
+    if($screen==='comentarios_semana') return permissions_can('comments.view',$usuario);
+    if(in_array($screen,['top_total','top_hml'],true)){
+        return permissions_can_menu('top20_all',$usuario) || permissions_can_menu('alarmas24h',$usuario);
+    }
+    return permissions_can_menu($screen,$usuario);
+}
+function report_screen_picker_definitions_for_user($usuario=null){
+    $out=[];
+    foreach(report_screen_picker_definitions() as $key=>$def){
+        if(report_screen_allowed_for_user($key,$usuario)) $out[$key]=$def;
+    }
+    return $out;
+}
 function report_screen_group($screen){
     $defs=report_screen_definitions();
     return isset($defs[$screen])?(string)($defs[$screen]['group']??'Otros'):'Otros';
@@ -221,8 +241,16 @@ function report_smtp_config(){
 function report_execute(array $r,$user='scheduler'){
     $start=microtime(true);
     $screens=report_parse_screens($r['PANTALLAS']??$r['TIPO_REPORTE']??'dashboard');
+    $owner=trim((string)($r['USUARIO_CARGA']??''));
     $files=[];
     foreach($screens as $screen){
+        if($owner!=='' && !report_screen_allowed_for_user($screen,$owner)){
+            $catalog=report_screen_catalog();
+            $label=$catalog[$screen]??$screen;
+            $err='La pantalla "'.$label.'" ya no está habilitada para el usuario '.$owner.'.';
+            report_log($r['ID'],$r['DESTINATARIOS'],'ERROR','',$err,(int)(microtime(true)-$start),$user);
+            return [false,$err];
+        }
         $safe=preg_replace('/[^A-Za-z0-9_-]+/','_', $screen);
         $tmp=sys_get_temp_dir().DIRECTORY_SEPARATOR.'CLEAR_'.$safe.'_'.date('Ymd_His').'.pdf';
         list($ok,$err)=report_generate_pdf((int)$r['ID'],$screen,$tmp);
