@@ -160,7 +160,15 @@ function report_screen_allowed_for_user($screen,$usuario=null){
 function report_screen_picker_definitions_for_user($usuario=null){
     $out=[];
     foreach(report_screen_picker_definitions() as $key=>$def){
-        if(report_screen_allowed_for_user($key,$usuario)) $out[$key]=$def;
+        if(!report_screen_allowed_for_user($key,$usuario)) continue;
+
+        /* En "Mis Reportes" mostrar únicamente pantallas reales a las que el
+           usuario puede navegar. Se excluyen vistas internas/compatibilidad
+           que no tienen una pantalla propia en el menú. */
+        $target=trim((string)($def['target']??''));
+        if($target==='') continue;
+
+        $out[$key]=$def;
     }
     return $out;
 }
