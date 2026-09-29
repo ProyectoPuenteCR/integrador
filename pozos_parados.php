@@ -117,6 +117,16 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
         <div class="ppStatePicker__actions"><button type="button" data-state-all="1">Todos</button><button type="button" data-state-all="0">Ninguno</button></div>
       </div>
     </div>
+    <div class="ppStatePicker" id="ppTelemetryPicker">
+      <button class="ppStatePicker__button" type="button" id="ppTelemetryPickerButton">Estados telemetría ▾</button>
+      <div class="ppStatePicker__menu ppStatePicker__menu--wide" id="ppTelemetryPickerMenu" hidden>
+        <div class="ppStatePicker__title">Estados de telemetría considerados</div>
+        <?php foreach($telemetryStates as $telemetryOption): ?>
+          <label><input type="checkbox" class="ppTelemetryCheck" value="<?php echo h($telemetryOption); ?>" checked><span><?php echo h($telemetryOption); ?></span></label>
+        <?php endforeach; ?>
+        <div class="ppStatePicker__actions"><button type="button" data-telemetry-all="1">Todos</button><button type="button" data-telemetry-all="0">Ninguno</button></div>
+      </div>
+    </div>
     <input id="ppSearch" type="search" placeholder="Buscar pozo, batería o estado Zafiro…">
     <button class="ppBtn" id="ppClear">Limpiar filtros</button>
     <span class="ppUpdated">Actualizado: <b><?php echo h(pp_d($lastCache)); ?></b></span>
@@ -215,6 +225,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
  modal?.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});
  const sys=document.getElementById('ppSystem'),search=document.getElementById('ppSearch');
  const stateChecks=Array.from(document.querySelectorAll('.ppStateCheck'));
+ const telemetryChecks=Array.from(document.querySelectorAll('.ppTelemetryCheck'));
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
  const ppNumber=v=>{
    if(v===null||v===undefined||v==='')return 0;
@@ -231,6 +242,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
  };
  const fmt=v=>ppNumber(v).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
  function selectedStates(){return new Set(stateChecks.filter(x=>x.checked).map(x=>x.value));}
+ function selectedTelemetryStates(){return new Set(telemetryChecks.filter(x=>x.checked).map(x=>x.value.toLowerCase()));}
 
  // Redimensionado de columnas: arrastrar el borde derecho del encabezado.
  document.querySelectorAll('#ppTable thead tr:first-child th').forEach((th,index)=>{
@@ -257,11 +269,14 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
  });
  function apply(){
    let n=0,oil=0,lossNow=0,loss24=0,counts={MONITOREO:0,PCP:0,BES:0,TECSS:0};
-   const q=(search?.value||'').trim().toLowerCase(),states=selectedStates();
+   const q=(search?.value||'').trim().toLowerCase(),states=selectedStates(),telemetrySelected=selectedTelemetryStates();
    const cf={};colFilters.forEach(x=>cf[x.dataset.colFilter]=(x.value||'').trim().toLowerCase());
    document.querySelectorAll('#ppTable tbody tr[data-system]').forEach(r=>{
      const alarm=Number(r.dataset.alarm||0);
-     let ok=states.has(r.dataset.state)&&(!sys.value||r.dataset.system===sys.value)&&(!q||r.dataset.search.includes(q));
+     let ok=states.has(r.dataset.state)
+       && telemetrySelected.has((r.dataset.telemetry||'').toLowerCase())
+       && (!sys.value||r.dataset.system===sys.value)
+       && (!q||r.dataset.search.includes(q));
      if(cf.well&&!r.dataset.well.includes(cf.well))ok=false;
      if(cf.battery&&!r.dataset.battery.includes(cf.battery))ok=false;
      if(cf.system&&r.dataset.system.toLowerCase()!==cf.system)ok=false;
@@ -284,14 +299,20 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
    document.getElementById('ppLossNow').textContent=fmt(lossNow);
    document.getElementById('ppLoss24').textContent=fmt(loss24);
  }
- [sys,...stateChecks,...colFilters].forEach(x=>x&&x.addEventListener(x.tagName==='INPUT'&&x.type!=='checkbox'?'input':'change',apply));
+ [sys,...stateChecks,...telemetryChecks,...colFilters].forEach(x=>x&&x.addEventListener(x.tagName==='INPUT'&&x.type!=='checkbox'?'input':'change',apply));
  search?.addEventListener('input',apply);
  document.querySelectorAll('[data-system-card]').forEach(b=>b.addEventListener('click',()=>{if(sys){sys.value=b.dataset.systemCard;apply();}}));
  const picker=document.getElementById('ppStatePicker'),pickerBtn=document.getElementById('ppStatePickerButton'),pickerMenu=document.getElementById('ppStatePickerMenu');
- pickerBtn?.addEventListener('click',()=>pickerMenu.hidden=!pickerMenu.hidden);
- document.addEventListener('click',e=>{if(picker&&!picker.contains(e.target))pickerMenu.hidden=true;});
+ const telemetryPicker=document.getElementById('ppTelemetryPicker'),telemetryPickerBtn=document.getElementById('ppTelemetryPickerButton'),telemetryPickerMenu=document.getElementById('ppTelemetryPickerMenu');
+ pickerBtn?.addEventListener('click',()=>{pickerMenu.hidden=!pickerMenu.hidden;if(telemetryPickerMenu)telemetryPickerMenu.hidden=true;});
+ telemetryPickerBtn?.addEventListener('click',()=>{telemetryPickerMenu.hidden=!telemetryPickerMenu.hidden;if(pickerMenu)pickerMenu.hidden=true;});
+ document.addEventListener('click',e=>{
+   if(picker&&!picker.contains(e.target))pickerMenu.hidden=true;
+   if(telemetryPicker&&!telemetryPicker.contains(e.target))telemetryPickerMenu.hidden=true;
+ });
  document.querySelectorAll('[data-state-all]').forEach(b=>b.addEventListener('click',()=>{stateChecks.forEach(x=>x.checked=b.dataset.stateAll==='1');apply();}));
- document.getElementById('ppClear')?.addEventListener('click',()=>{sys.value='';search.value='';stateChecks.forEach(x=>x.checked=true);colFilters.forEach(x=>x.value='');apply();});
+ document.querySelectorAll('[data-telemetry-all]').forEach(b=>b.addEventListener('click',()=>{telemetryChecks.forEach(x=>x.checked=b.dataset.telemetryAll==='1');apply();}));
+ document.getElementById('ppClear')?.addEventListener('click',()=>{sys.value='';search.value='';stateChecks.forEach(x=>x.checked=true);telemetryChecks.forEach(x=>x.checked=true);colFilters.forEach(x=>x.value='');apply();});
  apply();
 })();
 </script>
