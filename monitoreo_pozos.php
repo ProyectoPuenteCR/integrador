@@ -12,8 +12,8 @@ $TELEMETRY = [
     'remote_stop_after'=>'ESTADO',
     'force_columns'=>['PT:LINEA'],
     'display_order'=>['POZO','BATERIA','ALM','__COMUNICACION','ESTADO','ESTADO-GRAL','PT:LINEA','QT:RPM','ESTADO_RPM','PANTALLA','CARTAS'],
-    'column_state_version'=>'342',
-    'labels'=>['Fecha'=>'ÚLTIMA ACTUALIZACIÓN','PT:LINEA'=>'PRESIÓN LÍNEA','QT:RPM'=>'RPM','ESTADO_RPM'=>'ESTADO RPM','PRODUCCION_PETROLEO'=>'PRODUCCIÓN PETRÓLEO','PRODUCCION_LIQUIDO'=>'PRODUCCIÓN LÍQUIDO','PRODUCCION_GAS'=>'PRODUCCIÓN GAS'],
+    'column_state_version'=>'343',
+    'labels'=>['Fecha'=>'ÚLTIMA ACTUALIZACIÓN','PT:LINEA'=>'PRESIÓN LÍNEA','QT:RPM'=>'RPM','ESTADO_RPM'=>'ESTADO POZO','PRODUCCION_PETROLEO'=>'PRODUCCIÓN PETRÓLEO','PRODUCCION_LIQUIDO'=>'PRODUCCIÓN LÍQUIDO','PRODUCCION_GAS'=>'PRODUCCIÓN GAS'],
     'non_numeric'=>['POZO','BATERIA','ESTADO','Fecha','ECO','ESTADO-GRAL','YAT:COM','PANTALLA','CARTAS','YT:CONTROL','YT:DEVICE','YT:LLAVE','YT:LLAVE-AUTO','ESTADO_RPM']
 ];
 require __DIR__.'/includes/telemetry_grid.php';
