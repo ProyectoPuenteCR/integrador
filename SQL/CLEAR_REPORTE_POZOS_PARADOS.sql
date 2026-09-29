@@ -248,7 +248,7 @@ BEGIN
                            CASE WHEN A.PRODUCCION_PETROLEO IS NULL THEN 1 ELSE 0 END,
                            A.POZO
                    ) AS RN
-            FROM #ActualUnico A
+            FROM #Actual A
         ) D
         WHERE RN=1;
 
