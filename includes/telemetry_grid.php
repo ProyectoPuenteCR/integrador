@@ -266,6 +266,21 @@ if($db->ok()&&$columns){
   if(!$rows&&$db->error())$error=tg_clean_error($db->error());
 }elseif(!$columns){$error='La fuente no contiene ninguna de las columnas configuradas.';}else{$error=tg_clean_error($db->error());}
 
+/* Estado derivado por RPM para pantallas que lo habiliten. */
+$rpmStateColumn=trim((string)($TELEMETRY['rpm_state_column'] ?? ''));
+$rpmSourceColumn=trim((string)($TELEMETRY['rpm_source_column'] ?? 'QT:RPM'));
+if($rpmStateColumn!==''&&$rpmSourceColumn!==''&&in_array($rpmStateColumn,$virtualColumns,true)){
+  if(!in_array($rpmStateColumn,$columns,true))$columns[]=$rpmStateColumn;
+  foreach($rows as &$rpmStateRow){
+    $rpmRaw=$rpmStateRow[$rpmSourceColumn]??null;
+    if($rpmRaw===null||trim((string)$rpmRaw)==='')$rpmStateRow[$rpmStateColumn]='SIN DATO';
+    elseif(is_numeric($rpmRaw)&&(float)$rpmRaw==0.0)$rpmStateRow[$rpmStateColumn]='PARADO';
+    elseif(is_numeric($rpmRaw)&&(float)$rpmRaw>0.0)$rpmStateRow[$rpmStateColumn]='EN MARCHA';
+    else $rpmStateRow[$rpmStateColumn]='SIN DATO';
+  }
+  unset($rpmStateRow);
+}
+
 /* Normalizar valores visibles sin modificar la tabla caché ni sus orígenes. */
 if($rows&&$serverDisplayNormalizers){
   foreach($rows as &$serverDisplayRow){
