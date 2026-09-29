@@ -24,6 +24,7 @@ $items = [
     ['key'=>'pozos_por_baterias','label'=>'Pozos por Baterías','icon'=>'grid'],
     ['key'=>'scada_realtime','label'=>'SCADA Real time','icon'=>'monitor'],
     ['key' => 'monitoreo_pozos','label' => 'Telemetría · Monitoreo Pozos','icon' => 'monitor'],
+    ['key'=>'pozos_parados','label'=>'Telemetría · Reporte Pozos Parados','icon'=>'oil'],
     ['key'=>'telemetria_pcp','label'=>'Telemetría · PCP','icon'=>'oil'],
     ['key'=>'telemetria_bes','label'=>'Telemetría · BES','icon'=>'gauge'],
     ['key'=>'telemetria_tecss','label'=>'Telemetría · TECCS','icon'=>'trend'],
