@@ -76,8 +76,8 @@ function report_screen_definitions(){
         'scada_realtime'=>['label'=>'SCADA Real time','group'=>'Operación','target'=>'scada_realtime.php'],
 
         'telemetria_general'=>['label'=>'Grilla general de pozos','group'=>'Telemetría de Pozos','target'=>'telemetria_general.php'],
-        'monitoreo_pozos'=>['label'=>'Monitoreo Pozos','group'=>'Telemetría de Pozos','target'=>'monitoreo_pozos.php'],
         'pozos_parados'=>['label'=>'Reporte Pozos Parados','group'=>'Telemetría de Pozos','target'=>'pozos_parados.php'],
+        'monitoreo_pozos'=>['label'=>'Monitoreo Pozos','group'=>'Telemetría de Pozos','target'=>'monitoreo_pozos.php'],
         'telemetria_pcp'=>['label'=>'Telemetría PCP','group'=>'Telemetría de Pozos','target'=>'telemetria_pcp.php'],
         'telemetria_bes'=>['label'=>'Telemetría BES','group'=>'Telemetría de Pozos','target'=>'telemetria_bes.php'],
         'telemetria_tecss'=>['label'=>'Telemetría TECCS','group'=>'Telemetría de Pozos','target'=>'telemetria_tecss.php'],
