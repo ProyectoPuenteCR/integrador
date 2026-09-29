@@ -30,3 +30,8 @@
 .ppResizeHandle:hover,.ppResizing .ppResizeHandle{background:rgba(18,94,115,.20)}
 body.ppResizing{cursor:col-resize!important;user-select:none!important}
 body.ppResizing *{cursor:col-resize!important}
+
+.ppStatePicker__menu--wide{min-width:330px;max-width:460px;max-height:420px;overflow:auto}
+.ppStatePicker__title{font-size:11px;font-weight:800;color:var(--text-mut);padding:3px 7px 7px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.ppStatePicker__menu--wide label{align-items:flex-start}
+.ppStatePicker__menu--wide label span{white-space:normal;line-height:1.35}
