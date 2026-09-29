@@ -74,6 +74,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
 <title>Reporte de Pozos Parados · CLEAR</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20260929-pp1">
 <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
+<link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9">
 <link rel="stylesheet" href="assets/css/pozos_parados.css?v=20260929-pp4">
 </head>
 <body><div class="app"><?php include __DIR__.'/includes/sidebar.php'; ?><main class="main"><?php include __DIR__.'/includes/topbar.php'; ?>
@@ -171,7 +172,14 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
         <td><b><?php echo h($well); ?></b></td>
         <td><?php echo h($r['BATERIA']?:'—'); ?></td>
         <td><span class="ppSystem s-<?php echo h(strtolower($r['SISTEMA'])); ?>"><?php echo h($r['SISTEMA']); ?></span></td>
-        <td><a class="ppAlarm <?php echo $alm>0?'has':'none'; ?>" href="<?php echo h($alarmUrl); ?>" title="<?php echo h($alm.' alarmas en las últimas 24 horas'); ?>"><?php echo icon('bell'); ?><span><?php echo $alm; ?></span></a></td>
+        <td><a class="ppAlarm <?php echo $alm>0?'has':'none'; ?>"
+          href="<?php echo h($alarmUrl); ?>"
+          data-telemetry-modal-url="<?php echo h($alarmUrl.'&embed=1'); ?>"
+          data-telemetry-modal-open-url="<?php echo h($alarmUrl); ?>"
+          data-telemetry-modal-title="<?php echo h('Alarmas 24 h · '.$well); ?>"
+          data-telemetry-modal-subtitle="Consulta operativa de las alarmas del pozo"
+          data-telemetry-modal-eyebrow="Alarmas de pozo"
+          title="<?php echo h($alm.' alarmas en las últimas 24 horas'); ?>"><?php echo icon('bell'); ?><span><?php echo $alm; ?></span></a></td>
         <td class="ppActionCell"><?php echo clear_alarm_actions_cell(['display'=>'','subject'=>$subject,'subject_label'=>'Pozo '.$well,'context'=>'pozos_parados','show_history'=>false,'show_comment'=>true,'has_comment'=>$hasComment,'icon_only'=>true]); ?></td>
         <td class="ppActionCell"><?php if($screen!==''): ?><a class="ppScreen" href="<?php echo h($screen); ?>" target="_blank" rel="noopener" title="Abrir pantalla"><?php echo icon('monitor'); ?></a><?php else: ?>—<?php endif; ?></td>
         <td><span class="ppBadge <?php echo $stateClass; ?>"><?php echo h($state); ?></span></td>
@@ -189,6 +197,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
   <?php endif; ?>
 </div></main></div>
 <?php clear_alarm_actions_modal(); ?>
+<?php include __DIR__.'/includes/telemetry_modal.php'; ?>
 
 <div class="ppModal" id="ppModal" hidden><div class="ppModalCard"><button class="ppModalClose" type="button">×</button><h2 id="ppModalTitle"></h2><div id="ppModalBody"></div></div></div>
 <script>
@@ -288,4 +297,5 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
 </script>
 <script src="assets/js/app.js?v=20260929-pp1"></script>
 <script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
+<script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
 </body></html>
