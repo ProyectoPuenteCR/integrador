@@ -32,7 +32,7 @@ $total=count($rows);
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Reporte de Pozos Parados · CLEAR</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20260929-pp1">
-<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20260929-pp1">
+<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20260929-pp2">
 </head>
 <body><div class="app"><?php include __DIR__.'/includes/sidebar.php'; ?><main class="main"><?php include __DIR__.'/includes/topbar.php'; ?>
 <div class="pp">
