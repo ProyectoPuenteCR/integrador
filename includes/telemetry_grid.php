@@ -893,7 +893,7 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
    data-telemetry-popup-name="CLEAR_PI_CARTAS"
    title="Abrir carta en ventana emergente"><?php echo icon('chart'); ?></a>
 <?php elseif(($c==='PANTALLA'||$c==='CARTAS')&&!tg_link($raw)): ?>
-<?php elseif($c==='__COMUNICACION'||$c===$stateCol||$c===$zafiroStateColumn||$c===$zafiroActiveColumn||$c===$remoteStopColumn||($generalCol!==''&&$c===$generalCol)): ?>
+<?php elseif($c==='__COMUNICACION'||$c===$stateCol||$c===$zafiroStateColumn||$c===$zafiroActiveColumn||$c===$remoteStopColumn||$c===$rpmStateColumn||($generalCol!==''&&$c===$generalCol)): ?>
 <span class="tg-badge <?php echo h($c===$remoteStopColumn?tg_remote_stop_class($raw):tg_status_class($raw)); ?>"><?php echo h($raw); ?></span>
 <?php else: echo h($isNum?tg_number($r[$c]??''):$raw); endif; ?>
 </td>
