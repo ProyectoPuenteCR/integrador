@@ -57,6 +57,15 @@ $counts=['MONITOREO'=>0,'PCP'=>0,'BES'=>0,'TECSS'=>0];
 $totalOil=0.0;$lossNow=0.0;$loss24=0.0;
 foreach($rows as $r){$s=(string)$r['SISTEMA'];if(isset($counts[$s]))$counts[$s]++;if($r['PRODUCCION_PETROLEO']!==null)$totalOil+=(float)$r['PRODUCCION_PETROLEO'];if($r['PERDIDA_INSTANTANEA']!==null)$lossNow+=(float)$r['PERDIDA_INSTANTANEA'];if($r['PERDIDA_24H']!==null)$loss24+=(float)$r['PERDIDA_24H'];}
 $total=count($rows);
+$telemetryStates=[];$zafiroStates=[];$zafiroMethods=[];
+foreach($rows as $r){
+  $v=trim((string)($r['ESTADO_TELEMETRIA']??'')); if($v!=='')$telemetryStates[$v]=1;
+  $v=trim((string)($r['ESTADO_ZAFIRO']??'')); if($v!=='')$zafiroStates[$v]=1;
+  $v=trim((string)($r['METODO_ZAFIRO']??'')); if($v!=='')$zafiroMethods[$v]=1;
+}
+$telemetryStates=array_keys($telemetryStates); sort($telemetryStates,SORT_NATURAL|SORT_FLAG_CASE);
+$zafiroStates=array_keys($zafiroStates); sort($zafiroStates,SORT_NATURAL|SORT_FLAG_CASE);
+$zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT_FLAG_CASE);
 ?>
 <!doctype html>
 <html lang="es">
@@ -65,7 +74,7 @@ $total=count($rows);
 <title>Reporte de Pozos Parados · CLEAR</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20260929-pp1">
 <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
-<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20260929-pp3">
+<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20260929-pp4">
 </head>
 <body><div class="app"><?php include __DIR__.'/includes/sidebar.php'; ?><main class="main"><?php include __DIR__.'/includes/topbar.php'; ?>
 <div class="pp">
@@ -99,8 +108,10 @@ $total=count($rows);
     <div class="ppStatePicker" id="ppStatePicker">
       <button class="ppStatePicker__button" type="button" id="ppStatePickerButton">Estados considerados ▾</button>
       <div class="ppStatePicker__menu" id="ppStatePickerMenu" hidden>
-        <?php foreach(['PARO REAL','VERIFICAR PARO','PARADO','PARO CONTROLADO'] as $stateOption): ?>
-          <label><input type="checkbox" class="ppStateCheck" value="<?php echo h($stateOption); ?>" checked> <span><?php echo h($stateOption); ?></span></label>
+        <?php foreach(['PARO REAL','VERIFICAR PARO','PARADO','PARO CONTROLADO'] as $stateOption):
+          $pickerClass=$stateOption==='PARO REAL'?'is-danger':($stateOption==='VERIFICAR PARO'?'is-warning':($stateOption==='PARO CONTROLADO'?'is-control':'is-muted'));
+        ?>
+          <label><input type="checkbox" class="ppStateCheck" value="<?php echo h($stateOption); ?>" checked><span class="ppBadge <?php echo $pickerClass; ?>"><?php echo h($stateOption); ?></span></label>
         <?php endforeach; ?>
         <div class="ppStatePicker__actions"><button type="button" data-state-all="1">Todos</button><button type="button" data-state-all="0">Ninguno</button></div>
       </div>
@@ -124,10 +135,10 @@ $total=count($rows);
         <th><select data-col-filter="system"><option value="">Todos</option><option>MONITOREO</option><option>PCP</option><option>BES</option><option>TECSS</option></select></th>
         <th><select data-col-filter="alarm"><option value="">Todas</option><option value="with">Con alarmas</option><option value="without">Sin alarmas</option></select></th>
         <th></th><th></th>
-        <th></th>
-        <th><input data-col-filter="telemetry" placeholder="Filtrar"></th>
-        <th><input data-col-filter="zafiro" placeholder="Filtrar"></th>
-        <th><input data-col-filter="method" placeholder="Filtrar"></th>
+        <th><select data-col-filter="state"><option value="">Todos</option><option>PARO REAL</option><option>VERIFICAR PARO</option><option>PARADO</option><option>PARO CONTROLADO</option></select></th>
+        <th><select data-col-filter="telemetry"><option value="">Todos</option><?php foreach($telemetryStates as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
+        <th><select data-col-filter="zafiro"><option value="">Todos</option><?php foreach($zafiroStates as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
+        <th><select data-col-filter="method"><option value="">Todos</option><?php foreach($zafiroMethods as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
         <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
       </tr>
     </thead>
@@ -190,7 +201,7 @@ $total=count($rows);
   tecss:['Help · TECSS','La señal de paro se toma de ESTADO = Parado. Se excluye cuando Estado Zafiro es Downtime de Producción (Pérdida Localizada). El resto de los paros queda disponible para el análisis de pérdida.']
  };
  const modal=document.getElementById('ppModal');
- document.querySelectorAll('[data-help]').forEach(b=>b.onclick=()=>{const h=help[b.dataset.help];document.getElementById('ppModalTitle').textContent=h[0];document.getElementById('ppModalBody').textContent=h[1];modal.hidden=false;});
+ document.querySelectorAll('[data-help]').forEach(b=>b.onclick=()=>{const h=help[b.dataset.help];document.getElementById('ppModalTitle').textContent=h[0];document.getElementById('ppModalBody').innerHTML='<p>'+h[1]+'</p>';modal.hidden=false;});
  document.querySelector('.ppModalClose')?.addEventListener('click',()=>modal.hidden=true);
  modal?.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});
  const sys=document.getElementById('ppSystem'),search=document.getElementById('ppSearch');
@@ -198,6 +209,30 @@ $total=count($rows);
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
  const fmt=v=>Number(v||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
  function selectedStates(){return new Set(stateChecks.filter(x=>x.checked).map(x=>x.value));}
+
+ // Redimensionado de columnas: arrastrar el borde derecho del encabezado.
+ document.querySelectorAll('#ppTable thead tr:first-child th').forEach((th,index)=>{
+   th.dataset.colIndex=index;
+   const handle=document.createElement('span');
+   handle.className='ppResizeHandle';
+   handle.title='Arrastrar para redimensionar';
+   th.appendChild(handle);
+   let startX=0,startWidth=0;
+   handle.addEventListener('mousedown',e=>{
+     e.preventDefault();e.stopPropagation();
+     startX=e.clientX;startWidth=th.getBoundingClientRect().width;
+     document.body.classList.add('ppResizing');
+     const move=ev=>{
+       const width=Math.max(58,Math.min(520,startWidth+(ev.clientX-startX)));
+       document.querySelectorAll('#ppTable tr').forEach(row=>{
+         const cell=row.children[index];
+         if(cell){cell.style.width=width+'px';cell.style.minWidth=width+'px';cell.style.maxWidth=width+'px';}
+       });
+     };
+     const up=()=>{document.body.classList.remove('ppResizing');document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);};
+     document.addEventListener('mousemove',move);document.addEventListener('mouseup',up);
+   });
+ });
  function apply(){
    let n=0,oil=0,lossNow=0,loss24=0,counts={MONITOREO:0,PCP:0,BES:0,TECSS:0};
    const q=(search?.value||'').trim().toLowerCase(),states=selectedStates();
@@ -208,6 +243,7 @@ $total=count($rows);
      if(cf.well&&!r.dataset.well.includes(cf.well))ok=false;
      if(cf.battery&&!r.dataset.battery.includes(cf.battery))ok=false;
      if(cf.system&&r.dataset.system.toLowerCase()!==cf.system)ok=false;
+     if(cf.state&&r.dataset.state.toLowerCase()!==cf.state)ok=false;
      if(cf.telemetry&&!r.dataset.telemetry.includes(cf.telemetry))ok=false;
      if(cf.zafiro&&!r.dataset.zafiro.includes(cf.zafiro))ok=false;
      if(cf.method&&!r.dataset.method.includes(cf.method))ok=false;
