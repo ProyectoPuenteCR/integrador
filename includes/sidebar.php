@@ -15,6 +15,7 @@ $ocultos = function_exists('menu_ocultos') ? menu_ocultos() : [];
 $telemetriaPozos = [
     ['key'=>'telemetria_general','label'=>'Grilla general de pozos','icon'=>'grid','url'=>'telemetria_general.php'],
     ['key'=>'monitoreo_pozos','label'=>'Monitoreo Pozos','icon'=>'monitor','url'=>'monitoreo_pozos.php'],
+    ['key'=>'pozos_parados','label'=>'Reporte Pozos Parados','icon'=>'oil','url'=>'pozos_parados.php'],
     ['key'=>'telemetria_pcp','label'=>'Telemetría PCP','icon'=>'oil','url'=>'telemetria_pcp.php'],
     ['key'=>'telemetria_bes','label'=>'Telemetría BES','icon'=>'gauge','url'=>'telemetria_bes.php'],
     ['key'=>'telemetria_tecss','label'=>'Telemetría TECCS','icon'=>'trend','url'=>'telemetria_tecss.php'],
