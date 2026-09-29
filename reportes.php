@@ -30,6 +30,14 @@ if(requestedScreen==='sin_telemetria_zafiro'){
     if(b)b.value='Se adjunta el estado completo de pozos sin telemetría en Zafiro, con evolución semanal y producción asociada.';
   });
 }
+if(requestedScreen==='pozos_parados'){
+  document.addEventListener('DOMContentLoaded',function(){
+    var n=document.getElementById('nombre'),a=document.getElementById('asunto'),b=document.getElementById('cuerpo');
+    if(n&&!n.value)n.value='Reporte de Pozos Parados';
+    if(a)a.value='CLEAR Petroleum | Reporte de Pozos Parados';
+    if(b)b.value='Se adjunta el reporte consolidado de pozos parados por sistema de telemetría, con validación Zafiro y estimación de pérdida de producción.';
+  });
+}
 document.addEventListener('DOMContentLoaded',function(){
   if(!requestedScreen)return;
   var reportScreenSelected=document.querySelector('.reportScreens input[value="'+CSS.escape(requestedScreen)+'"]');
