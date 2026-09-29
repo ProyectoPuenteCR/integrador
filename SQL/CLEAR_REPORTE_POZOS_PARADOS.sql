@@ -148,18 +148,23 @@ BEGIN
         END;
 
         CREATE TABLE #Actual(
-            SISTEMA nvarchar(20) NOT NULL,
-            POZO_CLAVE nvarchar(100) NOT NULL,
-            POZO nvarchar(255) NOT NULL,
-            BATERIA nvarchar(255) NULL,
-            ESTADO_TELEMETRIA nvarchar(255) NULL,
-            ESTADO_POZO nvarchar(40) NOT NULL,
-            ESTADO_ZAFIRO nvarchar(500) NULL,
-            METODO_ZAFIRO nvarchar(500) NULL,
+            /*
+             * Las #temp nacen en tempdb. Forzamos DATABASE_DEFAULT en todos los
+             * textos para evitar el conflicto LC_MDB (Modern_Spanish_CI_AS)
+             * vs tempdb (SQL_Latin1_General_CP1_CI_AS).
+             */
+            SISTEMA nvarchar(20) COLLATE DATABASE_DEFAULT NOT NULL,
+            POZO_CLAVE nvarchar(100) COLLATE DATABASE_DEFAULT NOT NULL,
+            POZO nvarchar(255) COLLATE DATABASE_DEFAULT NOT NULL,
+            BATERIA nvarchar(255) COLLATE DATABASE_DEFAULT NULL,
+            ESTADO_TELEMETRIA nvarchar(255) COLLATE DATABASE_DEFAULT NULL,
+            ESTADO_POZO nvarchar(40) COLLATE DATABASE_DEFAULT NOT NULL,
+            ESTADO_ZAFIRO nvarchar(500) COLLATE DATABASE_DEFAULT NULL,
+            METODO_ZAFIRO nvarchar(500) COLLATE DATABASE_DEFAULT NULL,
             RPM real NULL,
-            VARIADOR nvarchar(100) NULL,
-            LLAVE nvarchar(100) NULL,
-            LLAVE_AUTO nvarchar(100) NULL,
+            VARIADOR nvarchar(100) COLLATE DATABASE_DEFAULT NULL,
+            LLAVE nvarchar(100) COLLATE DATABASE_DEFAULT NULL,
+            LLAVE_AUTO nvarchar(100) COLLATE DATABASE_DEFAULT NULL,
             PRODUCCION_PETROLEO decimal(18,3) NULL,
             FECHA_DATO datetime2(0) NULL
         );
@@ -228,7 +233,9 @@ BEGIN
         FROM #Actual A
         WHERE NOT EXISTS(
           SELECT 1 FROM dbo.CLEAR_POZOS_PARADOS_HIST H
-          WHERE H.FECHA_SNAPSHOT=@Snapshot AND H.SISTEMA=A.SISTEMA AND H.POZO_CLAVE=A.POZO_CLAVE
+          WHERE H.FECHA_SNAPSHOT=@Snapshot
+            AND H.SISTEMA COLLATE DATABASE_DEFAULT=A.SISTEMA COLLATE DATABASE_DEFAULT
+            AND H.POZO_CLAVE COLLATE DATABASE_DEFAULT=A.POZO_CLAVE COLLATE DATABASE_DEFAULT
         );
 
         DELETE FROM dbo.CLEAR_POZOS_PARADOS_HIST
@@ -247,7 +254,8 @@ BEGIN
           OUTER APPLY(
               SELECT CAST(SUM(ISNULL(X.PRODUCCION_PETROLEO,0))/144.0 AS decimal(18,3)) PERDIDA_24H
               FROM dbo.CLEAR_POZOS_PARADOS_HIST X
-              WHERE X.SISTEMA=A.SISTEMA AND X.POZO_CLAVE=A.POZO_CLAVE
+              WHERE X.SISTEMA COLLATE DATABASE_DEFAULT=A.SISTEMA COLLATE DATABASE_DEFAULT
+                AND X.POZO_CLAVE COLLATE DATABASE_DEFAULT=A.POZO_CLAVE COLLATE DATABASE_DEFAULT
                 AND X.FECHA_SNAPSHOT>=DATEADD(hour,-24,@Ahora)
           )H;
         COMMIT TRANSACTION;
