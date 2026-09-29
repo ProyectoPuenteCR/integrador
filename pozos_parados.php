@@ -164,9 +164,9 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
         data-zafiro="<?php echo h(strtolower((string)$r['ESTADO_ZAFIRO'])); ?>"
         data-method="<?php echo h(strtolower((string)$r['METODO_ZAFIRO'])); ?>"
         data-alarm="<?php echo $alm; ?>"
-        data-oil="<?php echo h((string)($r['PRODUCCION_PETROLEO']??0)); ?>"
-        data-loss-now="<?php echo h((string)($r['PERDIDA_INSTANTANEA']??0)); ?>"
-        data-loss24="<?php echo h((string)($r['PERDIDA_24H']??0)); ?>"
+        data-oil="<?php echo h(number_format((float)($r['PRODUCCION_PETROLEO']??0),6,'.','')); ?>"
+        data-loss-now="<?php echo h(number_format((float)($r['PERDIDA_INSTANTANEA']??0),6,'.','')); ?>"
+        data-loss24="<?php echo h(number_format((float)($r['PERDIDA_24H']??0),6,'.','')); ?>"
         data-search="<?php echo h(strtolower(implode(' ',[$well,$r['BATERIA'],$r['ESTADO_ZAFIRO'],$r['ESTADO_TELEMETRIA'],$r['METODO_ZAFIRO'],$state]))); ?>">
         <td><b><?php echo h($well); ?></b></td>
         <td><?php echo h($r['BATERIA']?:'—'); ?></td>
@@ -207,7 +207,20 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
  const sys=document.getElementById('ppSystem'),search=document.getElementById('ppSearch');
  const stateChecks=Array.from(document.querySelectorAll('.ppStateCheck'));
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
- const fmt=v=>Number(v||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+ const ppNumber=v=>{
+   if(v===null||v===undefined||v==='')return 0;
+   if(typeof v==='number')return Number.isFinite(v)?v:0;
+   let s=String(v).trim().replace(/\s/g,'');
+   if(s.includes(',')&&s.includes('.')){
+     if(s.lastIndexOf(',')>s.lastIndexOf('.'))s=s.replace(/\./g,'').replace(',','.');
+     else s=s.replace(/,/g,'');
+   }else if(s.includes(',')){
+     s=s.replace(',','.');
+   }
+   const n=Number(s);
+   return Number.isFinite(n)?n:0;
+ };
+ const fmt=v=>ppNumber(v).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
  function selectedStates(){return new Set(stateChecks.filter(x=>x.checked).map(x=>x.value));}
 
  // Redimensionado de columnas: arrastrar el borde derecho del encabezado.
@@ -250,7 +263,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
      if(cf.alarm==='with'&&alarm<=0)ok=false;
      if(cf.alarm==='without'&&alarm>0)ok=false;
      r.hidden=!ok;
-     if(ok){n++;counts[r.dataset.system]=(counts[r.dataset.system]||0)+1;oil+=Number(r.dataset.oil||0);lossNow+=Number(r.dataset.lossNow||0);loss24+=Number(r.dataset.loss24||0);}
+     if(ok){n++;counts[r.dataset.system]=(counts[r.dataset.system]||0)+1;oil+=ppNumber(r.dataset.oil);lossNow+=ppNumber(r.dataset.lossNow);loss24+=ppNumber(r.dataset.loss24);}
    });
    document.getElementById('ppVisible').textContent=n;
    document.getElementById('ppCountTotal').textContent=n;
