@@ -226,11 +226,40 @@ BEGIN
           AND UPPER(ISNULL(Z.ESTADO,N'')) COLLATE Modern_Spanish_CI_AI NOT LIKE N'%DOWNTIME DE PRODUCCION%PERDIDA LOCALIZADA%'
           AND K.K<>N'';
 
+        /*
+         * Las vistas RTQP pueden devolver mas de una fila para el mismo pozo.
+         * Normalizamos a UNA fila por SISTEMA + POZO_CLAVE antes de persistir.
+         * Se prioriza el dato con FECHA_DATO mas reciente y luego el que tenga
+         * produccion/estado informados. Esto evita duplicados en la PK del cache.
+         */
+        SELECT SISTEMA,POZO_CLAVE,POZO,BATERIA,ESTADO_TELEMETRIA,ESTADO_POZO,
+               ESTADO_ZAFIRO,METODO_ZAFIRO,RPM,VARIADOR,LLAVE,LLAVE_AUTO,
+               PRODUCCION_PETROLEO,FECHA_DATO
+        INTO #ActualUnico
+        FROM
+        (
+            SELECT A.*,
+                   ROW_NUMBER() OVER
+                   (
+                       PARTITION BY A.SISTEMA,A.POZO_CLAVE
+                       ORDER BY
+                           CASE WHEN A.FECHA_DATO IS NULL THEN 1 ELSE 0 END,
+                           A.FECHA_DATO DESC,
+                           CASE WHEN A.PRODUCCION_PETROLEO IS NULL THEN 1 ELSE 0 END,
+                           A.POZO
+                   ) AS RN
+            FROM #ActualUnico A
+        ) D
+        WHERE RN=1;
+
+        CREATE UNIQUE CLUSTERED INDEX IX_TMP_ACTUAL_UNICO
+            ON #ActualUnico(SISTEMA,POZO_CLAVE);
+
         /* Snapshot: 10 min. La perdida del intervalo = m3/d / 144. */
         INSERT INTO dbo.CLEAR_POZOS_PARADOS_HIST
           (FECHA_SNAPSHOT,SISTEMA,POZO_CLAVE,POZO,BATERIA,ESTADO_POZO,ESTADO_ZAFIRO,PRODUCCION_PETROLEO)
         SELECT @Snapshot,A.SISTEMA,A.POZO_CLAVE,A.POZO,A.BATERIA,A.ESTADO_POZO,A.ESTADO_ZAFIRO,A.PRODUCCION_PETROLEO
-        FROM #Actual A
+        FROM #ActualUnico A
         WHERE NOT EXISTS(
           SELECT 1 FROM dbo.CLEAR_POZOS_PARADOS_HIST H
           WHERE H.FECHA_SNAPSHOT=@Snapshot
@@ -250,7 +279,7 @@ BEGIN
           SELECT A.SISTEMA,A.POZO_CLAVE,A.POZO,A.BATERIA,A.ESTADO_TELEMETRIA,A.ESTADO_POZO,A.ESTADO_ZAFIRO,A.METODO_ZAFIRO,
                  A.RPM,A.VARIADOR,A.LLAVE,A.LLAVE_AUTO,A.PRODUCCION_PETROLEO,A.PRODUCCION_PETROLEO,
                  H.PERDIDA_24H,A.FECHA_DATO,@Ahora
-          FROM #Actual A
+          FROM #ActualUnico A
           OUTER APPLY(
               SELECT CAST(SUM(ISNULL(X.PRODUCCION_PETROLEO,0))/144.0 AS decimal(18,3)) PERDIDA_24H
               FROM dbo.CLEAR_POZOS_PARADOS_HIST X
