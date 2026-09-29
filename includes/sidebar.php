@@ -14,7 +14,6 @@ $ocultos = function_exists('menu_ocultos') ? menu_ocultos() : [];
 
 $telemetriaPozos = [
     ['key'=>'telemetria_general','label'=>'Grilla general de pozos','icon'=>'grid','url'=>'telemetria_general.php'],
-    ['key'=>'pozos_parados','label'=>'Reporte Pozos Parados','icon'=>'oil','url'=>'pozos_parados.php'],
     ['key'=>'monitoreo_pozos','label'=>'Monitoreo Pozos','icon'=>'monitor','url'=>'monitoreo_pozos.php'],
     ['key'=>'telemetria_pcp','label'=>'Telemetría PCP','icon'=>'oil','url'=>'telemetria_pcp.php'],
     ['key'=>'telemetria_bes','label'=>'Telemetría BES','icon'=>'gauge','url'=>'telemetria_bes.php'],
@@ -62,6 +61,12 @@ $alarmasInstalaciones = [
 ];
 
 /* Módulo aditivo. Las rutas operativas existentes no se reemplazan. */
+$reportesMenu = [
+    ['key'=>'pozos_parados','label'=>'Reporte Pozos Parados','icon'=>'oil','url'=>'pozos_parados.php'],
+    ['key'=>'reportes_guardados','label'=>'REPORTES','icon'=>'file','url'=>'reportes_guardados.php'],
+    ['key'=>'mis_reportes','label'=>'Mis Reportes','icon'=>'file','url'=>'mis_reportes.php'],
+];
+
 $novedadesSemanales = [
     ['key'=>'novedades_semanales_panel','label'=>'Panel semanal','icon'=>'grid','url'=>'novedades_semanales.php'],
     ['key'=>'novedades_semanales_monitoreo','label'=>'Reporte de Pozos','icon'=>'monitor','url'=>'novedades_semanales_monitoreo.php'],
@@ -83,8 +88,7 @@ $menuItems = [
     ['key'=>'grupo_telemetria','label'=>'Telemetría de Pozos','icon'=>'monitor','children'=>$telemetriaPozos],
     $inyeccionAgua,
     ['key'=>'grupo_novedades_semanales','label'=>'Novedades semanales','icon'=>'calendar','children'=>$novedadesSemanales],
-    ['key'=>'mis_reportes','label'=>'Mis Reportes','icon'=>'file','url'=>'mis_reportes.php'],
-    ['key'=>'reportes_guardados','label'=>'REPORTES','icon'=>'file','url'=>'reportes_guardados.php'],
+    ['key'=>'grupo_reportes','label'=>'REPORTES','icon'=>'file','children'=>$reportesMenu],
     ['key'=>'comentarios','label'=>'Comentarios','icon'=>'message','url'=>'comentarios.php'],
     ['key'=>'grupo_alarmas_pozos','label'=>'Alarmas de Pozos','icon'=>'oil','children'=>$alarmasPozos],
     ['key'=>'grupo_instalaciones','label'=>'Alarmas Instalaciones de superficie','icon'=>'bell','children'=>$alarmasInstalaciones],
@@ -102,7 +106,7 @@ $favCatalog = [
     'reportes_guardados'=>['REPORTES','file','reportes_guardados.php'],
     'comentarios'=>['Comentarios','message','comentarios.php']
 ];
-foreach (array_merge($telemetriaPozos, $novedadesSemanales, $alarmasPozos, $alarmasInstalaciones) as $n) {
+foreach (array_merge($telemetriaPozos, $novedadesSemanales, $reportesMenu, $alarmasPozos, $alarmasInstalaciones) as $n) {
     $favCatalog[$n['key']] = [$n['label'], $n['icon'], $n['url']];
 }
 $favCatalog[$inyeccionAgua['key']] = [$inyeccionAgua['label'], $inyeccionAgua['icon'], $inyeccionAgua['url']];
