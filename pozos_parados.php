@@ -254,7 +254,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
 
   <div class="ppToolbar">
     <select id="ppSystem"><option value="">Todos los sistemas</option><option>MONITOREO</option><option>PCP</option><option>BES</option><option>TECSS</option></select>
-    <button class="ppBtn ppConfigButton" type="button" id="ppConfigOpen"><?php echo icon('settings'); ?> Configuración de paros</button>
+    <button class="ppBtn ppConfigButton" type="button" id="ppConfigOpen"><?php echo icon('tools'); ?> Configuración de paros</button>
     <input id="ppSearch" type="search" placeholder="Buscar pozo, batería o estado Zafiro…">
     <button class="ppBtn" id="ppClear">Limpiar filtros</button>
     <span class="ppUpdated">Actualizado: <b><?php echo h(pp_d($lastCache)); ?></b></span>
