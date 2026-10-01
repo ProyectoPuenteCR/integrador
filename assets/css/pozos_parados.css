@@ -75,3 +75,37 @@ body.ppResizing *{cursor:col-resize!important}
 .ppConfigFooter{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface)}
 .ppConfigFooter>span{margin-right:auto;color:var(--text-mut);font-size:11px}
 @media(max-width:800px){.ppConfigColumns,.ppConfigZafiroGrid{grid-template-columns:1fr}.ppConfigCard{max-height:96vh}.ppConfigFooter{flex-wrap:wrap}.ppConfigFooter>span{width:100%;margin-right:0}}
+
+/* Configuracion de paros - orden visual por sistema */
+.ppConfigBody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.ppConfigSystem{margin:0!important;border-width:1px;box-shadow:0 2px 10px rgba(20,46,58,.05)}
+.ppConfigSystem h3{display:flex;align-items:center;margin:-2px 0 12px;padding-bottom:9px;border-bottom:1px solid var(--line)}
+.ppConfigSystem h3 span{display:inline-flex;align-items:center;min-height:27px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.03em}
+.ppConfigSystem--monitoreo{border-color:#efc7c3;background:#fffafa}
+.ppConfigSystem--monitoreo h3 span{background:#fde7e5;color:#b52d27}
+.ppConfigSystem--pcp{border-color:#c9daf3;background:#fbfdff}
+.ppConfigSystem--pcp h3 span{background:#e5effd;color:#246bb2}
+.ppConfigSystem--bes{border-color:#c5e5eb;background:#fbfeff}
+.ppConfigSystem--bes h3 span{background:#e6f7fb;color:#17758a}
+.ppConfigSystem--tecss{border-color:#c6e7d4;background:#fbfffc}
+.ppConfigSystem--tecss h3 span{background:#e2f5e9;color:#17804e}
+.ppConfigColumns{grid-template-columns:1fr 1fr;gap:14px}
+.ppConfigColumns>div{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface)}
+.ppConfigColumns h4{padding-bottom:7px;border-bottom:1px solid var(--line)}
+.ppConfigColumns label,.ppConfigZafiroGrid label{display:flex!important;width:100%;box-sizing:border-box;margin:0 0 4px;padding:7px 8px!important;align-items:flex-start!important;gap:8px!important}
+.ppConfigColumns label span,.ppConfigZafiroGrid label span{display:block;white-space:normal;line-height:1.35}
+.ppConfigColumns input,.ppConfigZafiroGrid input{margin:1px 0 0 0!important}
+.ppConfigSystem--monitoreo .ppConfigColumns{grid-template-columns:1fr 1.45fr}
+.ppConfigSystem--monitoreo .ppConfigColumns label{min-height:31px}
+.ppConfigZafiro,.ppConfigLog{grid-column:1/-1}
+.ppConfigZafiro{border-color:#d9dfe6;background:#fcfdff}
+.ppConfigZafiro h3 span{background:#edf0f3;color:#52616e}
+.ppConfigZafiroGrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ppConfigLog{margin-top:0}
+@media(max-width:1050px){
+  .ppConfigBody{grid-template-columns:1fr}
+  .ppConfigZafiro,.ppConfigLog{grid-column:auto}
+}
+@media(max-width:720px){
+  .ppConfigColumns,.ppConfigSystem--monitoreo .ppConfigColumns,.ppConfigZafiroGrid{grid-template-columns:1fr}
+}
