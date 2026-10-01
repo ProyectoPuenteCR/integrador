@@ -47,3 +47,31 @@ body.ppResizing *{cursor:col-resize!important}
 .ppLastAlarm.is-stop{background:#fff5f4;color:#ad2d28}
 .ppLastAlarm.is-stop span{color:#ad2d28}
 .ppFilterRow th:nth-child(11) input{min-width:190px}
+
+/* Popup Configuracion de paros 2026-10-01 */
+.ppConfigButton{background:var(--petrol-soft);border-color:var(--petrol-line);color:var(--petrol)}
+.ppConfigModal{position:fixed;inset:0;z-index:2400;background:rgba(10,25,35,.52);display:flex;align-items:center;justify-content:center;padding:22px}
+.ppConfigModal[hidden]{display:none}
+.ppConfigCard{width:min(1120px,96vw);max-height:92vh;background:var(--surface);border:1px solid var(--line-mid);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.ppConfigHead{position:relative;padding:20px 24px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.ppConfigHead h2{margin:3px 40px 5px 0;font:800 24px/1.1 var(--font-head)}
+.ppConfigHead p{margin:0;color:var(--text-mut);font-size:12px}
+.ppConfigBody{padding:16px 20px 20px;overflow:auto;background:var(--bg)}
+.ppConfigSystem{background:var(--surface);border:1px solid var(--line-mid);border-radius:13px;padding:14px 16px;margin-bottom:12px}
+.ppConfigSystem h3{margin:0 0 10px;font:800 15px var(--font-head);color:var(--petrol)}
+.ppConfigSystem h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mut)}
+.ppConfigColumns{display:grid;grid-template-columns:1fr 1.35fr;gap:18px}
+.ppConfigColumns label,.ppConfigZafiroGrid label{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:7px;font-size:11px;line-height:1.35}
+.ppConfigColumns label:hover,.ppConfigZafiroGrid label:hover{background:var(--petrol-soft)}
+.ppConfigColumns input,.ppConfigZafiroGrid input{width:15px;height:15px;flex:0 0 15px;margin-top:1px;accent-color:var(--petrol)}
+.ppConfigZafiroGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 14px}
+.ppConfigEmpty{font-size:11px;color:var(--text-mut);padding:7px 0}
+.ppConfigLog{background:var(--surface);border:1px solid var(--line-mid);border-radius:13px;padding:14px 16px}
+.ppConfigLog h3{margin:0 0 10px;font:800 14px var(--font-head)}
+.ppConfigLogTable{overflow:auto}
+.ppConfigLogTable table{width:100%;border-collapse:collapse;font-size:10.5px}
+.ppConfigLogTable th,.ppConfigLogTable td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+.ppConfigLogTable th{color:var(--text-mut);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em}
+.ppConfigFooter{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);background:var(--surface)}
+.ppConfigFooter>span{margin-right:auto;color:var(--text-mut);font-size:11px}
+@media(max-width:800px){.ppConfigColumns,.ppConfigZafiroGrid{grid-template-columns:1fr}.ppConfigCard{max-height:96vh}.ppConfigFooter{flex-wrap:wrap}.ppConfigFooter>span{width:100%;margin-right:0}}
