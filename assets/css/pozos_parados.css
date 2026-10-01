@@ -35,3 +35,15 @@ body.ppResizing *{cursor:col-resize!important}
 .ppStatePicker__title{font-size:11px;font-weight:800;color:var(--text-mut);padding:3px 7px 7px;border-bottom:1px solid var(--line);margin-bottom:4px}
 .ppStatePicker__menu--wide label{align-items:flex-start}
 .ppStatePicker__menu--wide label span{white-space:normal;line-height:1.35}
+
+/* Ajustes validacion operativa 2026-10-01 */
+.ppBadge.is-inconsistency{background:#fff2c8;color:#7b5600;border:1px solid #efd478}
+.ppStatePicker__title--zafiro{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.ppStatePicker__hint{font-size:10px;line-height:1.45;color:var(--text-mut);padding:7px}
+.ppZafiroConfigRow span{font-weight:600!important;line-height:1.3}
+.ppLastAlarm{max-width:330px;white-space:normal!important;line-height:1.25}
+.ppLastAlarm span{display:block;font-weight:700;color:var(--text)}
+.ppLastAlarm small{display:block;margin-top:3px;color:var(--text-mut);font-size:9px}
+.ppLastAlarm.is-stop{background:#fff5f4;color:#ad2d28}
+.ppLastAlarm.is-stop span{color:#ad2d28}
+.ppFilterRow th:nth-child(11) input{min-width:190px}
