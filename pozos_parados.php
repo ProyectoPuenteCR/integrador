@@ -254,7 +254,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
 
   <div class="ppToolbar">
     <select id="ppSystem"><option value="">Todos los sistemas</option><option>MONITOREO</option><option>PCP</option><option>BES</option><option>TECSS</option></select>
-    <button class="ppBtn ppConfigButton" type="button" id="ppConfigOpen"><?php echo icon('tools'); ?> Configuración de paros</button>
+    <button class="ppBtn ppConfigButton" type="button" id="ppConfigOpen" onclick="var m=document.getElementById('ppConfigModal');if(m){m.hidden=false;m.style.display='flex';}"><?php echo icon('tools'); ?> Configuración de paros</button>
     <input id="ppSearch" type="search" placeholder="Buscar pozo, batería o estado Zafiro…">
     <button class="ppBtn" id="ppClear">Limpiar filtros</button>
     <span class="ppUpdated">Actualizado: <b><?php echo h(pp_d($lastCache)); ?></b></span>
@@ -350,7 +350,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
   <div class="ppConfigCard">
     <div class="ppConfigHead">
       <div><div class="ppEyebrow">Criterios globales</div><h2>Configuración de paros</h2><p>Define qué diagnósticos y estados de telemetría se consideran por sistema. La configuración aplica a todos los usuarios y a los reportes automáticos.</p></div>
-      <button class="ppModalClose" type="button" id="ppConfigClose">×</button>
+      <button class="ppModalClose" type="button" id="ppConfigClose" onclick="var m=document.getElementById('ppConfigModal');if(m){m.hidden=true;m.style.display='none';}">×</button>
     </div>
     <div class="ppConfigBody">
       <?php foreach($paroSystems as $system): ?>
@@ -382,7 +382,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
         <div class="ppConfigZafiroGrid">
           <?php if(!$zafiroConfig): ?><div class="ppConfigEmpty">Ejecutá el SQL actualizado para habilitar esta configuración.</div>
           <?php else: foreach($zafiroConfig as $value=>$included): ?>
-            <label><input class="ppConfigZafiro" type="checkbox" value="<?php echo h($value); ?>" <?php echo $included?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>><span><?php echo h($value); ?></span></label>
+            <label><input class="ppConfigZafiroCheck" type="checkbox" value="<?php echo h($value); ?>" <?php echo $included?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>><span><?php echo h($value); ?></span></label>
           <?php endforeach; endif; ?>
         </div>
       </section>
@@ -423,7 +423,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
  const configModal=document.getElementById('ppConfigModal');
  const configCriteria=Array.from(document.querySelectorAll('.ppConfigCriterion'));
- const configZafiro=Array.from(document.querySelectorAll('.ppConfigZafiro'));
+ const configZafiro=Array.from(document.querySelectorAll('.ppConfigZafiroCheck'));
  const ppNumber=v=>{
    if(v===null||v===undefined||v==='')return 0;
    if(typeof v==='number')return Number.isFinite(v)?v:0;
@@ -500,8 +500,8 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
  const configCancel=document.getElementById('ppConfigCancel');
  const configSave=document.getElementById('ppConfigSave');
  const configStatus=document.getElementById('ppConfigStatus');
- const closeConfig=()=>{if(configModal)configModal.hidden=true;};
- configOpen?.addEventListener('click',()=>{if(configModal)configModal.hidden=false;});
+ const closeConfig=()=>{if(configModal){configModal.hidden=true;configModal.style.display='none';}};
+ configOpen?.addEventListener('click',()=>{if(configModal){configModal.hidden=false;configModal.style.display='flex';}});
  configClose?.addEventListener('click',closeConfig);
  configCancel?.addEventListener('click',closeConfig);
  configModal?.addEventListener('click',e=>{if(e.target===configModal)closeConfig();});
