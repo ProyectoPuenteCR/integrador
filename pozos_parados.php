@@ -14,14 +14,13 @@ $APP_ROLE=auth_es_admin()?'Administrador':'Operador';
 $ACTIVE='pozos_parados';
 $db=clear_db();
 
-/* Configuracion global: los estados Zafiro marcados/desmarcados afectan a
-   todos los usuarios y tambien a los reportes automaticos. Solo un admin
-   puede cambiar este criterio para evitar cambios operativos accidentales. */
-if(($_SERVER['REQUEST_METHOD']??'GET')==='POST' && (string)($_POST['action']??'')==='save_zafiro_state'){
+/* Configuracion global de paros. Se guarda en SQL para todos los usuarios
+   y cada guardado queda auditado con usuario, fecha y detalle de cambios. */
+if(($_SERVER['REQUEST_METHOD']??'GET')==='POST' && (string)($_POST['action']??'')==='save_paro_config'){
   header('Content-Type: application/json; charset=utf-8');
   if(!auth_es_admin()){
     http_response_code(403);
-    echo json_encode(['ok'=>false,'error'=>'Solo un administrador puede modificar los estados Zafiro considerados.'],JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok'=>false,'error'=>'Solo un administrador puede modificar la configuracion de paros.'],JSON_UNESCAPED_UNICODE);
     exit;
   }
   if(!$db->ok()){
@@ -29,36 +28,84 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST' && (string)($_POST['action']??''
     echo json_encode(['ok'=>false,'error'=>$db->error()],JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $hasCfg=(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG',N'U') IS NULL THEN 0 ELSE 1 END")===1;
-  if(!$hasCfg){
+  $hasZ=(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG',N'U') IS NULL THEN 0 ELSE 1 END")===1;
+  $hasC=(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_CRITERIOS_CONFIG',N'U') IS NULL THEN 0 ELSE 1 END")===1;
+  if(!$hasZ||!$hasC){
     http_response_code(409);
-    echo json_encode(['ok'=>false,'error'=>'Falta instalar la configuracion global. Ejecuta SQL/CLEAR_REPORTE_POZOS_PARADOS.sql actualizado.'],JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok'=>false,'error'=>'Falta instalar la configuracion. Ejecuta SQL/CLEAR_REPORTE_POZOS_PARADOS.sql actualizado.'],JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $estado=trim((string)($_POST['estado']??''));
-  $incluir=((string)($_POST['incluir']??'1'))==='1'?1:0;
-  if($estado===''){
+
+  $payload=json_decode((string)($_POST['config']??''),true);
+  if(!is_array($payload)){
     http_response_code(400);
-    echo json_encode(['ok'=>false,'error'=>'El estado Zafiro es obligatorio.'],JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok'=>false,'error'=>'La configuracion recibida no es valida.'],JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $ok=$db->execute("UPDATE dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG
-                    SET INCLUIR=?,FECHA_MODIFICACION=SYSDATETIME(),USUARIO_MODIFICACION=?
-                    WHERE ESTADO_ZAFIRO=?",
-                   [$incluir,$APP_USER?:'CLEAR',$estado]);
-  if($ok){
-    $db->execute("EXEC dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR");
-    echo json_encode(['ok'=>true,'estado'=>$estado,'incluir'=>$incluir],JSON_UNESCAPED_UNICODE);
-  }else{
-    http_response_code(500);
-    echo json_encode(['ok'=>false,'error'=>$db->error()?:'No se pudo guardar la configuracion.'],JSON_UNESCAPED_UNICODE);
+
+  $changes=[];
+  $user=$APP_USER?:'CLEAR';
+
+  $zWanted=[];
+  foreach((array)($payload['zafiro']??[]) as $item){
+    if(!is_array($item))continue;
+    $value=trim((string)($item['value']??''));
+    if($value==='')continue;
+    $zWanted[$value]=!empty($item['include'])?1:0;
   }
+  foreach($db->all("SELECT ESTADO_ZAFIRO,INCLUIR FROM dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG") as $row){
+    $value=trim((string)($row['ESTADO_ZAFIRO']??''));
+    if($value===''||!array_key_exists($value,$zWanted))continue;
+    $old=((int)($row['INCLUIR']??1))===1?1:0; $new=$zWanted[$value];
+    if($old===$new)continue;
+    if(!$db->execute("UPDATE dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG SET INCLUIR=?,FECHA_MODIFICACION=SYSDATETIME(),USUARIO_MODIFICACION=? WHERE ESTADO_ZAFIRO=?",[$new,$user,$value])){
+      http_response_code(500); echo json_encode(['ok'=>false,'error'=>$db->error()],JSON_UNESCAPED_UNICODE); exit;
+    }
+    $changes[]=['tipo'=>'ZAFIRO','sistema'=>'TODOS','valor'=>$value,'antes'=>$old,'despues'=>$new];
+  }
+
+  $cWanted=[];
+  foreach((array)($payload['criterios']??[]) as $item){
+    if(!is_array($item))continue;
+    $type=strtoupper(trim((string)($item['type']??'')));
+    $system=strtoupper(trim((string)($item['system']??'')));
+    $value=trim((string)($item['value']??''));
+    if(!in_array($type,['DIAGNOSTICO','TELEMETRIA'],true)||!in_array($system,['MONITOREO','PCP','BES','TECSS'],true)||$value==='')continue;
+    $cWanted[$type.'|'.$system.'|'.$value]=!empty($item['include'])?1:0;
+  }
+  foreach($db->all("SELECT TIPO,SISTEMA,VALOR,INCLUIR FROM dbo.CLEAR_POZOS_PARADOS_CRITERIOS_CONFIG") as $row){
+    $type=strtoupper(trim((string)($row['TIPO']??'')));
+    $system=strtoupper(trim((string)($row['SISTEMA']??'')));
+    $value=trim((string)($row['VALOR']??''));
+    $key=$type.'|'.$system.'|'.$value;
+    if(!array_key_exists($key,$cWanted))continue;
+    $old=((int)($row['INCLUIR']??1))===1?1:0; $new=$cWanted[$key];
+    if($old===$new)continue;
+    if(!$db->execute("UPDATE dbo.CLEAR_POZOS_PARADOS_CRITERIOS_CONFIG SET INCLUIR=?,FECHA_MODIFICACION=SYSDATETIME(),USUARIO_MODIFICACION=? WHERE TIPO=? AND SISTEMA=? AND VALOR=?",[$new,$user,$type,$system,$value])){
+      http_response_code(500); echo json_encode(['ok'=>false,'error'=>$db->error()],JSON_UNESCAPED_UNICODE); exit;
+    }
+    $changes[]=['tipo'=>$type,'sistema'=>$system,'valor'=>$value,'antes'=>$old,'despues'=>$new];
+  }
+
+  if(!$db->execute("EXEC dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR")){
+    http_response_code(500);
+    echo json_encode(['ok'=>false,'error'=>'La configuracion se guardo, pero fallo el refresco del reporte. '.$db->error()],JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  if($changes){
+    audit_log('CONFIG_PAROS_GUARDADA','pozos_parados',json_encode([
+      'cantidad'=>count($changes),
+      'cambios'=>$changes
+    ],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$user);
+  }
+  echo json_encode(['ok'=>true,'changes'=>count($changes),'message'=>$changes?'Configuracion guardada y aplicada.':'No habia cambios para guardar.'],JSON_UNESCAPED_UNICODE);
   exit;
 }
 
 $ready=$db->ok() && (int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_CACHE',N'U') IS NULL THEN 0 ELSE 1 END")===1;
 $rows=[];$lastCache=null;
-$auxMap=[];$lastAlarmMap=[];$commentMap=[];$zafiroConfig=[];$canViewComments=permissions_can('comments.view');
+$auxMap=[];$lastAlarmMap=[];$commentMap=[];$zafiroConfig=[];$criteriaConfig=[];$configAudit=[];$canViewComments=permissions_can('comments.view');
 if($ready){
   $rows=$db->all("SELECT SISTEMA,POZO,BATERIA,ESTADO_TELEMETRIA,ESTADO_POZO,ESTADO_ZAFIRO,METODO_ZAFIRO,RPM,VARIADOR,LLAVE,LLAVE_AUTO,PRODUCCION_PETROLEO,PERDIDA_INSTANTANEA,PERDIDA_24H,FECHA_DATO,FECHA_CACHE FROM dbo.CLEAR_POZOS_PARADOS_CACHE ORDER BY CASE SISTEMA WHEN 'MONITOREO' THEN 1 WHEN 'PCP' THEN 2 WHEN 'BES' THEN 3 WHEN 'TECSS' THEN 4 ELSE 9 END,POZO");
   $lastCache=$db->scalar("SELECT MAX(FECHA_CACHE) FROM dbo.CLEAR_POZOS_PARADOS_CACHE");
@@ -89,6 +136,23 @@ if($ready){
       $name=trim((string)($zc['ESTADO_ZAFIRO']??''));
       if($name!=='')$zafiroConfig[$name]=((int)($zc['INCLUIR']??1))===1;
     }
+  }
+
+  $hasCriteriaCfg=(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_CRITERIOS_CONFIG',N'U') IS NULL THEN 0 ELSE 1 END")===1;
+  if($hasCriteriaCfg){
+    foreach($db->all("SELECT TIPO,SISTEMA,VALOR,INCLUIR,FECHA_MODIFICACION,USUARIO_MODIFICACION
+                      FROM dbo.CLEAR_POZOS_PARADOS_CRITERIOS_CONFIG
+                      ORDER BY SISTEMA,TIPO,VALOR") as $cc){
+      $type=strtoupper(trim((string)($cc['TIPO']??'')));
+      $system=strtoupper(trim((string)($cc['SISTEMA']??'')));
+      $value=trim((string)($cc['VALOR']??''));
+      if($type!==''&&$system!==''&&$value!=='')$criteriaConfig[$system][$type][$value]=((int)($cc['INCLUIR']??1))===1;
+    }
+  }
+  if((int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_AUDIT_LOG',N'U') IS NULL THEN 0 ELSE 1 END")===1){
+    $configAudit=$db->all("SELECT TOP 5 FECHA,USUARIO,DETALLE FROM dbo.CLEAR_AUDIT_LOG
+                           WHERE MODULO='pozos_parados' AND ACCION='CONFIG_PAROS_GUARDADA'
+                           ORDER BY FECHA DESC");
   }
 
   /* Ultima alarma SCADA de las ultimas 24 h, solo para los pozos que estan
@@ -149,6 +213,7 @@ $telemetryStates=array_keys($telemetryStates); sort($telemetryStates,SORT_NATURA
 $zafiroStates=array_keys($zafiroStates); sort($zafiroStates,SORT_NATURAL|SORT_FLAG_CASE);
 $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT_FLAG_CASE);
 $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO','PARADO','PARO CONTROLADO'];
+$paroSystems=['MONITOREO','PCP','BES','TECSS'];
 ?>
 <!doctype html>
 <html lang="es">
@@ -158,7 +223,7 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
 <link rel="stylesheet" href="assets/css/app.css?v=20260929-pp1">
 <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
 <link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9">
-<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20260929-pp4">
+<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20261001-config2">
 </head>
 <body><div class="app"><?php include __DIR__.'/includes/sidebar.php'; ?><main class="main"><?php include __DIR__.'/includes/topbar.php'; ?>
 <div class="pp">
@@ -182,46 +247,14 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
     <button class="ppKpi is-cyan" data-system-card="BES"><span>BES</span><b id="ppCountBes"><?php echo $counts['BES']; ?></b><small>ESTADO</small></button>
     <button class="ppKpi is-green" data-system-card="TECSS"><span>TECSS</span><b id="ppCountTecss"><?php echo $counts['TECSS']; ?></b><small>ESTADO</small></button>
     <button class="ppKpi is-total" data-system-card=""><span>Total parados</span><b id="ppCountTotal"><?php echo $total; ?></b><small>Todos los sistemas</small></button>
-    <div class="ppKpi is-oil"><span>Producción petróleo</span><b id="ppOilTotal"><?php echo pp_n($totalOil); ?></b><small>m³/d · pozos considerados</small></div>
+    <div class="ppKpi is-oil"><span>Producción petróleo</span><b id="ppOilTotal"><?php echo pp_n($totalOil); ?></b><small>m³/d · suma de filas visibles</small></div>
     <div class="ppKpi is-loss"><span>Pérdida instantánea</span><b id="ppLossNow"><?php echo pp_n($lossNow); ?></b><small>m³/d</small></div>
     <div class="ppKpi is-loss"><span>Pérdida últimas 24 h</span><b id="ppLoss24"><?php echo pp_n($loss24); ?></b><small>m³ estimados</small></div>
   </section>
 
   <div class="ppToolbar">
     <select id="ppSystem"><option value="">Todos los sistemas</option><option>MONITOREO</option><option>PCP</option><option>BES</option><option>TECSS</option></select>
-    <div class="ppStatePicker" id="ppStatePicker">
-      <button class="ppStatePicker__button" type="button" id="ppStatePickerButton">Estados considerados ▾</button>
-      <div class="ppStatePicker__menu ppStatePicker__menu--wide" id="ppStatePickerMenu" hidden>
-        <div class="ppStatePicker__title">Diagnosticos visibles</div>
-        <?php foreach($diagnosticStates as $stateOption):
-          $pickerClass=$stateOption==='PARO REAL'?'is-danger':($stateOption==='INCONSISTENCIA'?'is-inconsistency':($stateOption==='PROBABLE PARO'||$stateOption==='VERIFICAR PARO'?'is-warning':($stateOption==='PARO CONTROLADO'?'is-control':'is-muted')));
-        ?>
-          <label><input type="checkbox" class="ppStateCheck" value="<?php echo h($stateOption); ?>" checked><span class="ppBadge <?php echo $pickerClass; ?>"><?php echo h($stateOption); ?></span></label>
-        <?php endforeach; ?>
-        <div class="ppStatePicker__actions"><button type="button" data-state-all="1">Todos</button><button type="button" data-state-all="0">Ninguno</button></div>
-
-        <div class="ppStatePicker__title ppStatePicker__title--zafiro">Estados Zafiro considerados en el reporte</div>
-        <?php if(!$zafiroConfig): ?>
-          <div class="ppStatePicker__hint">Ejecuta el SQL actualizado para habilitar la configuracion global.</div>
-        <?php else: foreach($zafiroConfig as $zState=>$zIncluded): ?>
-          <label class="ppZafiroConfigRow">
-            <input type="checkbox" class="ppZafiroGlobalCheck" value="<?php echo h($zState); ?>" <?php echo $zIncluded?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>>
-            <span><?php echo h($zState); ?></span>
-          </label>
-        <?php endforeach; endif; ?>
-        <div class="ppStatePicker__hint">La seleccion Zafiro es global: afecta la grilla, KPIs y reportes automaticos para todos los usuarios. Downtime de Produccion (Perdida Localizada) queda excluido por defecto.</div>
-      </div>
-    </div>
-    <div class="ppStatePicker" id="ppTelemetryPicker">
-      <button class="ppStatePicker__button" type="button" id="ppTelemetryPickerButton">Estados telemetría ▾</button>
-      <div class="ppStatePicker__menu ppStatePicker__menu--wide" id="ppTelemetryPickerMenu" hidden>
-        <div class="ppStatePicker__title">Estados de telemetría considerados</div>
-        <?php foreach($telemetryStates as $telemetryOption): ?>
-          <label><input type="checkbox" class="ppTelemetryCheck" value="<?php echo h($telemetryOption); ?>" checked><span><?php echo h($telemetryOption); ?></span></label>
-        <?php endforeach; ?>
-        <div class="ppStatePicker__actions"><button type="button" data-telemetry-all="1">Todos</button><button type="button" data-telemetry-all="0">Ninguno</button></div>
-      </div>
-    </div>
+    <button class="ppBtn ppConfigButton" type="button" id="ppConfigOpen"><?php echo icon('settings'); ?> Configuración de paros</button>
     <input id="ppSearch" type="search" placeholder="Buscar pozo, batería o estado Zafiro…">
     <button class="ppBtn" id="ppClear">Limpiar filtros</button>
     <span class="ppUpdated">Actualizado: <b><?php echo h(pp_d($lastCache)); ?></b></span>
@@ -313,6 +346,65 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
 <?php clear_alarm_actions_modal(); ?>
 <?php include __DIR__.'/includes/telemetry_modal.php'; ?>
 
+<div class="ppConfigModal" id="ppConfigModal" hidden>
+  <div class="ppConfigCard">
+    <div class="ppConfigHead">
+      <div><div class="ppEyebrow">Criterios globales</div><h2>Configuración de paros</h2><p>Define qué diagnósticos y estados de telemetría se consideran por sistema. La configuración aplica a todos los usuarios y a los reportes automáticos.</p></div>
+      <button class="ppModalClose" type="button" id="ppConfigClose">×</button>
+    </div>
+    <div class="ppConfigBody">
+      <?php foreach($paroSystems as $system): ?>
+      <section class="ppConfigSystem">
+        <h3><?php echo h($system); ?></h3>
+        <div class="ppConfigColumns">
+          <div>
+            <h4>Tipos de paro / Diagnóstico</h4>
+            <?php $diagCfg=$criteriaConfig[$system]['DIAGNOSTICO']??[]; ?>
+            <?php if(!$diagCfg): ?><div class="ppConfigEmpty">Todavía no hay diagnósticos registrados para este sistema.</div>
+            <?php else: foreach($diagCfg as $value=>$included): ?>
+              <label><input class="ppConfigCriterion" type="checkbox" data-type="DIAGNOSTICO" data-system="<?php echo h($system); ?>" value="<?php echo h($value); ?>" <?php echo $included?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>><span><?php echo h($value); ?></span></label>
+            <?php endforeach; endif; ?>
+          </div>
+          <div>
+            <h4>Estados de telemetría</h4>
+            <?php $telCfg=$criteriaConfig[$system]['TELEMETRIA']??[]; ?>
+            <?php if(!$telCfg): ?><div class="ppConfigEmpty">Todavía no hay estados registrados para este sistema.</div>
+            <?php else: foreach($telCfg as $value=>$included): ?>
+              <label><input class="ppConfigCriterion" type="checkbox" data-type="TELEMETRIA" data-system="<?php echo h($system); ?>" value="<?php echo h($value); ?>" <?php echo $included?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>><span><?php echo h($value); ?></span></label>
+            <?php endforeach; endif; ?>
+          </div>
+        </div>
+      </section>
+      <?php endforeach; ?>
+
+      <section class="ppConfigSystem ppConfigZafiro">
+        <h3>Estados Zafiro considerados</h3>
+        <div class="ppConfigZafiroGrid">
+          <?php if(!$zafiroConfig): ?><div class="ppConfigEmpty">Ejecutá el SQL actualizado para habilitar esta configuración.</div>
+          <?php else: foreach($zafiroConfig as $value=>$included): ?>
+            <label><input class="ppConfigZafiro" type="checkbox" value="<?php echo h($value); ?>" <?php echo $included?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>><span><?php echo h($value); ?></span></label>
+          <?php endforeach; endif; ?>
+        </div>
+      </section>
+
+      <section class="ppConfigLog">
+        <h3>Últimos cambios</h3>
+        <?php if(!$configAudit): ?><div class="ppConfigEmpty">Todavía no hay cambios registrados.</div>
+        <?php else: ?><div class="ppConfigLogTable"><table><thead><tr><th>Fecha</th><th>Usuario</th><th>Detalle</th></tr></thead><tbody>
+          <?php foreach($configAudit as $log): $detail=json_decode((string)($log['DETALLE']??''),true); $qty=(int)($detail['cantidad']??0); ?>
+          <tr><td><?php echo h(pp_d($log['FECHA']??'')); ?></td><td><b><?php echo h($log['USUARIO']??''); ?></b></td><td><?php echo h($qty.' cambio'.($qty===1?'':'s')); ?></td></tr>
+          <?php endforeach; ?>
+        </tbody></table></div><?php endif; ?>
+      </section>
+    </div>
+    <div class="ppConfigFooter">
+      <span id="ppConfigStatus"><?php echo auth_es_admin()?'Los cambios se aplican al guardar.':'Modo lectura: solo administradores pueden guardar cambios.'; ?></span>
+      <button class="ppBtn" type="button" id="ppConfigCancel">Cancelar</button>
+      <?php if(auth_es_admin()): ?><button class="ppBtn is-primary" type="button" id="ppConfigSave">Guardar configuración</button><?php endif; ?>
+    </div>
+  </div>
+</div>
+
 <div class="ppModal" id="ppModal" hidden><div class="ppModalCard"><button class="ppModalClose" type="button">×</button><h2 id="ppModalTitle"></h2><div id="ppModalBody"></div></div></div>
 <script>
 (function(){
@@ -328,10 +420,10 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
  document.querySelector('.ppModalClose')?.addEventListener('click',()=>modal.hidden=true);
  modal?.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});
  const sys=document.getElementById('ppSystem'),search=document.getElementById('ppSearch');
- const stateChecks=Array.from(document.querySelectorAll('.ppStateCheck'));
- const telemetryChecks=Array.from(document.querySelectorAll('.ppTelemetryCheck'));
- const zafiroGlobalChecks=Array.from(document.querySelectorAll('.ppZafiroGlobalCheck'));
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
+ const configModal=document.getElementById('ppConfigModal');
+ const configCriteria=Array.from(document.querySelectorAll('.ppConfigCriterion'));
+ const configZafiro=Array.from(document.querySelectorAll('.ppConfigZafiro'));
  const ppNumber=v=>{
    if(v===null||v===undefined||v==='')return 0;
    if(typeof v==='number')return Number.isFinite(v)?v:0;
@@ -346,9 +438,6 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
    return Number.isFinite(n)?n:0;
  };
  const fmt=v=>ppNumber(v).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
- function selectedStates(){return new Set(stateChecks.filter(x=>x.checked).map(x=>x.value));}
- function selectedTelemetryStates(){return new Set(telemetryChecks.filter(x=>x.checked).map(x=>x.value.toLowerCase()));}
-
  // Redimensionado de columnas: arrastrar el borde derecho del encabezado.
  document.querySelectorAll('#ppTable thead tr:first-child th').forEach((th,index)=>{
    th.dataset.colIndex=index;
@@ -374,13 +463,11 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
  });
  function apply(){
    let n=0,oil=0,lossNow=0,loss24=0,counts={MONITOREO:0,PCP:0,BES:0,TECSS:0};
-   const q=(search?.value||'').trim().toLowerCase(),states=selectedStates(),telemetrySelected=selectedTelemetryStates();
+   const q=(search?.value||'').trim().toLowerCase();
    const cf={};colFilters.forEach(x=>cf[x.dataset.colFilter]=(x.value||'').trim().toLowerCase());
    document.querySelectorAll('#ppTable tbody tr[data-system]').forEach(r=>{
      const alarm=Number(r.dataset.alarm||0);
-     let ok=states.has(r.dataset.state)
-       && telemetrySelected.has((r.dataset.telemetry||'').toLowerCase())
-       && (!sys.value||r.dataset.system===sys.value)
+     let ok=(!sys.value||r.dataset.system===sys.value)
        && (!q||r.dataset.search.includes(q));
      if(cf.well&&!r.dataset.well.includes(cf.well))ok=false;
      if(cf.battery&&!r.dataset.battery.includes(cf.battery))ok=false;
@@ -405,36 +492,40 @@ $diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO'
    document.getElementById('ppLossNow').textContent=fmt(lossNow);
    document.getElementById('ppLoss24').textContent=fmt(loss24);
  }
- [sys,...stateChecks,...telemetryChecks,...colFilters].forEach(x=>x&&x.addEventListener(x.tagName==='INPUT'&&x.type!=='checkbox'?'input':'change',apply));
+ [sys,...colFilters].forEach(x=>x&&x.addEventListener(x.tagName==='INPUT'&&x.type!=='checkbox'?'input':'change',apply));
  search?.addEventListener('input',apply);
  document.querySelectorAll('[data-system-card]').forEach(b=>b.addEventListener('click',()=>{if(sys){sys.value=b.dataset.systemCard;apply();}}));
- const picker=document.getElementById('ppStatePicker'),pickerBtn=document.getElementById('ppStatePickerButton'),pickerMenu=document.getElementById('ppStatePickerMenu');
- const telemetryPicker=document.getElementById('ppTelemetryPicker'),telemetryPickerBtn=document.getElementById('ppTelemetryPickerButton'),telemetryPickerMenu=document.getElementById('ppTelemetryPickerMenu');
- pickerBtn?.addEventListener('click',()=>{pickerMenu.hidden=!pickerMenu.hidden;if(telemetryPickerMenu)telemetryPickerMenu.hidden=true;});
- telemetryPickerBtn?.addEventListener('click',()=>{telemetryPickerMenu.hidden=!telemetryPickerMenu.hidden;if(pickerMenu)pickerMenu.hidden=true;});
- document.addEventListener('click',e=>{
-   if(picker&&!picker.contains(e.target))pickerMenu.hidden=true;
-   if(telemetryPicker&&!telemetryPicker.contains(e.target))telemetryPickerMenu.hidden=true;
- });
- document.querySelectorAll('[data-state-all]').forEach(b=>b.addEventListener('click',()=>{stateChecks.forEach(x=>x.checked=b.dataset.stateAll==='1');apply();}));
- document.querySelectorAll('[data-telemetry-all]').forEach(b=>b.addEventListener('click',()=>{telemetryChecks.forEach(x=>x.checked=b.dataset.telemetryAll==='1');apply();}));
+ const configOpen=document.getElementById('ppConfigOpen');
+ const configClose=document.getElementById('ppConfigClose');
+ const configCancel=document.getElementById('ppConfigCancel');
+ const configSave=document.getElementById('ppConfigSave');
+ const configStatus=document.getElementById('ppConfigStatus');
+ const closeConfig=()=>{if(configModal)configModal.hidden=true;};
+ configOpen?.addEventListener('click',()=>{if(configModal)configModal.hidden=false;});
+ configClose?.addEventListener('click',closeConfig);
+ configCancel?.addEventListener('click',closeConfig);
+ configModal?.addEventListener('click',e=>{if(e.target===configModal)closeConfig();});
 
- zafiroGlobalChecks.forEach(chk=>chk.addEventListener('change',async()=>{
-   const previous=!chk.checked;
-   chk.disabled=true;
+ configSave?.addEventListener('click',async()=>{
+   configSave.disabled=true;
+   if(configStatus)configStatus.textContent='Guardando configuración y refrescando el reporte…';
+   const payload={
+     criterios:configCriteria.map(x=>({type:x.dataset.type,system:x.dataset.system,value:x.value,include:x.checked})),
+     zafiro:configZafiro.map(x=>({value:x.value,include:x.checked}))
+   };
    try{
-     const body=new URLSearchParams({action:'save_zafiro_state',estado:chk.value,incluir:chk.checked?'1':'0'});
+     const body=new URLSearchParams({action:'save_paro_config',config:JSON.stringify(payload)});
      const res=await fetch('pozos_parados.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body});
      const data=await res.json();
-     if(!res.ok||!data.ok)throw new Error(data.error||'No se pudo guardar el estado Zafiro.');
-     window.location.reload();
+     if(!res.ok||!data.ok)throw new Error(data.error||'No se pudo guardar la configuración.');
+     if(configStatus)configStatus.textContent=data.message||'Configuración guardada.';
+     window.setTimeout(()=>window.location.reload(),500);
    }catch(err){
-     chk.checked=previous;
-     chk.disabled=false;
-     alert(err.message||'No se pudo guardar la configuracion.');
+     if(configStatus)configStatus.textContent=err.message||'No se pudo guardar la configuración.';
+     configSave.disabled=false;
    }
- }));
- document.getElementById('ppClear')?.addEventListener('click',()=>{sys.value='';search.value='';stateChecks.forEach(x=>x.checked=true);telemetryChecks.forEach(x=>x.checked=true);colFilters.forEach(x=>x.value='');apply();});
+ });
+ document.getElementById('ppClear')?.addEventListener('click',()=>{sys.value='';search.value='';colFilters.forEach(x=>x.value='');apply();});
  apply();
 })();
 </script>
