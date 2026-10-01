@@ -223,7 +223,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
 <link rel="stylesheet" href="assets/css/app.css?v=20260929-pp1">
 <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
 <link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9">
-<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20261001-config2">
+<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20261001-config3">
 </head>
 <body><div class="app"><?php include __DIR__.'/includes/sidebar.php'; ?><main class="main"><?php include __DIR__.'/includes/topbar.php'; ?>
 <div class="pp">
@@ -346,8 +346,8 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
 <?php clear_alarm_actions_modal(); ?>
 <?php include __DIR__.'/includes/telemetry_modal.php'; ?>
 
-<div class="ppConfigModal" id="ppConfigModal" hidden>
-  <div class="ppConfigCard">
+<div class="ppModal ppConfigModal" id="ppConfigModal" hidden>
+  <div class="ppModalCard ppConfigCard">
     <div class="ppConfigHead">
       <div><div class="ppEyebrow">Criterios globales</div><h2>Configuración de paros</h2><p>Define qué diagnósticos y estados de telemetría se consideran por sistema. La configuración aplica a todos los usuarios y a los reportes automáticos.</p></div>
       <button class="ppModalClose" type="button" id="ppConfigClose" onclick="var m=document.getElementById('ppConfigModal');if(m){m.hidden=true;m.style.display='none';}">×</button>
@@ -405,7 +405,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
   </div>
 </div>
 
-<div class="ppModal" id="ppModal" hidden><div class="ppModalCard"><button class="ppModalClose" type="button">×</button><h2 id="ppModalTitle"></h2><div id="ppModalBody"></div></div></div>
+<div class="ppModal" id="ppModal" hidden><div class="ppModalCard"><button class="ppModalClose" type="button" id="ppHelpClose" onclick="var m=document.getElementById('ppModal');if(m){m.hidden=true;m.style.display='none';}">×</button><h2 id="ppModalTitle"></h2><div id="ppModalBody"></div></div></div>
 <script>
 (function(){
  const help={
@@ -416,14 +416,28 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
   tecss:['Help · TECSS','La señal de paro se toma de ESTADO = Parado. Se excluye cuando Estado Zafiro es Downtime de Producción (Pérdida Localizada). El resto de los paros queda disponible para el análisis de pérdida.']
  };
  const modal=document.getElementById('ppModal');
- document.querySelectorAll('[data-help]').forEach(b=>b.onclick=()=>{const h=help[b.dataset.help];document.getElementById('ppModalTitle').textContent=h[0];document.getElementById('ppModalBody').innerHTML='<p>'+h[1]+'</p>';modal.hidden=false;});
- document.querySelector('.ppModalClose')?.addEventListener('click',()=>modal.hidden=true);
- modal?.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});
+ document.querySelectorAll('[data-help]').forEach(b=>b.onclick=()=>{const h=help[b.dataset.help];document.getElementById('ppModalTitle').textContent=h[0];document.getElementById('ppModalBody').innerHTML='<p>'+h[1]+'</p>';if(modal){modal.hidden=false;modal.style.display='flex';}});
+ document.getElementById('ppHelpClose')?.addEventListener('click',()=>{if(modal){modal.hidden=true;modal.style.display='none';}});
+ modal?.addEventListener('click',e=>{if(e.target===modal){modal.hidden=true;modal.style.display='none';}});
  const sys=document.getElementById('ppSystem'),search=document.getElementById('ppSearch');
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
  const configModal=document.getElementById('ppConfigModal');
  const configCriteria=Array.from(document.querySelectorAll('.ppConfigCriterion'));
  const configZafiro=Array.from(document.querySelectorAll('.ppConfigZafiroCheck'));
+ document.addEventListener('click',e=>{
+   const open=e.target.closest?.('#ppConfigOpen');
+   if(open){
+     e.preventDefault();
+     const m=document.getElementById('ppConfigModal');
+     if(m){m.hidden=false;m.style.display='flex';}
+   }
+   const close=e.target.closest?.('#ppConfigClose,#ppConfigCancel');
+   if(close){
+     e.preventDefault();
+     const m=document.getElementById('ppConfigModal');
+     if(m){m.hidden=true;m.style.display='none';}
+   }
+ });
  const ppNumber=v=>{
    if(v===null||v===undefined||v==='')return 0;
    if(typeof v==='number')return Number.isFinite(v)?v:0;
@@ -529,7 +543,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
  apply();
 })();
 </script>
-<script src="assets/js/app.js?v=20260929-pp1"></script>
+<script src="assets/js/app.js?v=20261001-ppcfg1"></script>
 <script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
 <script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
 </body></html>
