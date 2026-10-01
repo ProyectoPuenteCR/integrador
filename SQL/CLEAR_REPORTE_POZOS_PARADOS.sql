@@ -77,6 +77,22 @@ BEGIN
 END;
 GO
 
+/* Configuracion global de estados Zafiro considerados por el reporte.
+   Es compartida por todos los usuarios. Los estados nuevos se incorporan
+   automaticamente en el refresco con INCLUIR=1, excepto Downtime de
+   Produccion (Perdida Localizada), que nace excluido. */
+IF OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG',N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG(
+        ESTADO_ZAFIRO nvarchar(400) NOT NULL,
+        INCLUIR bit NOT NULL CONSTRAINT DF_CLEAR_PP_ZAFIRO_INCLUIR DEFAULT(1),
+        FECHA_MODIFICACION datetime2(0) NOT NULL CONSTRAINT DF_CLEAR_PP_ZAFIRO_FECHA DEFAULT(SYSDATETIME()),
+        USUARIO_MODIFICACION nvarchar(150) NULL,
+        CONSTRAINT PK_CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG PRIMARY KEY CLUSTERED(ESTADO_ZAFIRO)
+    );
+END;
+GO
+
 IF OBJECT_ID(N'dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR',N'P') IS NULL
     EXEC(N'CREATE PROCEDURE dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR AS RETURN 0;');
 GO
@@ -128,6 +144,23 @@ BEGIN
                 EXEC sys.sp_executesql @q;
             END;
         END;
+
+        /* Registra automaticamente los estados Zafiro que vayan apareciendo.
+           La seleccion queda persistida y es comun a todos los usuarios. */
+        MERGE dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG AS T
+        USING(
+            SELECT DISTINCT LEFT(LTRIM(RTRIM(ESTADO)),400) AS ESTADO_ZAFIRO
+            FROM #Zafiro
+            WHERE NULLIF(LTRIM(RTRIM(ESTADO)),N'') IS NOT NULL
+        ) AS S
+        ON T.ESTADO_ZAFIRO COLLATE DATABASE_DEFAULT=S.ESTADO_ZAFIRO COLLATE DATABASE_DEFAULT
+        WHEN NOT MATCHED THEN
+          INSERT(ESTADO_ZAFIRO,INCLUIR,FECHA_MODIFICACION,USUARIO_MODIFICACION)
+          VALUES(
+            S.ESTADO_ZAFIRO,
+            CASE WHEN UPPER(S.ESTADO_ZAFIRO) COLLATE Modern_Spanish_CI_AI LIKE N'%DOWNTIME DE PRODUCCION%PERDIDA LOCALIZADA%' THEN 0 ELSE 1 END,
+            @Ahora,N'AUTO'
+          );
 
         CREATE TABLE #Prod(
             POZO_CLAVE nvarchar(100) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY,
@@ -202,19 +235,28 @@ BEGIN
           AND (NULLIF(LTRIM(RTRIM(Z.ESTADO)),N'') IS NULL OR UPPER(Z.ESTADO) LIKE N'%PRODUCIENDO%')
           AND K.K<>N'';
 
-        /* BES: ESTADO parado con el mismo criterio Zafiro que PCP. */
+        /* BES V2:
+           - Parado + Zafiro Produciendo = INCONSISTENCIA, no PARO REAL.
+           - Parado sin estado Zafiro = PROBABLE PARO.
+           - Parado con un estado Zafiro no productivo y habilitado = PARO REAL.
+           Los estados Zafiro deshabilitados se eliminan luego de consolidar. */
         INSERT INTO #Actual
-        SELECT N'BES',K.K,BX.POZO,BX.BATERIA,CONVERT(nvarchar(255),BX.ESTADO),N'PARO REAL',
+        SELECT N'BES',K.K,BX.POZO,BX.BATERIA,CONVERT(nvarchar(255),BX.ESTADO),
+               CASE
+                 WHEN NULLIF(LTRIM(RTRIM(Z.ESTADO)),N'') IS NULL THEN N'PROBABLE PARO'
+                 WHEN UPPER(Z.ESTADO) COLLATE Modern_Spanish_CI_AI LIKE N'%PRODUCIENDO%' THEN N'INCONSISTENCIA'
+                 ELSE N'PARO REAL'
+               END,
                Z.ESTADO,Z.METODO,NULL,NULL,NULL,NULL,P.PETROLEO,TRY_CONVERT(datetime2(0),BX.FEHA)
         FROM dbo.BES_RTQP BX
         CROSS APPLY(SELECT dbo.FN_CLEAR_POZO_CLAVE(BX.POZO) K)K
         LEFT JOIN #Zafiro Z ON Z.POZO_CLAVE=K.K
         LEFT JOIN #Prod P ON P.POZO_CLAVE=K.K
         WHERE UPPER(CONVERT(nvarchar(255),BX.ESTADO)) LIKE N'%PARAD%'
-          AND (NULLIF(LTRIM(RTRIM(Z.ESTADO)),N'') IS NULL OR UPPER(Z.ESTADO) LIKE N'%PRODUCIENDO%')
           AND K.K<>N'';
 
-        /* TECSS: ESTADO parado, excluyendo Downtime de Produccion (Perdida Localizada) de Zafiro. */
+        /* TECSS: ESTADO parado. La inclusion/exclusion por Estado Zafiro
+           se administra en CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG. */
         INSERT INTO #Actual
         SELECT N'TECSS',K.K,TX.POZO,TX.BATERIA,CONVERT(nvarchar(255),TX.ESTADO),N'PARO REAL',
                Z.ESTADO,Z.METODO,NULL,NULL,NULL,NULL,P.PETROLEO,TRY_CONVERT(datetime2(0),TX.HOY)
@@ -223,8 +265,16 @@ BEGIN
         LEFT JOIN #Zafiro Z ON Z.POZO_CLAVE=K.K
         LEFT JOIN #Prod P ON P.POZO_CLAVE=K.K
         WHERE UPPER(CONVERT(nvarchar(255),TX.ESTADO)) LIKE N'%PARAD%'
-          AND UPPER(ISNULL(Z.ESTADO,N'')) COLLATE Modern_Spanish_CI_AI NOT LIKE N'%DOWNTIME DE PRODUCCION%PERDIDA LOCALIZADA%'
           AND K.K<>N'';
+
+        /* Aplica la configuracion global a todos los sistemas.
+           Un estado Zafiro desmarcado deja de formar parte del reporte,
+           KPIs, perdidas e historico de 24 h. */
+        DELETE A
+        FROM #Actual A
+        INNER JOIN dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG C
+          ON C.ESTADO_ZAFIRO COLLATE DATABASE_DEFAULT=LEFT(LTRIM(RTRIM(A.ESTADO_ZAFIRO)),400) COLLATE DATABASE_DEFAULT
+        WHERE C.INCLUIR=0;
 
         /*
          * Las vistas RTQP pueden devolver mas de una fila para el mismo pozo.
@@ -305,6 +355,7 @@ IF DATABASE_PRINCIPAL_ID(N'fix') IS NOT NULL
 BEGIN
     GRANT SELECT ON dbo.CLEAR_POZOS_PARADOS_CACHE TO [fix];
     GRANT SELECT ON dbo.CLEAR_POZOS_PARADOS_HIST TO [fix];
+    GRANT SELECT, INSERT, UPDATE ON dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG TO [fix];
     GRANT EXECUTE ON dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR TO [fix];
 END;
 GO
