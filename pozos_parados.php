@@ -223,7 +223,7 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
 <link rel="stylesheet" href="assets/css/app.css?v=20260929-pp1">
 <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
 <link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9">
-<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20261001-config3">
+<link rel="stylesheet" href="assets/css/pozos_parados.css?v=20261001-config4">
 </head>
 <body><div class="app"><?php include __DIR__.'/includes/sidebar.php'; ?><main class="main"><?php include __DIR__.'/includes/topbar.php'; ?>
 <div class="pp">
@@ -354,8 +354,8 @@ $paroSystems=['MONITOREO','PCP','BES','TECSS'];
     </div>
     <div class="ppConfigBody">
       <?php foreach($paroSystems as $system): ?>
-      <section class="ppConfigSystem">
-        <h3><?php echo h($system); ?></h3>
+      <section class="ppConfigSystem ppConfigSystem--<?php echo h(strtolower($system)); ?>" data-config-system="<?php echo h($system); ?>">
+        <h3><span><?php echo h($system); ?></span></h3>
         <div class="ppConfigColumns">
           <div>
             <h4>Tipos de paro / Diagnóstico</h4>
