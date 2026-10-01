@@ -14,9 +14,51 @@ $APP_ROLE=auth_es_admin()?'Administrador':'Operador';
 $ACTIVE='pozos_parados';
 $db=clear_db();
 
+/* Configuracion global: los estados Zafiro marcados/desmarcados afectan a
+   todos los usuarios y tambien a los reportes automaticos. Solo un admin
+   puede cambiar este criterio para evitar cambios operativos accidentales. */
+if(($_SERVER['REQUEST_METHOD']??'GET')==='POST' && (string)($_POST['action']??'')==='save_zafiro_state'){
+  header('Content-Type: application/json; charset=utf-8');
+  if(!auth_es_admin()){
+    http_response_code(403);
+    echo json_encode(['ok'=>false,'error'=>'Solo un administrador puede modificar los estados Zafiro considerados.'],JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if(!$db->ok()){
+    http_response_code(500);
+    echo json_encode(['ok'=>false,'error'=>$db->error()],JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $hasCfg=(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG',N'U') IS NULL THEN 0 ELSE 1 END")===1;
+  if(!$hasCfg){
+    http_response_code(409);
+    echo json_encode(['ok'=>false,'error'=>'Falta instalar la configuracion global. Ejecuta SQL/CLEAR_REPORTE_POZOS_PARADOS.sql actualizado.'],JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $estado=trim((string)($_POST['estado']??''));
+  $incluir=((string)($_POST['incluir']??'1'))==='1'?1:0;
+  if($estado===''){
+    http_response_code(400);
+    echo json_encode(['ok'=>false,'error'=>'El estado Zafiro es obligatorio.'],JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $ok=$db->execute("UPDATE dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG
+                    SET INCLUIR=?,FECHA_MODIFICACION=SYSDATETIME(),USUARIO_MODIFICACION=?
+                    WHERE ESTADO_ZAFIRO=?",
+                   [$incluir,$APP_USER?:'CLEAR',$estado]);
+  if($ok){
+    $db->execute("EXEC dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR");
+    echo json_encode(['ok'=>true,'estado'=>$estado,'incluir'=>$incluir],JSON_UNESCAPED_UNICODE);
+  }else{
+    http_response_code(500);
+    echo json_encode(['ok'=>false,'error'=>$db->error()?:'No se pudo guardar la configuracion.'],JSON_UNESCAPED_UNICODE);
+  }
+  exit;
+}
+
 $ready=$db->ok() && (int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_CACHE',N'U') IS NULL THEN 0 ELSE 1 END")===1;
 $rows=[];$lastCache=null;
-$auxMap=[];$commentMap=[];$canViewComments=permissions_can('comments.view');
+$auxMap=[];$lastAlarmMap=[];$commentMap=[];$zafiroConfig=[];$canViewComments=permissions_can('comments.view');
 if($ready){
   $rows=$db->all("SELECT SISTEMA,POZO,BATERIA,ESTADO_TELEMETRIA,ESTADO_POZO,ESTADO_ZAFIRO,METODO_ZAFIRO,RPM,VARIADOR,LLAVE,LLAVE_AUTO,PRODUCCION_PETROLEO,PERDIDA_INSTANTANEA,PERDIDA_24H,FECHA_DATO,FECHA_CACHE FROM dbo.CLEAR_POZOS_PARADOS_CACHE ORDER BY CASE SISTEMA WHEN 'MONITOREO' THEN 1 WHEN 'PCP' THEN 2 WHEN 'BES' THEN 3 WHEN 'TECSS' THEN 4 ELSE 9 END,POZO");
   $lastCache=$db->scalar("SELECT MAX(FECHA_CACHE) FROM dbo.CLEAR_POZOS_PARADOS_CACHE");
@@ -34,6 +76,45 @@ if($ready){
       $alm=(int)($a['ALM']??0);
       if(!isset($auxMap[$k])||$alm>(int)($auxMap[$k]['ALM']??0))$auxMap[$k]=['ALM'=>$alm,'PANTALLA'=>trim((string)($a['PANTALLA']??''))];
       elseif(($auxMap[$k]['PANTALLA']??'')===''&&trim((string)($a['PANTALLA']??''))!=='')$auxMap[$k]['PANTALLA']=trim((string)$a['PANTALLA']);
+    }
+  }
+
+  /* Criterio Zafiro global. Si el script actualizado aun no fue instalado,
+     la pantalla conserva el comportamiento anterior sin romper la grilla. */
+  $hasZafiroCfg=(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG',N'U') IS NULL THEN 0 ELSE 1 END")===1;
+  if($hasZafiroCfg){
+    foreach($db->all("SELECT ESTADO_ZAFIRO,INCLUIR,FECHA_MODIFICACION,USUARIO_MODIFICACION
+                      FROM dbo.CLEAR_POZOS_PARADOS_ZAFIRO_CONFIG
+                      ORDER BY ESTADO_ZAFIRO") as $zc){
+      $name=trim((string)($zc['ESTADO_ZAFIRO']??''));
+      if($name!=='')$zafiroConfig[$name]=((int)($zc['INCLUIR']??1))===1;
+    }
+  }
+
+  /* Ultima alarma SCADA de las ultimas 24 h, solo para los pozos que estan
+     en el cache actual. Se muestra la descripcion, no solo el contador. */
+  if($rows){
+    $wellKeys=[];
+    foreach($rows as $r){$w=trim((string)($r['POZO']??''));if($w!=='')$wellKeys[$w]=1;}
+    foreach(array_chunk(array_keys($wellKeys),120) as $chunk){
+      $ph=implode(',',array_fill(0,count($chunk),'?'));
+      $sqlLast=";WITH A AS(
+        SELECT ALM_ALMEXTFLD2 AS POZO,
+               COALESCE(NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(1000),ALM_DESCR))),''),NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(1000),ALM_TAGDESC))),''),CONVERT(nvarchar(1000),ALM_TAGNAME)) AS DESCRIPCION,
+               ALM_NATIVETIMEIN,
+               ROW_NUMBER() OVER(PARTITION BY ALM_ALMEXTFLD2 ORDER BY ALM_NATIVETIMEIN DESC) AS RN
+        FROM dbo.FIXALARMS
+        WHERE ALM_NATIVETIMEIN>=DATEADD(hour,-24,SYSDATETIME())
+          AND ALM_ALMEXTFLD2 IN ($ph)
+      )
+      SELECT POZO,DESCRIPCION,ALM_NATIVETIMEIN FROM A WHERE RN=1";
+      foreach($db->all($sqlLast,$chunk) as $la){
+        $k=pp_key($la['POZO']??''); if($k==='')continue;
+        $lastAlarmMap[$k]=[
+          'DESCRIPCION'=>trim((string)($la['DESCRIPCION']??'')),
+          'FECHA'=>$la['ALM_NATIVETIMEIN']??null
+        ];
+      }
     }
   }
 
@@ -63,9 +144,11 @@ foreach($rows as $r){
   $v=trim((string)($r['ESTADO_ZAFIRO']??'')); if($v!=='')$zafiroStates[$v]=1;
   $v=trim((string)($r['METODO_ZAFIRO']??'')); if($v!=='')$zafiroMethods[$v]=1;
 }
+foreach(array_keys($zafiroConfig) as $v){if($v!=='')$zafiroStates[$v]=1;}
 $telemetryStates=array_keys($telemetryStates); sort($telemetryStates,SORT_NATURAL|SORT_FLAG_CASE);
 $zafiroStates=array_keys($zafiroStates); sort($zafiroStates,SORT_NATURAL|SORT_FLAG_CASE);
 $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT_FLAG_CASE);
+$diagnosticStates=['PARO REAL','PROBABLE PARO','INCONSISTENCIA','VERIFICAR PARO','PARADO','PARO CONTROLADO'];
 ?>
 <!doctype html>
 <html lang="es">
@@ -108,13 +191,25 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
     <select id="ppSystem"><option value="">Todos los sistemas</option><option>MONITOREO</option><option>PCP</option><option>BES</option><option>TECSS</option></select>
     <div class="ppStatePicker" id="ppStatePicker">
       <button class="ppStatePicker__button" type="button" id="ppStatePickerButton">Estados considerados ▾</button>
-      <div class="ppStatePicker__menu" id="ppStatePickerMenu" hidden>
-        <?php foreach(['PARO REAL','VERIFICAR PARO','PARADO','PARO CONTROLADO'] as $stateOption):
-          $pickerClass=$stateOption==='PARO REAL'?'is-danger':($stateOption==='VERIFICAR PARO'?'is-warning':($stateOption==='PARO CONTROLADO'?'is-control':'is-muted'));
+      <div class="ppStatePicker__menu ppStatePicker__menu--wide" id="ppStatePickerMenu" hidden>
+        <div class="ppStatePicker__title">Diagnosticos visibles</div>
+        <?php foreach($diagnosticStates as $stateOption):
+          $pickerClass=$stateOption==='PARO REAL'?'is-danger':($stateOption==='INCONSISTENCIA'?'is-inconsistency':($stateOption==='PROBABLE PARO'||$stateOption==='VERIFICAR PARO'?'is-warning':($stateOption==='PARO CONTROLADO'?'is-control':'is-muted')));
         ?>
           <label><input type="checkbox" class="ppStateCheck" value="<?php echo h($stateOption); ?>" checked><span class="ppBadge <?php echo $pickerClass; ?>"><?php echo h($stateOption); ?></span></label>
         <?php endforeach; ?>
         <div class="ppStatePicker__actions"><button type="button" data-state-all="1">Todos</button><button type="button" data-state-all="0">Ninguno</button></div>
+
+        <div class="ppStatePicker__title ppStatePicker__title--zafiro">Estados Zafiro considerados en el reporte</div>
+        <?php if(!$zafiroConfig): ?>
+          <div class="ppStatePicker__hint">Ejecuta el SQL actualizado para habilitar la configuracion global.</div>
+        <?php else: foreach($zafiroConfig as $zState=>$zIncluded): ?>
+          <label class="ppZafiroConfigRow">
+            <input type="checkbox" class="ppZafiroGlobalCheck" value="<?php echo h($zState); ?>" <?php echo $zIncluded?'checked':''; ?> <?php echo auth_es_admin()?'':'disabled'; ?>>
+            <span><?php echo h($zState); ?></span>
+          </label>
+        <?php endforeach; endif; ?>
+        <div class="ppStatePicker__hint">La seleccion Zafiro es global: afecta la grilla, KPIs y reportes automaticos para todos los usuarios. Downtime de Produccion (Perdida Localizada) queda excluido por defecto.</div>
       </div>
     </div>
     <div class="ppStatePicker" id="ppTelemetryPicker">
@@ -136,7 +231,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
     <thead>
       <tr>
         <th>Pozo ↕</th><th>Batería ↕</th><th>Sistema ↕</th><th>ALM ↕</th><th>Comentario</th><th>Pantalla</th>
-        <th>Estado pozo ↕</th><th>Estado telemetría ↕</th><th>Estado Zafiro ↕</th><th>Método Zafiro ↕</th>
+        <th>Diagnóstico ↕</th><th>Estado telemetría ↕</th><th>Estado Zafiro ↕</th><th>Método Zafiro ↕</th><th>Última alarma SCADA ↕</th>
         <th>Producción petróleo<br><small>m³/d</small></th><th>Pérdida instantánea<br><small>m³/d</small></th><th>Pérdida 24 h<br><small>m³</small></th>
         <th>RPM</th><th>Variador</th><th>Llave</th><th>Último dato</th>
       </tr>
@@ -146,20 +241,25 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
         <th><select data-col-filter="system"><option value="">Todos</option><option>MONITOREO</option><option>PCP</option><option>BES</option><option>TECSS</option></select></th>
         <th><select data-col-filter="alarm"><option value="">Todas</option><option value="with">Con alarmas</option><option value="without">Sin alarmas</option></select></th>
         <th></th><th></th>
-        <th><select data-col-filter="state"><option value="">Todos</option><option>PARO REAL</option><option>VERIFICAR PARO</option><option>PARADO</option><option>PARO CONTROLADO</option></select></th>
+        <th><select data-col-filter="state"><option value="">Todos</option><?php foreach($diagnosticStates as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
         <th><select data-col-filter="telemetry"><option value="">Todos</option><?php foreach($telemetryStates as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
         <th><select data-col-filter="zafiro"><option value="">Todos</option><?php foreach($zafiroStates as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
         <th><select data-col-filter="method"><option value="">Todos</option><?php foreach($zafiroMethods as $v): ?><option><?php echo h($v); ?></option><?php endforeach; ?></select></th>
+        <th><input data-col-filter="lastalarm" placeholder="Filtrar"></th>
         <th></th><th></th><th></th><th></th><th></th><th></th><th></th>
       </tr>
     </thead>
     <tbody>
-    <?php if(!$rows): ?><tr><td colspan="17" class="ppEmpty">No hay pozos parados con los criterios actuales.</td></tr>
+    <?php if(!$rows): ?><tr><td colspan="18" class="ppEmpty">No hay pozos parados con los criterios actuales.</td></tr>
     <?php else: foreach($rows as $r):
       $state=(string)$r['ESTADO_POZO'];
-      $stateClass=$state==='PARO REAL'?'is-danger':($state==='VERIFICAR PARO'?'is-warning':($state==='PARO CONTROLADO'?'is-control':'is-muted'));
+      $stateClass=$state==='PARO REAL'?'is-danger':($state==='INCONSISTENCIA'?'is-inconsistency':($state==='PROBABLE PARO'||$state==='VERIFICAR PARO'?'is-warning':($state==='PARO CONTROLADO'?'is-control':'is-muted')));
       $well=(string)$r['POZO']; $key=pp_key($well); $aux=$auxMap[$key]??[];
       $alm=(int)($aux['ALM']??0); $screen=trim((string)($aux['PANTALLA']??''));
+      $lastAlarm=$lastAlarmMap[$key]??[];
+      $lastAlarmDesc=trim((string)($lastAlarm['DESCRIPCION']??''));
+      $lastAlarmDate=$lastAlarm['FECHA']??null;
+      $isStopAlarm=preg_match('/\b(PARO|PARADA|DETENID[OA]|STOP)\b/ui',$lastAlarmDesc)===1;
       $subject=clear_alarm_comment_subject($well,'pozo');
       $comment=$subject!==''?($commentMap[strtoupper($subject)]??[]):[];
       $commentText=trim((string)($comment['COMENTARIO']??$comment['comentario']??''));
@@ -174,11 +274,12 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
         data-telemetry="<?php echo h(strtolower((string)$r['ESTADO_TELEMETRIA'])); ?>"
         data-zafiro="<?php echo h(strtolower((string)$r['ESTADO_ZAFIRO'])); ?>"
         data-method="<?php echo h(strtolower((string)$r['METODO_ZAFIRO'])); ?>"
+        data-lastalarm="<?php echo h(strtolower($lastAlarmDesc)); ?>"
         data-alarm="<?php echo $alm; ?>"
         data-oil="<?php echo h(number_format((float)($r['PRODUCCION_PETROLEO']??0),6,'.','')); ?>"
         data-loss-now="<?php echo h(number_format((float)($r['PERDIDA_INSTANTANEA']??0),6,'.','')); ?>"
         data-loss24="<?php echo h(number_format((float)($r['PERDIDA_24H']??0),6,'.','')); ?>"
-        data-search="<?php echo h(strtolower(implode(' ',[$well,$r['BATERIA'],$r['ESTADO_ZAFIRO'],$r['ESTADO_TELEMETRIA'],$r['METODO_ZAFIRO'],$state]))); ?>">
+        data-search="<?php echo h(strtolower(implode(' ',[$well,$r['BATERIA'],$r['ESTADO_ZAFIRO'],$r['ESTADO_TELEMETRIA'],$r['METODO_ZAFIRO'],$state,$lastAlarmDesc]))); ?>">
         <td><b><?php echo h($well); ?></b></td>
         <td><?php echo h($r['BATERIA']?:'—'); ?></td>
         <td><span class="ppSystem s-<?php echo h(strtolower($r['SISTEMA'])); ?>"><?php echo h($r['SISTEMA']); ?></span></td>
@@ -195,6 +296,9 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
         <td><span class="ppBadge <?php echo $stateClass; ?>"><?php echo h($state); ?></span></td>
         <td><?php echo h($r['ESTADO_TELEMETRIA']?:'—'); ?></td>
         <td><?php echo h($r['ESTADO_ZAFIRO']?:'Sin dato'); ?></td><td><?php echo h($r['METODO_ZAFIRO']?:'—'); ?></td>
+        <td class="ppLastAlarm <?php echo $isStopAlarm?'is-stop':''; ?>" title="<?php echo h($lastAlarmDesc!==''?($lastAlarmDesc.' · '.pp_d($lastAlarmDate)):'Sin alarmas en las últimas 24 h'); ?>">
+          <?php if($lastAlarmDesc!==''): ?><span><?php echo h($lastAlarmDesc); ?></span><small><?php echo h(pp_d($lastAlarmDate)); ?></small><?php else: ?>—<?php endif; ?>
+        </td>
         <td class="num"><?php echo pp_n($r['PRODUCCION_PETROLEO']); ?></td>
         <td class="num loss"><?php echo pp_n($r['PERDIDA_INSTANTANEA']); ?></td>
         <td class="num loss"><?php echo pp_n($r['PERDIDA_24H']); ?></td>
@@ -213,10 +317,10 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
 <script>
 (function(){
  const help={
-  general:['Help · Reporte de Pozos Parados','La página lee exclusivamente una caché SQL refrescada cada 10 minutos. Consolida cuatro sistemas, cruza el último estado de Zafiro y asocia la producción de petróleo disponible en CLEAR. La pérdida instantánea es la producción diaria asociada a los pozos actualmente parados. La pérdida 24 h se estima con snapshots de 10 minutos.'],
+  general:['Help · Reporte de Pozos Parados','La página lee exclusivamente una caché SQL refrescada cada 10 minutos. Consolida Monitoreo, PCP, BES y TECSS, cruza Zafiro y asocia la producción disponible en CLEAR. Los estados Zafiro incluidos/excluidos se configuran globalmente y afectan a todos los usuarios y reportes automáticos. También se muestra la última alarma SCADA de las últimas 24 h para aportar contexto operativo.'],
   monitoreo:['Help · Monitoreo Pozos (Lufkin / Pump-Off)','Se consideran únicamente registros con QT:RPM = 0 y RPM informado. HOA Off o funcionamiento defectuoso = PARO REAL. Timed o Setpoint = PARO CONTROLADO. Si el controlador indica Bombeo/Bombeando pero RPM sigue en cero = VERIFICAR PARO. RPM mayor a cero y RPM sin dato no ingresan al reporte.'],
   pcp:['Help · PCP','La señal de paro se toma de YT:POZO. Se incluye cuando YT:POZO indica Parado y Zafiro no tiene estado, o cuando Zafiro todavía indica Produciendo. Los estados en marcha no se muestran.'],
-  bes:['Help · BES','La señal de paro se toma de ESTADO. Se incluye cuando ESTADO indica Parado y Zafiro no tiene estado, o cuando Zafiro todavía indica Produciendo. Los estados en marcha no se muestran.'],
+  bes:['Help · BES','BES V2: ESTADO = Parado es el disparador. Si Zafiro indica Produciendo, el caso se clasifica como INCONSISTENCIA y no como PARO REAL. Si Zafiro no tiene estado queda como PROBABLE PARO. Solo se eleva a PARO REAL cuando el estado Zafiro no contradice la detencion y esta habilitado en la configuracion global.'],
   tecss:['Help · TECSS','La señal de paro se toma de ESTADO = Parado. Se excluye cuando Estado Zafiro es Downtime de Producción (Pérdida Localizada). El resto de los paros queda disponible para el análisis de pérdida.']
  };
  const modal=document.getElementById('ppModal');
@@ -226,6 +330,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
  const sys=document.getElementById('ppSystem'),search=document.getElementById('ppSearch');
  const stateChecks=Array.from(document.querySelectorAll('.ppStateCheck'));
  const telemetryChecks=Array.from(document.querySelectorAll('.ppTelemetryCheck'));
+ const zafiroGlobalChecks=Array.from(document.querySelectorAll('.ppZafiroGlobalCheck'));
  const colFilters=Array.from(document.querySelectorAll('[data-col-filter]'));
  const ppNumber=v=>{
    if(v===null||v===undefined||v==='')return 0;
@@ -284,6 +389,7 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
      if(cf.telemetry&&!r.dataset.telemetry.includes(cf.telemetry))ok=false;
      if(cf.zafiro&&!r.dataset.zafiro.includes(cf.zafiro))ok=false;
      if(cf.method&&!r.dataset.method.includes(cf.method))ok=false;
+     if(cf.lastalarm&&!r.dataset.lastalarm.includes(cf.lastalarm))ok=false;
      if(cf.alarm==='with'&&alarm<=0)ok=false;
      if(cf.alarm==='without'&&alarm>0)ok=false;
      r.hidden=!ok;
@@ -312,6 +418,22 @@ $zafiroMethods=array_keys($zafiroMethods); sort($zafiroMethods,SORT_NATURAL|SORT
  });
  document.querySelectorAll('[data-state-all]').forEach(b=>b.addEventListener('click',()=>{stateChecks.forEach(x=>x.checked=b.dataset.stateAll==='1');apply();}));
  document.querySelectorAll('[data-telemetry-all]').forEach(b=>b.addEventListener('click',()=>{telemetryChecks.forEach(x=>x.checked=b.dataset.telemetryAll==='1');apply();}));
+
+ zafiroGlobalChecks.forEach(chk=>chk.addEventListener('change',async()=>{
+   const previous=!chk.checked;
+   chk.disabled=true;
+   try{
+     const body=new URLSearchParams({action:'save_zafiro_state',estado:chk.value,incluir:chk.checked?'1':'0'});
+     const res=await fetch('pozos_parados.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body});
+     const data=await res.json();
+     if(!res.ok||!data.ok)throw new Error(data.error||'No se pudo guardar el estado Zafiro.');
+     window.location.reload();
+   }catch(err){
+     chk.checked=previous;
+     chk.disabled=false;
+     alert(err.message||'No se pudo guardar la configuracion.');
+   }
+ }));
  document.getElementById('ppClear')?.addEventListener('click',()=>{sys.value='';search.value='';stateChecks.forEach(x=>x.checked=true);telemetryChecks.forEach(x=>x.checked=true);colFilters.forEach(x=>x.value='');apply();});
  apply();
 })();
