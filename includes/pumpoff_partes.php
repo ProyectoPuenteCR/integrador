@@ -67,7 +67,7 @@ function pfp_history($db,array $period,string $user=''): array {
         $row['ADJUNTO']=$row['ADJUNTO_NOMBRE'];
         $start=ns_parse_date($row['SEMANA_DESDE']);if(!$start)continue;
         $row['SEMANA']=ns_week_label($start,false);$row['FECHA_FUENTE']='Carga manual de parte';
-        $row['CAN_EDIT']=pfp_can_edit($row,(string)auth_user());$out['rows'][]=$row;
+        $row['CAN_EDIT']=pfp_can_edit($row,(string)auth_user());$row['CAN_DELETE']=strcasecmp($row['USUARIO_CARGA'],(string)auth_user())===0;$out['rows'][]=$row;
     }
     return $out;
 }
