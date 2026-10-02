@@ -51,13 +51,13 @@ function pfp_validate(array $input,DateTimeImmutable $now): array {
     if(($row['ID']===0)!==($row['VERSION']===0))throw new RuntimeException('La versión del parte no es válida. Actualizá la pantalla.');
     return $row;
 }
-function pfp_history($db,array $period): array {
+function pfp_history($db,array $period,string $user=''): array {
     $out=['ready'=>pfp_ready($db),'rows'=>[],'error'=>''];
     if(!$out['ready'])return $out;
     $details=pfp_details_ready($db);$out['details_ready']=$details;
     $extra=$details?"CASE WHEN SEMANA_DESDE=CONVERT(date,?,23) THEN OBSERVACIONES ELSE NULL END OBSERVACIONES,ADJUNTO_NOMBRE,ADJUNTO_BYTES":"CAST(NULL AS nvarchar(2000)) OBSERVACIONES,CAST(NULL AS nvarchar(180)) ADJUNTO_NOMBRE,CAST(NULL AS int) ADJUNTO_BYTES";
-    $params=$details?[$period['selected_value']??$period['to_value']]:[];$params[]=$period['from_value'];$params[]=$period['to_value'];
-    $rows=$db->all("SELECT TOP (12001) ID,VERSION,CONVERT(varchar(10),SEMANA_DESDE,23) SEMANA_DESDE,ZONA,SUPERVISOR,JEFE_PRODUCCION,BATERIA,POZO,TAG,ESTADO,$extra,USUARIO_CARGA,USUARIO_MODIFICACION,CONVERT(varchar(19),FECHA_MODIFICACION,120) CAPTURADO_EN FROM dbo.CLEAR_PUMPOFF_PARTES WHERE SEMANA_DESDE>=CONVERT(date,?,23) AND SEMANA_DESDE<=CONVERT(date,?,23) ORDER BY SEMANA_DESDE,POZO",$params);
+    $params=$details?[$period['selected_value']??$period['to_value']]:[];$params[]=$period['from_value'];$params[]=$period['to_value'];$params[]=$user;
+    $rows=$db->all("SELECT TOP (12001) ID,VERSION,CONVERT(varchar(10),SEMANA_DESDE,23) SEMANA_DESDE,ZONA,SUPERVISOR,JEFE_PRODUCCION,BATERIA,POZO,TAG,ESTADO,$extra,USUARIO_CARGA,USUARIO_MODIFICACION,CONVERT(varchar(19),FECHA_MODIFICACION,120) CAPTURADO_EN FROM dbo.CLEAR_PUMPOFF_PARTES WHERE SEMANA_DESDE>=CONVERT(date,?,23) AND SEMANA_DESDE<=CONVERT(date,?,23) AND USUARIO_CARGA=? ORDER BY SEMANA_DESDE,POZO",$params);
     if($db->error()){$out['error']='No se pudieron leer los partes semanales.';return $out;}
     if(count($rows)>12000){$out['error']='Acortá el período: se superó el límite de 12.000 partes.';return $out;}
     foreach($rows as $raw){
@@ -85,7 +85,7 @@ function pfp_store($db,array $input,DateTimeImmutable $now,string $user,?array $
     try {
         $attachment=['key'=>'','name'=>'','bytes'=>0];
         if($row['ID']){
-            $existing=$db->all('SELECT ID,VERSION,USUARIO_CARGA,OBSERVACIONES,ADJUNTO_CLAVE,ADJUNTO_NOMBRE,ADJUNTO_BYTES FROM dbo.CLEAR_PUMPOFF_PARTES WITH (UPDLOCK,HOLDLOCK) WHERE ID=?',[$row['ID']]);
+            $existing=$db->all('SELECT ID,VERSION,USUARIO_CARGA,OBSERVACIONES,ADJUNTO_CLAVE,ADJUNTO_NOMBRE,ADJUNTO_BYTES FROM dbo.CLEAR_PUMPOFF_PARTES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND USUARIO_CARGA=?',[$row['ID'],$user]);
             if($db->error()||!$existing)throw new RuntimeException('El parte ya no está disponible. Actualizá la pantalla.');
             if(!pfp_can_edit($existing[0],$user))throw new RuntimeException('No tenés permiso para editar este parte.');
             if((int)ns_value($existing[0],'VERSION')!==$row['VERSION'])throw new RuntimeException('Otro usuario modificó el parte. Actualizá la pantalla antes de editarlo.');
@@ -96,10 +96,10 @@ function pfp_store($db,array $input,DateTimeImmutable $now,string $user,?array $
             $attachment=['key'=>$oldKey,'name'=>nm_text(ns_value($existing[0],'ADJUNTO_NOMBRE')),'bytes'=>(int)ns_value($existing[0],'ADJUNTO_BYTES')];
         }
         if($row['QUITAR_ADJUNTO'])$attachment=['key'=>'','name'=>'','bytes'=>0];
-        $duplicate=$db->all('SELECT ID FROM dbo.CLEAR_PUMPOFF_PARTES WITH (UPDLOCK,HOLDLOCK) WHERE SEMANA_DESDE=CONVERT(date,?,23) AND POZO=? AND ID<>?',[$row['SEMANA_DESDE'],$row['POZO'],$row['ID']]);
+        $duplicate=$db->all('SELECT ID FROM dbo.CLEAR_PUMPOFF_PARTES WITH (UPDLOCK,HOLDLOCK) WHERE SEMANA_DESDE=CONVERT(date,?,23) AND POZO=? AND ID<>? AND USUARIO_CARGA=?',[$row['SEMANA_DESDE'],$row['POZO'],$row['ID'],$user]);
         if($db->error())throw new RuntimeException('No se pudo comprobar si el parte existe.');
         if($duplicate)throw new RuntimeException('Ese pozo ya tiene un parte para la semana. Editá el existente para no contarlo dos veces.');
-        $total=$db->scalar('SELECT COUNT(*) FROM dbo.CLEAR_PUMPOFF_PARTES WHERE SEMANA_DESDE=CONVERT(date,?,23) AND ID<>?',[$row['SEMANA_DESDE'],$row['ID']]);
+        $total=$db->scalar('SELECT COUNT(*) FROM dbo.CLEAR_PUMPOFF_PARTES WHERE SEMANA_DESDE=CONVERT(date,?,23) AND ID<>? AND USUARIO_CARGA=?',[$row['SEMANA_DESDE'],$row['ID'],$user]);
         if($db->error()||$total===null)throw new RuntimeException('No se pudo comprobar el tamaño de la semana.');
         if((int)$total>=1000)throw new RuntimeException('La semana alcanzó el límite de 1.000 pozos.');
         if($file){$staged=pfa_stage($file);$attachment=$staged;}
@@ -119,4 +119,26 @@ function pfp_store($db,array $input,DateTimeImmutable $now,string $user,?array $
         if($oldKey!==''&&$oldKey!==$attachment['key'])pfa_remove_old($oldKey);
         return ['id'=>(int)ns_value($saved[0],'ID'),'version'=>(int)ns_value($saved[0],'VERSION'),'week'=>$row['SEMANA_DESDE']];
     }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');if($staged&&!$commitAttempted)@unlink($staged['path']);if($staged&&$commitAttempted)error_log('CLEAR Reporte de Pozos: confirmar estado SQL antes de limpiar un adjunto tras fallo de COMMIT.');throw $e;}
+}
+
+function pfp_delete_many($db,array $items,string $user): array {
+    if(!pfp_ready($db))throw new RuntimeException('La tabla de partes no está disponible.');
+    if(!$items||count($items)>500)throw new RuntimeException('Seleccioná entre 1 y 500 partes para borrar.');
+    $ids=[];$keys=[];
+    if(!$db->execute("SET XACT_ABORT ON; BEGIN TRANSACTION;"))throw new RuntimeException('No se pudo iniciar la eliminación.');
+    try{
+        foreach($items as $item){
+            $id=(int)($item['ID']??0);$version=(int)($item['VERSION']??0);
+            if($id<1||$version<1)throw new RuntimeException('Selección de partes inválida.');
+            $rows=$db->all('SELECT ID,VERSION,USUARIO_CARGA,ADJUNTO_CLAVE FROM dbo.CLEAR_PUMPOFF_PARTES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND USUARIO_CARGA=?',[$id,$user]);
+            if($db->error()||count($rows)!==1)throw new RuntimeException('Uno de los partes ya no está disponible o pertenece a otro usuario.');
+            if((int)ns_value($rows[0],'VERSION')!==$version)throw new RuntimeException('Uno de los partes cambió. Actualizá la pantalla antes de borrar.');
+            $key=nm_text(ns_value($rows[0],'ADJUNTO_CLAVE'));if($key!=='')$keys[]=$key;
+            if(!$db->execute('DELETE FROM dbo.CLEAR_PUMPOFF_PARTES WHERE ID=? AND VERSION=? AND USUARIO_CARGA=?',[$id,$version,$user]))throw new RuntimeException('No se pudo borrar uno de los partes.');
+            $ids[]=$id;
+        }
+        if(!$db->execute('COMMIT TRANSACTION'))throw new RuntimeException('No se pudo confirmar la eliminación.');
+        foreach($keys as $key)pfa_remove_old($key);
+        return ['deleted'=>count($ids),'ids'=>$ids];
+    }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');throw $e;}
 }
