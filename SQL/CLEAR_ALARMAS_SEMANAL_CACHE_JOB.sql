@@ -172,6 +172,9 @@ BEGIN
         WHEN UPPER(I.INSTALACION) LIKE N'S%' THEN N'SATÉLITE'
         ELSE N'SIN CLASIFICAR'
     END)) T(TIPO_INSTALACION)
+    /* Novedades/Instalaciones no debe volver a contar alarmas asociadas a pozos.
+       Los pozos se cargan en la rama TIPO='P' inmediatamente debajo. */
+    WHERE NOT (B.POZO IS NOT NULL AND UPPER(B.POZO) LIKE N'YPF.SC%')
     GROUP BY CONVERT(date,B.FECHA_HORA),DATEPART(hour,B.FECHA_HORA),I.INSTALACION,T.TIPO_INSTALACION,B.TAG;
 
     /* Pozos: identificación compatible con las pantallas existentes. */
