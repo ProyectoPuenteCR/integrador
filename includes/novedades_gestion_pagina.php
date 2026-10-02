@@ -6,10 +6,10 @@ $APP_USER=auth_user();$APP_ROLE=auth_es_admin()?'Administrador':'Operador';$ACTI
 $defaultFrom=ns_week_for_date($now)['start']->modify('-49 days')->format('Y-m-d');$from=$defaultFrom;$to=$today;$error='';
 try{$from=ng_date($_GET['desde']??$defaultFrom,'Desde');$to=ng_date($_GET['hasta']??$today,'Hasta');if($from>$to||$to>$today||(new DateTimeImmutable($from))->diff(new DateTimeImmutable($to))->days>83)throw new RuntimeException('Elegí un período de hasta 12 semanas, sin fechas futuras.');}catch(Throwable $e){$error=$e->getMessage();}
 $db=clear_db();$data=$error?['ready'=>ng_ready($db),'rows'=>[],'error'=>$error]:ng_list($db,$gestionTipo,$from,$to);$rows=$data['rows'];$ready=$data['ready']&&$data['error']==='';
-$canCreate=pfp_can_create();$canEdit=$canCreate||auth_es_admin()||permissions_can('comments.edit_own')||permissions_can('comments.edit_all');$deleteReady=$isAudit?ng_delete_ready($db):false;
+$canCreate=pfp_can_create();$canEdit=$canCreate||auth_es_admin()||permissions_can('comments.edit_own')||permissions_can('comments.edit_all');
 if(empty($_SESSION['novedades_gestion_token']))$_SESSION['novedades_gestion_token']=bin2hex(random_bytes(24));
 $reportReady=$db->ok()&&permissions_can_menu('novedades_semanales_reporte')&&ns_report_ready($db);
-$columns=$spec['columns'];$isAudit=$gestionTipo==='AUDITORIA';
+$columns=$spec['columns'];$isAudit=$gestionTipo==='AUDITORIA';$deleteReady=$isAudit?ng_delete_ready($db):false;
 $chartKeys=['estado'=>ns_report_key('auditoria_estado',[$from,$to]),'semanal'=>ns_report_key('auditoria_cierres',[$from,$to])];
 ?><!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo h($spec['title']); ?> · CLEAR</title>
 <link rel="stylesheet" href="assets/css/app.css"><link rel="stylesheet" href="assets/css/novedades_semanales.css"><link rel="stylesheet" href="assets/css/novedades_monitoreo.css?v=20260828-gestion1"><link rel="stylesheet" href="assets/css/novedades_gestion.css?v=20260828-responsables2"></head>
