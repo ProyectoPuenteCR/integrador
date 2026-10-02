@@ -9,6 +9,9 @@ function ng_spec(string $type): array {
 function ng_ready($db): bool {
     return $db&&$db->ok()&&(int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_NS_GESTIONES',N'U') IS NOT NULL AND OBJECT_ID(N'dbo.CLEAR_NS_GESTIONES_HISTORIAL',N'U') IS NOT NULL AND OBJECT_ID(N'dbo.CLEAR_NS_RESPONSABLES',N'U') IS NOT NULL AND COL_LENGTH(N'dbo.CLEAR_NS_GESTIONES',N'RESPONSABLE_TIPO') IS NOT NULL AND COL_LENGTH(N'dbo.CLEAR_NS_GESTIONES',N'SUPERVISORES_JSON') IS NOT NULL THEN 1 ELSE 0 END")===1;
 }
+function ng_delete_ready($db): bool {
+    return ng_ready($db)&&(int)$db->scalar("SELECT CASE WHEN COL_LENGTH(N'dbo.CLEAR_NS_GESTIONES',N'ACTIVO') IS NULL THEN 0 ELSE 1 END")===1;
+}
 function ng_text($value,int $max,bool $required=false,bool $lines=false): string {
     if(!is_string($value)||!preg_match('//u',$value))throw new RuntimeException('Hay un campo de texto inválido.');
     $value=trim(str_replace(["\r\n","\r"],"\n",$value));
@@ -69,7 +72,8 @@ function ng_public(array $raw): array {
 function ng_list($db,string $type,string $from,string $to): array {
     if(!ng_ready($db))return ['ready'=>false,'rows'=>[],'error'=>''];
     // Incluir abiertos y registros con alta o cierre en el período; nunca RTQP.
-    $rows=$db->all('SELECT TOP (2001) '.ng_select()." FROM dbo.CLEAR_NS_GESTIONES WHERE TIPO=? AND FECHA<=CONVERT(date,?,23) AND (ESTADO<>'FINALIZADO' OR FECHA>=CONVERT(date,?,23) OR FECHA_CIERRE>=CONVERT(date,?,23) OR FECHA_PRIMER_CIERRE>=CONVERT(date,?,23)) ORDER BY FECHA DESC,ID DESC",[$type,$to,$from,$from,$from]);
+    $active=ng_delete_ready($db)?' AND ACTIVO=1':'';
+    $rows=$db->all('SELECT TOP (2001) '.ng_select()." FROM dbo.CLEAR_NS_GESTIONES WHERE TIPO=?".$active." AND FECHA<=CONVERT(date,?,23) AND (ESTADO<>'FINALIZADO' OR FECHA>=CONVERT(date,?,23) OR FECHA_CIERRE>=CONVERT(date,?,23) OR FECHA_PRIMER_CIERRE>=CONVERT(date,?,23)) ORDER BY FECHA DESC,ID DESC",[$type,$to,$from,$from,$from]);
     if($db->error())return ['ready'=>true,'rows'=>[],'error'=>'No se pudieron leer los registros. Revisá la instalación y los permisos SQL.'];
     if(count($rows)>2000)return ['ready'=>true,'rows'=>[],'error'=>'Más de 2.000 registros en el período. Acortá las fechas. No se muestran totales incompletos.'];
     return ['ready'=>true,'rows'=>array_map('ng_public',$rows),'error'=>''];
@@ -126,4 +130,23 @@ function ng_store($db,string $type,array $input,DateTimeImmutable $now,string $u
         if($oldKey!==''&&$oldKey!==$attachment['key'])pfa_remove_old($oldKey);
         return ['id'=>$id,'version'=>$version];
     }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');if($staged&&!$commitAttempted)@unlink($staged['path']);if($staged&&$commitAttempted)error_log('CLEAR Novedades: revisar referencia SQL antes de limpiar archivo tras COMMIT incierto.');throw $e;}
+}
+
+function ng_delete($db,string $type,int $id,int $version,string $user): array {
+    if($type!=='AUDITORIA')throw new RuntimeException('La eliminación está habilitada solamente para auditorías.');
+    if(!ng_delete_ready($db))throw new RuntimeException('Ejecutá SQL/CLEAR_NOVEDADES_GESTION_BAJA_LOGICA_20261002.sql antes de eliminar.');
+    $db->execute("SET XACT_ABORT ON; BEGIN TRANSACTION;");
+    try{
+        $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND ACTIVO=1',[$id,$type]);
+        if($db->error()||count($found)!==1)throw new RuntimeException('La auditoría ya no está disponible.');
+        $old=$found[0];
+        if(!pfp_can_edit($old,$user))throw new RuntimeException('No tenés permiso para eliminar esta auditoría.');
+        if((int)ns_value($old,'VERSION')!==$version)throw new RuntimeException('Otro usuario modificó esta auditoría. Recargá antes de eliminar.');
+        $newVersion=$version+1;
+        if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1",[$user,$id,$type,$version]))throw new RuntimeException('No se pudo eliminar la auditoría.');
+        $snapshot=[];foreach(['FECHA','ZONA','BATERIA','SUPERVISOR','JEFE_PRODUCCION','ESTADO','OBSERVACIONES','FECHA_CIERRE','ADJUNTO_NOMBRE'] as $key)$snapshot[$key]=(string)(ns_value($old,$key)??'');
+        if(!$db->execute('INSERT INTO dbo.CLEAR_NS_GESTIONES_HISTORIAL(GESTION_ID,VERSION,ESTADO_ANTERIOR,ESTADO_NUEVO,USUARIO,MOTIVO,ANTES_JSON,DESPUES_JSON) VALUES(?,?,?,?,?,?,?,?)',[$id,$newVersion,(string)ns_value($old,'ESTADO'),N'ELIMINADO',$user,N'Baja lógica solicitada por operador',nm_json($snapshot),nm_json(['ELIMINADO'=>true])]))throw new RuntimeException('No se pudo registrar el historial de eliminación.');
+        if(!$db->execute('COMMIT TRANSACTION'))throw new RuntimeException('No se pudo confirmar la eliminación.');
+        return ['id'=>$id,'version'=>$newVersion];
+    }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');throw $e;}
 }
