@@ -135,6 +135,12 @@ if (!$favoriteCards) {
           <div class="welcome-card__icon"><?php echo icon('file'); ?></div>
           <div class="welcome-card__body"><h2>Reportes y Análisis</h2><p>PDF automáticos, estadísticas operativas y diagnóstico asistido por IA.</p><a class="welcome-card__btn" href="<?php echo auth_es_admin() ? 'reportes.php' : 'analisis_ia.php'; ?>">Ver Reportes <?php echo icon('chevron-r'); ?></a></div>
         </article>
+        <?php if (permissions_can_menu('comentarios')): ?>
+        <article class="welcome-card welcome-card--cyan">
+          <div class="welcome-card__icon"><?php echo icon('message'); ?></div>
+          <div class="welcome-card__body"><h2>Comentarios</h2><p>Acceso centralizado a observaciones y comentarios operativos asociados a alarmas e instalaciones.</p><a class="welcome-card__btn" href="comentarios.php">Ver Comentarios <?php echo icon('chevron-r'); ?></a></div>
+        </article>
+        <?php endif; ?>
       </div>
 
       <div class="welcome__lower">
