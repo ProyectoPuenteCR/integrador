@@ -112,6 +112,8 @@ foreach (array_merge($telemetriaPozos, $novedadesSemanales, $reportesMenu, $alar
 $favCatalog[$inyeccionAgua['key']] = [$inyeccionAgua['label'], $inyeccionAgua['icon'], $inyeccionAgua['url']];
 $savedTheme = strtolower(trim((string)user_pref_get('appearance_theme', 'light')));
 if (!in_array($savedTheme, ['light','dark'], true)) $savedTheme = 'light';
+$savedMenuLayout = strtolower(trim((string)user_pref_get('menu_layout', 'left')));
+if (!in_array($savedMenuLayout, ['left','top'], true)) $savedMenuLayout = 'left';
 ?>
 <script>
 (function(){
@@ -123,6 +125,8 @@ if (!in_array($savedTheme, ['light','dark'], true)) $savedTheme = 'light';
   document.documentElement.setAttribute('data-theme',theme);
   document.documentElement.style.colorScheme=theme;
   window.CLEAR_THEME_USER_KEY=userKey;
+  document.documentElement.setAttribute('data-menu-layout',<?php echo json_encode($savedMenuLayout); ?>);
+  window.CLEAR_MENU_LAYOUT=<?php echo json_encode($savedMenuLayout); ?>;
 })();
 </script>
 <aside class="side" id="sidebar">
