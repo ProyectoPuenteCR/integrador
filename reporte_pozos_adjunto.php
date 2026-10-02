@@ -7,7 +7,7 @@ if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET'){http_response_code(405);exit('MÃ
 $id=$_GET['id']??'';
 if(!is_string($id)||!ctype_digit($id)||(float)$id<1||(float)$id>2147483647){http_response_code(404);exit('Adjunto no disponible.');}
 try{
-    $db=clear_db();$rows=$db->all('SELECT ADJUNTO_CLAVE,ADJUNTO_NOMBRE,ADJUNTO_BYTES FROM dbo.CLEAR_PUMPOFF_PARTES WHERE ID=?',[(int)$id]);
+    $db=clear_db();$rows=$db->all('SELECT ADJUNTO_CLAVE,ADJUNTO_NOMBRE,ADJUNTO_BYTES FROM dbo.CLEAR_PUMPOFF_PARTES WHERE ID=? AND USUARIO_CARGA=?',[(int)$id,(string)auth_user()]);
     if($db->error()||count($rows)!==1)throw new RuntimeException();
     $row=$rows[0];$path=pfa_path((string)($row['ADJUNTO_CLAVE']??''));$name=pfa_filename($row['ADJUNTO_NOMBRE']??'');$size=(int)($row['ADJUNTO_BYTES']??0);
     if($size<1||$size>pfa_max_bytes()||!is_file($path)||!is_readable($path)||filesize($path)!==$size)throw new RuntimeException();
