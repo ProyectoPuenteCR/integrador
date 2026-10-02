@@ -19,6 +19,12 @@ if(!is_array($input)||!is_string($input['token']??null)||empty($_SESSION['pumpof
 $cfg=require __DIR__.'/config.php';date_default_timezone_set($cfg['app']['tz']??'UTC');
 try{
     if(count($_FILES)>1||($_FILES&&!isset($_FILES['ADJUNTO'])))throw new RuntimeException('Adjuntá un solo archivo por parte.');
+    $action=(string)($input['action']??'save');
+    if($action==='delete'){
+        $items=$input['items']??[];if(!is_array($items))throw new RuntimeException('Selección inválida.');
+        $result=pfp_delete_many(clear_db(),$items,(string)auth_user());
+        pfp_reply(['ok'=>true,'message'=>$result['deleted'].' parte'.($result['deleted']===1?'':'s').' borrado'.($result['deleted']===1?'':'s').'.','result'=>$result]);
+    }
     $upload=$_FILES['ADJUNTO']??null;
     if($upload!==null&&!is_array($upload))throw new RuntimeException('El adjunto no es válido.');
     $result=pfp_store(clear_db(),$input,new DateTimeImmutable('now'),(string)auth_user(),$upload);
