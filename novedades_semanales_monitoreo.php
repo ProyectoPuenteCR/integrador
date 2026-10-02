@@ -15,7 +15,7 @@ if($period['from']<$period['to']->modify('-77 days'))$period['from']=$period['to
 $period['from_value']=$period['from']->format('Y-m-d');$period['to_value']=$period['to']->format('Y-m-d');
 $period['weeks']=(int)floor($period['from']->diff($period['to'])->days/7)+1;
 $period['selected_value']=$selectedValue;
-$history=pfp_history($db,$period);$columns=pf_columns()+['OBSERVACIONES'=>'OBSERVACIONES','ADJUNTO'=>'ADJUNTO'];$error=$history['error'];$rows=[];
+$history=pfp_history($db,$period,(string)$APP_USER);$columns=pf_columns()+['OBSERVACIONES'=>'OBSERVACIONES','ADJUNTO'=>'ADJUNTO'];$error=$history['error'];$rows=[];
 foreach($history['rows'] as $row)if($row['SEMANA_DESDE']===$selectedValue)$rows[]=$row;
 $configured=$history['ready']&&!empty($history['details_ready'])&&$error==='';$live=false;
 $reportReady=$db->ok()&&ns_report_ready($db)&&permissions_can_menu('novedades_semanales_reporte');
@@ -51,15 +51,17 @@ $stamp=$rows?max(array_column($rows,'CAPTURADO_EN')):'Sin partes';$label='Partes
 <noscript><div class="nsNotice is-warning">Activá JavaScript para los filtros, el autocompletado y la selección de pozos.</div></noscript>
 <section class="nsTableCard pfTableCard"><div class="nsTableHead"><div><h2>Parte de monitoreo de pozos</h2><p id="pfRowCount">Registros guardados de la semana seleccionada.</p></div><div class="nsTableHead__actions">
 <?php if($reportReady): ?><button class="nsButton" type="button" id="pfAddSelected">Agregar seleccionados al reporte</button><?php endif; ?>
+<button class="nsButton is-secondary" type="button" id="pfDeleteSelected">Borrar seleccionados</button>
 <button class="nsButton is-secondary" type="button" id="pfExport">Exportar CSV</button>
 <div class="nsColumnTools"><button class="nsButton is-secondary" type="button" data-ns-columns-toggle>Columnas ▾</button><div class="nsColumnsMenu" data-ns-columns-menu></div></div></div></div>
 <div class="tablescroll"><table class="grid nsTable" id="pfWellsTable" data-ns-custom-columns data-ns-no-auto-select-all>
-<thead><tr><?php foreach($columns as $field=>$title):$key=$field==='SEMANA'?'report':$field; ?><th data-column-key="<?php echo h($key); ?>" data-column-label="<?php echo h($title); ?>"><?php if($field==='SEMANA'&&$reportReady): ?><input type="checkbox" id="pfSelectAll" aria-label="Seleccionar todos los pozos visibles" title="Seleccionar todos los visibles"><?php endif; ?><button type="button" class="nsClientSort" data-pf-sort="<?php echo h($field); ?>"><?php echo h($title); ?></button></th><?php endforeach; ?></tr>
+<thead><tr><?php foreach($columns as $field=>$title):$key=$field==='SEMANA'?'report':$field; ?><th data-column-key="<?php echo h($key); ?>" data-column-label="<?php echo h($title); ?>"><?php if($field==='SEMANA'): ?><input type="checkbox" id="pfSelectAll" aria-label="Seleccionar todos los partes visibles" title="Seleccionar todos los visibles"><?php endif; ?><button type="button" class="nsClientSort" data-pf-sort="<?php echo h($field); ?>"><?php echo h($title); ?></button></th><?php endforeach; ?></tr>
 <tr class="nsFilterRow"><?php foreach($columns as $field=>$title): ?><th data-column-key="<?php echo h($field==='SEMANA'?'report':$field); ?>"><?php if($field==='SEMANA'): ?><small>Miércoles a martes</small><?php elseif(in_array($field,['POZO','TAG','OBSERVACIONES','ADJUNTO'],true)): ?><input data-pf-filter="<?php echo h($field); ?>" aria-label="Filtrar <?php echo h($title); ?>" placeholder="Buscar"><?php else: ?><select data-pf-filter="<?php echo h($field); ?>" aria-label="Filtrar <?php echo h($title); ?>"><option value="">Todos</option></select><?php endif; ?></th><?php endforeach; ?></tr></thead>
 <tbody><?php foreach($rows as $index=>$row):$payload=['Origen'=>'Reporte de Pozos · parte manual','Semana del parte'=>$label,'Modificado'=>$row['CAPTURADO_EN'],'Cargado por'=>$row['USUARIO_CARGA']];foreach($columns as $field=>$title)$payload[$title]=$row[$field]!==''?$row[$field]:'Sin asignar'; ?>
-<tr data-pf-row="<?php echo $index; ?>" title="<?php echo h('Parte manual · Modificado: '.$row['CAPTURADO_EN'].' · Cargado por: '.$row['USUARIO_CARGA']); ?>"><?php foreach($columns as $field=>$title): ?><td data-column-key="<?php echo h($field==='SEMANA'?'report':$field); ?>">
+<tr data-pf-row="<?php echo $index; ?>" data-part-id="<?php echo (int)$row['ID']; ?>" data-part-version="<?php echo (int)$row['VERSION']; ?>" title="<?php echo h('Parte manual · Modificado: '.$row['CAPTURADO_EN'].' · Cargado por: '.$row['USUARIO_CARGA']); ?>"><?php foreach($columns as $field=>$title): ?><td data-column-key="<?php echo h($field==='SEMANA'?'report':$field); ?>">
+<?php if($field==='SEMANA'): ?><input type="checkbox" data-pf-delete-select aria-label="Seleccionar parte #<?php echo (int)$row['ID']; ?>"> <?php endif; ?>
 <?php if($field==='SEMANA'&&$reportReady)echo ns_report_pick(ns_report_key('pumpoff_parte',[$row['ID']]),'row','Reporte de Pozos · '.$row['POZO'].' · '.$row['SEMANA'],ns_report_row_payload($payload),''); ?>
-<?php if($field==='SEMANA'&&!empty($row['CAN_EDIT'])): ?><button class="pfEditPart" type="button" data-pf-edit-part="<?php echo $index; ?>" aria-label="Editar parte de <?php echo h($row['POZO']); ?>">Editar</button><?php endif; ?>
+<?php if($field==='SEMANA'&&!empty($row['CAN_EDIT'])): ?><button class="pfEditPart" type="button" data-pf-edit-part="<?php echo $index; ?>" aria-label="Editar parte de <?php echo h($row['POZO']); ?>">Editar</button><button class="pfEditPart" type="button" data-pf-delete-one="<?php echo $index; ?>" aria-label="Borrar parte de <?php echo h($row['POZO']); ?>">Borrar</button><?php endif; ?>
 <?php if($field==='ADJUNTO'): ?><?php if($row['ADJUNTO_NOMBRE']!==''): ?><a class="rpAttachmentLink" href="reporte_pozos_adjunto.php?id=<?php echo (int)$row['ID']; ?>"><?php echo h($row['ADJUNTO_NOMBRE']); ?></a><small><?php echo h(number_format($row['ADJUNTO_BYTES']/1024,1,',','.')); ?> KB</small><?php else: ?>Sin adjunto<?php endif; ?><?php elseif($field==='OBSERVACIONES'): ?><div class="rpObservation"><?php echo h($row[$field]); ?></div><?php elseif($field==='ESTADO'): ?><span class="pfState pfState--<?php echo h(strtolower(str_replace(' ','-',$row[$field]))); ?>"><?php echo h($row[$field]==='AUTOMATICO'?'AUTOMÁTICO':$row[$field]); ?></span><?php else: ?><?php echo h($row[$field]!==''?$row[$field]:'Sin asignar'); ?><?php endif; ?></td><?php endforeach; ?></tr>
 <?php endforeach; ?><tr id="pfEmpty" <?php echo $rows?'hidden':''; ?>><td colspan="10" class="nsEmpty"><?php echo $configured?'No hay partes para esta semana o filtro. Usá Agregar parte.':'Instalá la tabla de partes para comenzar.'; ?></td></tr></tbody></table></div></section>
 
@@ -70,7 +72,7 @@ $stamp=$rows?max(array_column($rows,'CAPTURADO_EN')):'Sin partes';$label='Partes
 <script>window.CLEAR_PUMPOFF=<?php echo nm_json(['rows'=>$rows,'history'=>array_map(function($r){unset($r['OBSERVACIONES'],$r['ADJUNTO'],$r['ADJUNTO_NOMBRE'],$r['ADJUNTO_BYTES']);return $r;},$history['rows']),'weeks'=>$weeks,'zones'=>$zones,'columns'=>$columns,'configured'=>$configured&&$error==='','historyReady'=>$history['ready']&&$history['error']==='','live'=>$live,'label'=>$label,'stamp'=>$stamp,'reportReady'=>$reportReady,'token'=>$token,'manualParts'=>true,'partToken'=>$partToken,'selectedWeek'=>$selectedValue,'canCreate'=>$canCreate]); ?>;</script>
 <script src="assets/js/app.js"></script><script src="assets/js/novedades_semanales.js?v=20260828-reporte6"></script>
 <script src="assets/js/pumpoff_catalogo.js?v=20260828-reporte6"></script>
-<script src="assets/js/pumpoff_partes.js?v=20260828-reporte6"></script>
+<script src="assets/js/pumpoff_partes.js?v=20261002-delete-user1"></script>
 <script src="assets/js/reporte_pozos.js?v=20260828-reporte6"></script>
 </body></html>
 
