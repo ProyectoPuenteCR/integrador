@@ -41,11 +41,12 @@
       if(zone&&control.dataset.pfFilter==='ZONA')control.value=JSON.stringify(zone);
     });refresh();
   }
+  function deleteChecks(){return visible.map(function(i){return nodes.get(i).querySelector('[data-pf-delete-select]');}).filter(Boolean);}
   function syncMaster(){
-    if(!master)return;var inputs=visible.map(function(i){return nodes.get(i).querySelector('[data-ns-report-add]');}).filter(Boolean);
+    if(!master)return;var inputs=deleteChecks();
     var n=inputs.filter(function(i){return i.checked;}).length;master.checked=!!inputs.length&&n===inputs.length;master.indeterminate=n>0&&n<inputs.length;
   }
-  if(master)master.addEventListener('change',function(){visible.forEach(function(i){var input=nodes.get(i).querySelector('[data-ns-report-add]');if(input&&!input.disabled)input.checked=master.checked;});syncMaster();});
+  if(master)master.addEventListener('change',function(){deleteChecks().forEach(function(input){if(!input.disabled)input.checked=master.checked;});syncMaster();});
   table.addEventListener('change',syncMaster);root.addEventListener('clear-report-selection-loaded',syncMaster);
   var ring={id:'pfEmptyRing',afterDraw:function(chart){
     if(chart.config.type!=='doughnut'||chart.data.datasets[0].data.some(function(n){return n>0;}))return;
@@ -124,6 +125,22 @@
     var items=inputs.map(function(input){return{key:input.dataset.reportKey,type:'row',title:input.dataset.reportTitle,payload:JSON.parse(decodeURIComponent(escape(root.atob(input.dataset.reportPayload))))};});
     add.disabled=true;root.CLEAR_NS_REPORT.addItems(items).then(function(r){announce(r.message);}).catch(function(e){announce(e.message);}).then(function(){add.disabled=false;syncMaster();});
   });
+  function deleteParts(items){
+    if(!items.length){announce('Seleccioná al menos un parte.');return Promise.resolve(null);}
+    if(!root.confirm('¿Borrar '+items.length+' parte'+(items.length===1?'':'s')+'? Solo se borrarán registros creados por tu usuario.'))return Promise.resolve(null);
+    return root.fetch('pumpoff_partes_api.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({token:cfg.partToken,action:'delete',items:items})})
+      .then(function(r){return r.json();}).then(function(r){if(!r.ok)throw new Error(r.error||'No se pudieron borrar los partes.');announce(r.message||'Partes borrados.');root.location.reload();return r;})
+      .catch(function(e){announce(e.message);return null;});
+  }
+  var deleteSelected=doc.getElementById('pfDeleteSelected');
+  if(deleteSelected)deleteSelected.addEventListener('click',function(){
+    var items=visible.map(function(i){var node=nodes.get(i),check=node.querySelector('[data-pf-delete-select]');return check&&check.checked?{ID:Number(node.dataset.partId),VERSION:Number(node.dataset.partVersion)}:null;}).filter(Boolean);
+    deleteParts(items);
+  });
+  Array.from(doc.querySelectorAll('[data-pf-delete-one]')).forEach(function(button){button.addEventListener('click',function(){
+    var i=Number(button.dataset.pfDeleteOne),node=nodes.get(i),row=rows[i];if(!node||!row)return;
+    deleteParts([{ID:Number(node.dataset.partId),VERSION:Number(node.dataset.partVersion)}]);
+  });});
   doc.getElementById('pfExport').addEventListener('click',function(){
     var fields=Array.from(table.tHead.rows[0].cells).filter(function(c){return c.style.display!=='none';}).map(function(c){return c.dataset.columnKey==='report'?'SEMANA':c.dataset.columnKey;});
     var lines=[['PUMP OFF',cfg.label],['Captura',cfg.stamp],['Filtros',summary],fields.map(function(f){return cfg.columns[f];})];
