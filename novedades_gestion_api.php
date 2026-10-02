@@ -22,6 +22,11 @@ try{
   if($type!=='REQUERIMIENTO'||$_FILES)ng_reply(['ok'=>false,'error'=>'Operación no válida.'],400);
   ng_reply(['ok'=>true,'result'=>ngr_add($db,$input,(string)auth_user())]);
  }
+ if(($_GET['accion']??'')==='eliminar'){
+  if($_FILES)ng_reply(['ok'=>false,'error'=>'Operación no válida.'],400);
+  $id=ng_id($input['ID']??'',false);$version=ng_id($input['VERSION']??'',false);
+  ng_reply(['ok'=>true,'result'=>ng_delete($db,$type,$id,$version,(string)auth_user())]);
+ }
  if(($_GET['accion']??'')!=='')ng_reply(['ok'=>false,'error'=>'Operación no válida.'],400);
  $cfg=require __DIR__.'/config.php';date_default_timezone_set($cfg['app']['tz']??'UTC');
  $result=ng_store($db,$type,$input,new DateTimeImmutable('now'),(string)auth_user(),$_FILES['ADJUNTO']??null);ng_reply(['ok'=>true,'result'=>$result]);
