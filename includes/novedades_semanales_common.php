@@ -118,7 +118,7 @@ function ns_report_items($db, $user)
 
 function ns_type_options()
 {
-    return ['POZO'=>'Pozo','BATERÍA'=>'Batería','SATÉLITE'=>'Satélite','GAS'=>'Gas','PIAS'=>'PIAS','ENERGÍA'=>'Energía','PLANTA TRAT.'=>'Planta Trat.','PLANTA LH'=>'Planta LH','SIN CLASIFICAR'=>'Sin clasificar'];
+    return ['BATERÍA'=>'Batería','SATÉLITE'=>'Satélite','GAS'=>'Gas','PIAS'=>'PIAS','ENERGÍA'=>'Energía','PLANTA TRAT.'=>'Planta Trat.','PLANTA LH'=>'Planta LH','SIN CLASIFICAR'=>'Sin clasificar'];
 }
 
 function ns_type_class($value)
@@ -179,7 +179,7 @@ function ns_bad_actor_filters(array $query, array $period)
 
 function ns_bad_actor_where(array $filters, array &$params, $commentsReady = true)
 {
-    $where = ['C.SEMANA_DESDE>=CONVERT(date,?,23)','C.SEMANA_DESDE<=CONVERT(date,?,23)'];
+    $where = ['C.SEMANA_DESDE>=CONVERT(date,?,23)','C.SEMANA_DESDE<=CONVERT(date,?,23)',"UPPER(C.TIPO_INSTALACION)<>N'POZO'"];
     $params = [$filters['week_start'],$filters['week_end']];
     if ($filters['selected_week'] !== '') { $where[]='C.SEMANA_DESDE=CONVERT(date,?,23)'; $params[]=$filters['selected_week']; }
     if ($filters['type'] !== '') { $where[]='C.TIPO_INSTALACION=?'; $params[]=$filters['type']; }
