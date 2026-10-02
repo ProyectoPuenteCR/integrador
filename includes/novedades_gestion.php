@@ -57,6 +57,7 @@ function ng_validate(array $input,string $type,DateTimeImmutable $now): array {
     $row['SOLICITUD']=ng_text($input['SOLICITUD']??'',32,true);if(!preg_match('/^[a-f0-9]{32}$/D',$row['SOLICITUD']))throw new RuntimeException('Identificador de guardado inválido. Recargá la pantalla.');
     return $row;
 }
+function ng_can_delete(array $row,string $user): bool { return pfp_can_create()||pfp_can_edit($row,$user); }
 function ng_select(): string {
     return "ID,TIPO,VERSION,SOLICITUD,CONVERT(varchar(10),FECHA,23) FECHA,ZONA,BATERIA,SUPERVISOR,JEFE_PRODUCCION,REQUERIMIENTO,RESPONSABLE,RESPONSABLE_TIPO,SUPERVISORES_JSON,ESTADO,CONVERT(varchar(10),FECHA_CIERRE,23) FECHA_CIERRE,CONVERT(varchar(10),FECHA_PRIMER_CIERRE,23) FECHA_PRIMER_CIERRE,OBSERVACIONES,ADJUNTO_CLAVE,ADJUNTO_NOMBRE,ADJUNTO_BYTES,USUARIO_CARGA,USUARIO_MODIFICACION,CONVERT(varchar(19),FECHA_MODIFICACION,120) FECHA_MODIFICACION";
 }
@@ -67,7 +68,7 @@ function ng_public(array $raw): array {
     $row['RESPONSABLE_CLASE']=ngr_types()[$row['RESPONSABLE_TIPO']]??'';
     $list=json_decode((string)(ns_value($raw,'SUPERVISORES_JSON')??'[]'),true);$row['SUPERVISORES']=is_array($list)?$list:[];
     $row['SUPERVISORES_TEXTO']=implode('; ',$row['SUPERVISORES']);
-    $row['CAN_EDIT']=pfp_can_edit($row,(string)auth_user());return $row;
+    $row['CAN_EDIT']=pfp_can_edit($row,(string)auth_user());$row['CAN_DELETE']=ng_can_delete($row,(string)auth_user());return $row;
 }
 function ng_list($db,string $type,string $from,string $to): array {
     if(!ng_ready($db))return ['ready'=>false,'rows'=>[],'error'=>''];
@@ -140,7 +141,7 @@ function ng_delete($db,string $type,int $id,int $version,string $user): array {
         $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND ACTIVO=1',[$id,$type]);
         if($db->error()||count($found)!==1)throw new RuntimeException('La auditoría ya no está disponible.');
         $old=$found[0];
-        if(!pfp_can_edit($old,$user))throw new RuntimeException('No tenés permiso para eliminar esta auditoría.');
+        if(!ng_can_delete($old,$user))throw new RuntimeException('No tenés permiso para eliminar esta auditoría.');
         if((int)ns_value($old,'VERSION')!==$version)throw new RuntimeException('Otro usuario modificó esta auditoría. Recargá antes de eliminar.');
         $newVersion=$version+1;
         if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1",[$user,$id,$type,$version]))throw new RuntimeException('No se pudo eliminar la auditoría.');
