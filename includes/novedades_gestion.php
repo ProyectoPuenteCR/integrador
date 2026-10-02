@@ -57,7 +57,8 @@ function ng_validate(array $input,string $type,DateTimeImmutable $now): array {
     $row['SOLICITUD']=ng_text($input['SOLICITUD']??'',32,true);if(!preg_match('/^[a-f0-9]{32}$/D',$row['SOLICITUD']))throw new RuntimeException('Identificador de guardado inválido. Recargá la pantalla.');
     return $row;
 }
-function ng_can_delete(array $row,string $user): bool { return pfp_can_create()||pfp_can_edit($row,$user); }
+function ng_is_owner(array $row,string $user): bool { return $user!=='' && strcasecmp((string)ns_value($row,'USUARIO_CARGA'),$user)===0; }
+function ng_can_delete(array $row,string $user): bool { return ng_is_owner($row,$user); }
 function ng_select(): string {
     return "ID,TIPO,VERSION,SOLICITUD,CONVERT(varchar(10),FECHA,23) FECHA,ZONA,BATERIA,SUPERVISOR,JEFE_PRODUCCION,REQUERIMIENTO,RESPONSABLE,RESPONSABLE_TIPO,SUPERVISORES_JSON,ESTADO,CONVERT(varchar(10),FECHA_CIERRE,23) FECHA_CIERRE,CONVERT(varchar(10),FECHA_PRIMER_CIERRE,23) FECHA_PRIMER_CIERRE,OBSERVACIONES,ADJUNTO_CLAVE,ADJUNTO_NOMBRE,ADJUNTO_BYTES,USUARIO_CARGA,USUARIO_MODIFICACION,CONVERT(varchar(19),FECHA_MODIFICACION,120) FECHA_MODIFICACION";
 }
@@ -68,19 +69,19 @@ function ng_public(array $raw): array {
     $row['RESPONSABLE_CLASE']=ngr_types()[$row['RESPONSABLE_TIPO']]??'';
     $list=json_decode((string)(ns_value($raw,'SUPERVISORES_JSON')??'[]'),true);$row['SUPERVISORES']=is_array($list)?$list:[];
     $row['SUPERVISORES_TEXTO']=implode('; ',$row['SUPERVISORES']);
-    $row['CAN_EDIT']=pfp_can_edit($row,(string)auth_user());$row['CAN_DELETE']=ng_can_delete($row,(string)auth_user());return $row;
+    $row['CAN_EDIT']=ng_is_owner($row,(string)auth_user());$row['CAN_DELETE']=ng_can_delete($row,(string)auth_user());return $row;
 }
-function ng_list($db,string $type,string $from,string $to): array {
+function ng_list($db,string $type,string $from,string $to,string $user): array {
     if(!ng_ready($db))return ['ready'=>false,'rows'=>[],'error'=>''];
     // Incluir abiertos y registros con alta o cierre en el período; nunca RTQP.
     $active=ng_delete_ready($db)?' AND ACTIVO=1':'';
-    $rows=$db->all('SELECT TOP (2001) '.ng_select()." FROM dbo.CLEAR_NS_GESTIONES WHERE TIPO=?".$active." AND FECHA<=CONVERT(date,?,23) AND (ESTADO<>'FINALIZADO' OR FECHA>=CONVERT(date,?,23) OR FECHA_CIERRE>=CONVERT(date,?,23) OR FECHA_PRIMER_CIERRE>=CONVERT(date,?,23)) ORDER BY FECHA DESC,ID DESC",[$type,$to,$from,$from,$from]);
+    $rows=$db->all('SELECT TOP (2001) '.ng_select()." FROM dbo.CLEAR_NS_GESTIONES WHERE TIPO=?".$active." AND USUARIO_CARGA=? AND FECHA<=CONVERT(date,?,23) AND (ESTADO<>'FINALIZADO' OR FECHA>=CONVERT(date,?,23) OR FECHA_CIERRE>=CONVERT(date,?,23) OR FECHA_PRIMER_CIERRE>=CONVERT(date,?,23)) ORDER BY FECHA DESC,ID DESC",[$type,$user,$to,$from,$from,$from]);
     if($db->error())return ['ready'=>true,'rows'=>[],'error'=>'No se pudieron leer los registros. Revisá la instalación y los permisos SQL.'];
     if(count($rows)>2000)return ['ready'=>true,'rows'=>[],'error'=>'Más de 2.000 registros en el período. Acortá las fechas. No se muestran totales incompletos.'];
     return ['ready'=>true,'rows'=>array_map('ng_public',$rows),'error'=>''];
 }
-function ng_history($db,string $type,int $id): array {
-    $rows=$db->all("SELECT TOP (101) H.VERSION,H.ESTADO_ANTERIOR,H.ESTADO_NUEVO,H.USUARIO,CONVERT(varchar(19),H.FECHA_EVENTO,120) FECHA_EVENTO,H.MOTIVO,H.ANTES_JSON,H.DESPUES_JSON FROM dbo.CLEAR_NS_GESTIONES_HISTORIAL H JOIN dbo.CLEAR_NS_GESTIONES G ON G.ID=H.GESTION_ID WHERE G.TIPO=? AND G.ID=? ORDER BY H.VERSION DESC",[$type,$id]);
+function ng_history($db,string $type,int $id,string $user): array {
+    $rows=$db->all("SELECT TOP (101) H.VERSION,H.ESTADO_ANTERIOR,H.ESTADO_NUEVO,H.USUARIO,CONVERT(varchar(19),H.FECHA_EVENTO,120) FECHA_EVENTO,H.MOTIVO,H.ANTES_JSON,H.DESPUES_JSON FROM dbo.CLEAR_NS_GESTIONES_HISTORIAL H JOIN dbo.CLEAR_NS_GESTIONES G ON G.ID=H.GESTION_ID WHERE G.TIPO=? AND G.ID=? AND G.USUARIO_CARGA=? ORDER BY H.VERSION DESC",[$type,$id,$user]);
     if($db->error())throw new RuntimeException('No se pudo leer el historial.');return ['rows'=>array_slice($rows,0,100),'more'=>count($rows)>100];
 }
 function ng_store($db,string $type,array $input,DateTimeImmutable $now,string $user,?array $upload=null): array {
@@ -92,9 +93,9 @@ function ng_store($db,string $type,array $input,DateTimeImmutable $now,string $u
     try{
         $old=[];$row['FECHA_PRIMER_CIERRE']='';$attachment=['key'=>'','name'=>'','bytes'=>0];
         if($row['ID']){
-            $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=?',[$row['ID'],$type]);
+            $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND USUARIO_CARGA=?',[$row['ID'],$type,$user]);
             if($db->error()||count($found)!==1)throw new RuntimeException('El registro no está disponible.');$old=$found[0];
-            if(!pfp_can_edit($old,$user))throw new RuntimeException('No tenés permiso para editar este registro.');
+            if(!ng_is_owner($old,$user))throw new RuntimeException('No tenés permiso para editar este registro.');
             if((int)ns_value($old,'VERSION')!==$row['VERSION'])throw new RuntimeException('Otro usuario modificó este registro. Recargá antes de editar.');
             $row['FECHA_PRIMER_CIERRE']=(string)(ns_value($old,'FECHA_PRIMER_CIERRE')??'');
             if($row['FECHA_PRIMER_CIERRE']!==''&&$row['FECHA']>$row['FECHA_PRIMER_CIERRE'])throw new RuntimeException('La fecha de alta no puede ser posterior al primer cierre registrado.');
@@ -134,20 +135,41 @@ function ng_store($db,string $type,array $input,DateTimeImmutable $now,string $u
 }
 
 function ng_delete($db,string $type,int $id,int $version,string $user): array {
-    if($type!=='AUDITORIA')throw new RuntimeException('La eliminación está habilitada solamente para auditorías.');
-    if(!ng_delete_ready($db))throw new RuntimeException('Ejecutá SQL/CLEAR_NOVEDADES_GESTION_BAJA_LOGICA_20261002.sql antes de eliminar.');
+        if(!ng_delete_ready($db))throw new RuntimeException('Ejecutá SQL/CLEAR_NOVEDADES_GESTION_BAJA_LOGICA_20261002.sql antes de eliminar.');
     $db->execute("SET XACT_ABORT ON; BEGIN TRANSACTION;");
     try{
-        $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND ACTIVO=1',[$id,$type]);
+        $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND ACTIVO=1 AND USUARIO_CARGA=?',[$id,$type,$user]);
         if($db->error()||count($found)!==1)throw new RuntimeException('La auditoría ya no está disponible.');
         $old=$found[0];
-        if(!ng_can_delete($old,$user))throw new RuntimeException('No tenés permiso para eliminar esta auditoría.');
-        if((int)ns_value($old,'VERSION')!==$version)throw new RuntimeException('Otro usuario modificó esta auditoría. Recargá antes de eliminar.');
+        if(!ng_can_delete($old,$user))throw new RuntimeException('No tenés permiso para eliminar este registro.');
+        if((int)ns_value($old,'VERSION')!==$version)throw new RuntimeException('Otro usuario modificó este registro. Recargá antes de eliminar.');
         $newVersion=$version+1;
-        if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1",[$user,$id,$type,$version]))throw new RuntimeException('No se pudo eliminar la auditoría.');
+        if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1",[$user,$id,$type,$version]))throw new RuntimeException('No se pudo eliminar el registro.');
         $snapshot=[];foreach(['FECHA','ZONA','BATERIA','SUPERVISOR','JEFE_PRODUCCION','ESTADO','OBSERVACIONES','FECHA_CIERRE','ADJUNTO_NOMBRE'] as $key)$snapshot[$key]=(string)(ns_value($old,$key)??'');
         if(!$db->execute('INSERT INTO dbo.CLEAR_NS_GESTIONES_HISTORIAL(GESTION_ID,VERSION,ESTADO_ANTERIOR,ESTADO_NUEVO,USUARIO,MOTIVO,ANTES_JSON,DESPUES_JSON) VALUES(?,?,?,?,?,?,?,?)',[$id,$newVersion,(string)ns_value($old,'ESTADO'),'ELIMINADO',$user,'Baja lógica solicitada por operador',nm_json($snapshot),nm_json(['ELIMINADO'=>true])]))throw new RuntimeException('No se pudo registrar el historial de eliminación.');
         if(!$db->execute('COMMIT TRANSACTION'))throw new RuntimeException('No se pudo confirmar la eliminación.');
         return ['id'=>$id,'version'=>$newVersion];
+    }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');throw $e;}
+}
+
+function ng_delete_many($db,string $type,array $items,string $user): array {
+    if(!ng_delete_ready($db))throw new RuntimeException('Ejecutá SQL/CLEAR_NOVEDADES_GESTION_BAJA_LOGICA_20261002.sql antes de borrar.');
+    if(!$items||count($items)>500)throw new RuntimeException('Seleccioná entre 1 y 500 registros para borrar.');
+    $deleted=0;
+    if(!$db->execute("SET XACT_ABORT ON; BEGIN TRANSACTION;"))throw new RuntimeException('No se pudo iniciar la eliminación.');
+    try{
+        foreach($items as $item){
+            $id=ng_id($item['ID']??'',false);$version=ng_id($item['VERSION']??'',false);
+            $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND ACTIVO=1 AND USUARIO_CARGA=?',[$id,$type,$user]);
+            if($db->error()||count($found)!==1)throw new RuntimeException('Uno de los registros ya no está disponible o pertenece a otro usuario.');
+            $old=$found[0];if((int)ns_value($old,'VERSION')!==$version)throw new RuntimeException('Uno de los registros cambió. Actualizá la pantalla antes de borrar.');
+            $newVersion=$version+1;
+            if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1 AND USUARIO_CARGA=?",[$user,$id,$type,$version,$user]))throw new RuntimeException('No se pudo borrar uno de los registros.');
+            $snapshot=[];foreach(['FECHA','ZONA','BATERIA','SUPERVISOR','JEFE_PRODUCCION','REQUERIMIENTO','RESPONSABLE','ESTADO','OBSERVACIONES','FECHA_CIERRE','ADJUNTO_NOMBRE'] as $key)$snapshot[$key]=(string)(ns_value($old,$key)??'');
+            if(!$db->execute('INSERT INTO dbo.CLEAR_NS_GESTIONES_HISTORIAL(GESTION_ID,VERSION,ESTADO_ANTERIOR,ESTADO_NUEVO,USUARIO,MOTIVO,ANTES_JSON,DESPUES_JSON) VALUES(?,?,?,?,?,?,?,?)',[$id,$newVersion,(string)ns_value($old,'ESTADO'),'ELIMINADO',$user,'Baja lógica grupal solicitada por usuario',nm_json($snapshot),nm_json(['ELIMINADO'=>true,'GRUPAL'=>true])]))throw new RuntimeException('No se pudo registrar la eliminación.');
+            $deleted++;
+        }
+        if(!$db->execute('COMMIT TRANSACTION'))throw new RuntimeException('No se pudo confirmar la eliminación.');
+        return ['deleted'=>$deleted];
     }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');throw $e;}
 }
