@@ -25,6 +25,24 @@ require_once __DIR__ . '/permissions.php';
   <button type="button" class="topmenu__btn themeToggle" id="themeToggleBtn" title="Cambiar entre modo claro y oscuro" aria-pressed="false" style="margin-right:8px">
     <span class="themeToggle__icon" id="themeToggleIcon" aria-hidden="true">☾</span><span id="themeToggleLabel">Oscuro</span>
   </button>
+  <div class="menuLayout" id="menuLayoutControl" style="margin-right:8px">
+    <button type="button" class="topmenu__btn" id="menuLayoutBtn" title="Cambiar posición del menú" aria-haspopup="true" aria-expanded="false">
+      <?php echo icon('grid'); ?><span>Menú</span>
+    </button>
+    <div class="menuLayout__drop" id="menuLayoutDrop" hidden>
+      <div class="menuLayout__title">Posición del menú principal</div>
+      <button type="button" class="menuLayout__option" data-menu-layout-value="left">
+        <span class="menuLayout__preview menuLayout__preview--left"></span>
+        <span><b>Izquierda</b><small>Menú vertical en el lateral</small></span>
+        <span class="menuLayout__check">✓</span>
+      </button>
+      <button type="button" class="menuLayout__option" data-menu-layout-value="top">
+        <span class="menuLayout__preview menuLayout__preview--top"></span>
+        <span><b>Superior</b><small>Menú horizontal en la parte superior</small></span>
+        <span class="menuLayout__check">✓</span>
+      </button>
+    </div>
+  </div>
   <?php if (function_exists('auth_es_admin') && auth_es_admin()): ?>
   <div class="topmenu" id="topmenu">
     <button type="button" class="topmenu__btn" id="topmenuBtn">
@@ -119,5 +137,36 @@ require_once __DIR__ . '/permissions.php';
   }
   render();
   button.addEventListener('click',function(){apply(current()==='dark'?'light':'dark',true);});
+})();
+</script>
+
+<script>
+(function(){
+  var root=document.documentElement,wrap=document.getElementById('menuLayoutControl'),btn=document.getElementById('menuLayoutBtn'),drop=document.getElementById('menuLayoutDrop');
+  if(!wrap||!btn||!drop)return;
+  var options=Array.prototype.slice.call(drop.querySelectorAll('[data-menu-layout-value]'));
+  function current(){return root.getAttribute('data-menu-layout')==='top'?'top':'left';}
+  function render(){
+    var value=current();
+    options.forEach(function(option){option.classList.toggle('is-active',option.getAttribute('data-menu-layout-value')===value);});
+  }
+  function close(){drop.hidden=true;btn.setAttribute('aria-expanded','false');}
+  function open(){drop.hidden=false;btn.setAttribute('aria-expanded','true');render();}
+  btn.addEventListener('click',function(e){e.stopPropagation();drop.hidden?open():close();});
+  drop.addEventListener('click',function(e){e.stopPropagation();});
+  document.addEventListener('click',close);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  options.forEach(function(option){
+    option.addEventListener('click',function(){
+      var value=option.getAttribute('data-menu-layout-value')==='top'?'top':'left';
+      root.setAttribute('data-menu-layout',value);
+      window.CLEAR_MENU_LAYOUT=value;
+      render();close();
+      var fd=new FormData();fd.append('key','menu_layout');fd.append('value',value);
+      fetch('user_prefs_api.php',{method:'POST',body:fd,credentials:'same-origin'}).catch(function(){});
+      window.dispatchEvent(new CustomEvent('clear-menu-layout-change',{detail:{layout:value}}));
+    });
+  });
+  render();
 })();
 </script>
