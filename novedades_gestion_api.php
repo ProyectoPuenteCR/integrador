@@ -9,7 +9,7 @@ try{
  if($method==='GET'){
   $action=$_GET['accion']??'';
   if($action==='catalogo'){ng_reply(['ok'=>true,'catalog'=>ngr_catalog($db)]);}
-  if($action==='historial'){ng_reply(['ok'=>true,'history'=>ng_history($db,$type,ng_id($_GET['id']??'',false))]);}
+  if($action==='historial'){ng_reply(['ok'=>true,'history'=>ng_history($db,$type,ng_id($_GET['id']??'',false),(string)auth_user())]);}
   ng_reply(['ok'=>false,'error'=>'Consulta no válida.'],400);
  }
  if($method!=='POST')ng_reply(['ok'=>false,'error'=>'Método no admitido.'],405);
@@ -26,6 +26,11 @@ try{
   if($_FILES)ng_reply(['ok'=>false,'error'=>'Operación no válida.'],400);
   $id=ng_id($input['ID']??'',false);$version=ng_id($input['VERSION']??'',false);
   ng_reply(['ok'=>true,'result'=>ng_delete($db,$type,$id,$version,(string)auth_user())]);
+ }
+ if(($_GET['accion']??'')==='eliminar_varios'){
+  if($_FILES)ng_reply(['ok'=>false,'error'=>'Operación no válida.'],400);
+  $items=$input['items']??[];if(!is_array($items))ng_reply(['ok'=>false,'error'=>'Selección inválida.'],400);
+  ng_reply(['ok'=>true,'result'=>ng_delete_many($db,$type,$items,(string)auth_user())]);
  }
  if(($_GET['accion']??'')!=='')ng_reply(['ok'=>false,'error'=>'Operación no válida.'],400);
  $cfg=require __DIR__.'/config.php';date_default_timezone_set($cfg['app']['tz']??'UTC');
