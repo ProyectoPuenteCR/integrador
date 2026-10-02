@@ -139,12 +139,12 @@ function ng_delete($db,string $type,int $id,int $version,string $user): array {
     $db->execute("SET XACT_ABORT ON; BEGIN TRANSACTION;");
     try{
         $found=$db->all('SELECT '.ng_select().' FROM dbo.CLEAR_NS_GESTIONES WITH (UPDLOCK,HOLDLOCK) WHERE ID=? AND TIPO=? AND ACTIVO=1 AND USUARIO_CARGA=?',[$id,$type,$user]);
-        if($db->error()||count($found)!==1)throw new RuntimeException('La auditoría ya no está disponible.');
+        if($db->error()||count($found)!==1)throw new RuntimeException('El registro ya no está disponible o pertenece a otro usuario.');
         $old=$found[0];
         if(!ng_can_delete($old,$user))throw new RuntimeException('No tenés permiso para eliminar este registro.');
         if((int)ns_value($old,'VERSION')!==$version)throw new RuntimeException('Otro usuario modificó este registro. Recargá antes de eliminar.');
         $newVersion=$version+1;
-        if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1",[$user,$id,$type,$version]))throw new RuntimeException('No se pudo eliminar el registro.');
+        if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1 AND USUARIO_CARGA=?",[$user,$id,$type,$version,$user]))throw new RuntimeException('No se pudo eliminar el registro.');
         $snapshot=[];foreach(['FECHA','ZONA','BATERIA','SUPERVISOR','JEFE_PRODUCCION','ESTADO','OBSERVACIONES','FECHA_CIERRE','ADJUNTO_NOMBRE'] as $key)$snapshot[$key]=(string)(ns_value($old,$key)??'');
         if(!$db->execute('INSERT INTO dbo.CLEAR_NS_GESTIONES_HISTORIAL(GESTION_ID,VERSION,ESTADO_ANTERIOR,ESTADO_NUEVO,USUARIO,MOTIVO,ANTES_JSON,DESPUES_JSON) VALUES(?,?,?,?,?,?,?,?)',[$id,$newVersion,(string)ns_value($old,'ESTADO'),'ELIMINADO',$user,'Baja lógica solicitada por operador',nm_json($snapshot),nm_json(['ELIMINADO'=>true])]))throw new RuntimeException('No se pudo registrar el historial de eliminación.');
         if(!$db->execute('COMMIT TRANSACTION'))throw new RuntimeException('No se pudo confirmar la eliminación.');
