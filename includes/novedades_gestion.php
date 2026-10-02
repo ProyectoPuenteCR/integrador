@@ -145,7 +145,7 @@ function ng_delete($db,string $type,int $id,int $version,string $user): array {
         $newVersion=$version+1;
         if(!$db->execute("UPDATE dbo.CLEAR_NS_GESTIONES SET ACTIVO=0,VERSION=VERSION+1,USUARIO_MODIFICACION=?,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=? AND TIPO=? AND VERSION=? AND ACTIVO=1",[$user,$id,$type,$version]))throw new RuntimeException('No se pudo eliminar la auditoría.');
         $snapshot=[];foreach(['FECHA','ZONA','BATERIA','SUPERVISOR','JEFE_PRODUCCION','ESTADO','OBSERVACIONES','FECHA_CIERRE','ADJUNTO_NOMBRE'] as $key)$snapshot[$key]=(string)(ns_value($old,$key)??'');
-        if(!$db->execute('INSERT INTO dbo.CLEAR_NS_GESTIONES_HISTORIAL(GESTION_ID,VERSION,ESTADO_ANTERIOR,ESTADO_NUEVO,USUARIO,MOTIVO,ANTES_JSON,DESPUES_JSON) VALUES(?,?,?,?,?,?,?,?)',[$id,$newVersion,(string)ns_value($old,'ESTADO'),N'ELIMINADO',$user,N'Baja lógica solicitada por operador',nm_json($snapshot),nm_json(['ELIMINADO'=>true])]))throw new RuntimeException('No se pudo registrar el historial de eliminación.');
+        if(!$db->execute('INSERT INTO dbo.CLEAR_NS_GESTIONES_HISTORIAL(GESTION_ID,VERSION,ESTADO_ANTERIOR,ESTADO_NUEVO,USUARIO,MOTIVO,ANTES_JSON,DESPUES_JSON) VALUES(?,?,?,?,?,?,?,?)',[$id,$newVersion,(string)ns_value($old,'ESTADO'),'ELIMINADO',$user,'Baja lógica solicitada por operador',nm_json($snapshot),nm_json(['ELIMINADO'=>true])]))throw new RuntimeException('No se pudo registrar el historial de eliminación.');
         if(!$db->execute('COMMIT TRANSACTION'))throw new RuntimeException('No se pudo confirmar la eliminación.');
         return ['id'=>$id,'version'=>$newVersion];
     }catch(Throwable $e){$db->execute('IF @@TRANCOUNT>0 ROLLBACK TRANSACTION');throw $e;}
