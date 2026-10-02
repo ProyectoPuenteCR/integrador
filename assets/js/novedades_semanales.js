@@ -14,7 +14,10 @@
   function trendDataset(series,index,colors){var color=colors[index%colors.length];return{type:'line',label:'Tendencia · '+series.label,data:trendValues(series.values||[]),borderColor:color,backgroundColor:'transparent',borderWidth:2,borderDash:[7,5],fill:false,tension:0,pointRadius:0,pointHoverRadius:3,order:0,nsTrend:true};}
   function createChart(id,model,type,clickHandler){var canvas=document.getElementById(id);if(typeof Chart==='undefined'||!canvas||!model)return null;type=['line','bar','doughnut'].indexOf(type)>=0?type:'line';var colors=palettes[model.palette]||palettes.blues;var series=model.series||[{label:model.label||'Alarmas',values:model.values||[]}];if(type==='doughnut'&&series.length>1){var totals=series.map(function(s){return s.values.reduce(function(a,b){return a+parseNumber(b);},0);});model={labels:series.map(function(s){return s.label;}),dates:model.dates,palette:model.palette,unit:model.unit,series:[{label:'Total',values:totals}]};series=model.series;}var datasets=series.map(function(s,i){return datasetStyle(s,i,type,series.length===1,colors);});if(model.trendline&&type!=='doughnut')series.forEach(function(s,i){datasets.push(trendDataset(s,i,colors));});var options=baseOptions(type,model.unit);if(clickHandler)options.onClick=clickHandler;return new Chart(canvas,{type:type,data:{labels:model.labels,datasets:datasets},options:options,plugins:[valueLabels]});}
   if(cfg.weeklyChart)createChart('nsWeeklyChart',{labels:cfg.weeklyChart.labels,dates:cfg.weeklyChart.dates,palette:cfg.weeklyChart.palette,series:[{label:'Total de alarmas',values:cfg.weeklyChart.values}]},cfg.weeklyChart.type||'line',function(evt,elements){if(!elements.length)return;var date=cfg.weeklyChart.dates[elements[0].index];if(date)window.location.href='novedades_semanales_malos_actores.php?desde='+encodeURIComponent(date)+'&hasta='+encodeURIComponent(date);});
-  function filterZoneDetail(group){
+  function saveGlobalZonePreference(group){
+    return fetch('novedades_semanales_global_pref_api.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({value:String(group||'')})}).then(function(r){return r.json();}).then(function(res){if(!res.ok)throw new Error(res.error||'No se pudo guardar la preferencia global.');return res;}).catch(function(){return null;});
+  }
+  function filterZoneDetail(group,saveGlobal){
     var table=document.getElementById('nsZoneTable'),filter=document.querySelector('[data-ns-zone-filter]');
     if(!table)return;
     group=String(group||'');
@@ -25,10 +28,12 @@
       row.hidden=!!group&&rowGroup!==group;
     });
     window.dispatchEvent(new CustomEvent('clear-grid-visibility-changed'));
+    if(saveGlobal)saveGlobalZonePreference(group);
   }
   var zoneFilter=document.querySelector('[data-ns-zone-filter]');
-  if(zoneFilter)zoneFilter.addEventListener('change',function(){filterZoneDetail(zoneFilter.value);});
-  if(cfg.typeChart)createChart('nsTypeChart',{labels:cfg.typeChart.labels,palette:cfg.typeChart.palette,series:[{label:'Alarmas',values:cfg.typeChart.values}]},cfg.typeChart.type||'bar',function(evt,elements){if(!elements.length)return;var label=cfg.typeChart.labels[elements[0].index]||'';filterZoneDetail(zoneFilter&&zoneFilter.value===label?'':label);var table=document.getElementById('nsZoneTable');if(table)table.scrollIntoView({behavior:'smooth',block:'start'});});
+  if(zoneFilter)zoneFilter.addEventListener('change',function(){filterZoneDetail(zoneFilter.value,true);});
+  if(zoneFilter&&cfg.zoneGroupPreference&&Array.prototype.some.call(zoneFilter.options,function(o){return o.value===cfg.zoneGroupPreference;}))filterZoneDetail(cfg.zoneGroupPreference,false);
+  if(cfg.typeChart)createChart('nsTypeChart',{labels:cfg.typeChart.labels,palette:cfg.typeChart.palette,series:[{label:'Alarmas',values:cfg.typeChart.values}]},cfg.typeChart.type||'bar',function(evt,elements){if(!elements.length)return;var label=cfg.typeChart.labels[elements[0].index]||'';filterZoneDetail(zoneFilter&&zoneFilter.value===label?'':label,true);var table=document.getElementById('nsZoneTable');if(table)table.scrollIntoView({behavior:'smooth',block:'start'});});
   if(cfg.comparison)createChart('nsComparisonChart',cfg.comparison,cfg.comparison.type||'line',function(evt,elements){if(!elements.length)return;var date=cfg.comparison.dates[elements[0].index];if(date)window.location.href='novedades_semanales_malos_actores.php?desde='+encodeURIComponent(date)+'&hasta='+encodeURIComponent(date);});
   if(cfg.badActors)createChart('nsBadActorsChart',cfg.badActors,cfg.badActors.type||'bar');
   if(cfg.reportCharts)(cfg.reportCharts||[]).forEach(function(model){createChart(model.id,model,model.type||'bar');});
