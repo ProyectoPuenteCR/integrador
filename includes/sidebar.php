@@ -131,7 +131,7 @@ if (!in_array($savedMenuLayout, ['left','top'], true)) $savedMenuLayout = 'left'
 </script>
 <aside class="side" id="sidebar">
   <div class="side__brand">
-    <img src="assets/img/logo-clear-horizontal.svg" alt="CLEAR Petroleum">
+    <img src="assets/img/logo-clear.jpg" alt="CLEAR Petroleum">
   </div>
 
   <div class="side__user">
