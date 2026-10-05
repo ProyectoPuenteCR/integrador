@@ -45,6 +45,7 @@ function zpc_load($db)
         'error' => '',
         'rows' => [],
         'methods' => [],
+        'states' => [],
         'piCount' => 0,
         'zafiroCount' => 0,
         'latestQ412' => null,
@@ -104,6 +105,7 @@ function zpc_load($db)
     }
 
     $methodCounts = [];
+    $stateCounts = [];
     $rows = [];
     $latestQ412 = null;
     foreach ($q412 as $r) {
@@ -111,6 +113,11 @@ function zpc_load($db)
         if ($method === '') $method = 'Sin método';
         if (!isset($methodCounts[$method])) $methodCounts[$method] = 0;
         $methodCounts[$method]++;
+
+        $stateName = trim((string)($r['EstadoZafiro'] ?? ''));
+        if ($stateName === '') $stateName = 'Sin estado';
+        if (!isset($stateCounts[$stateName])) $stateCounts[$stateName] = 0;
+        $stateCounts[$stateName]++;
 
         $key = zpc_norm_pozo($r['Pozo'] ?? '');
         $hit = $key !== '' && isset($pi[$key]) ? $pi[$key] : null;
@@ -125,7 +132,7 @@ function zpc_load($db)
             'area' => (string)($r['Area'] ?? ''),
             'metodo' => $method,
             'tipoMetodo' => (string)($r['TipoMetodoZafiro'] ?? ''),
-            'estado' => (string)($r['EstadoZafiro'] ?? ''),
+            'estado' => $stateName,
             'activo' => (int)($r['EstadoActivo'] ?? 0),
             'petroleo' => $r['Petroleo24'] === null ? null : (float)$r['Petroleo24'],
             'liquido' => $r['Liquido24'] === null ? null : (float)$r['Liquido24'],
@@ -138,6 +145,7 @@ function zpc_load($db)
     }
 
     arsort($methodCounts);
+    arsort($stateCounts);
     $latestPI = null;
     foreach ($pi as $p) {
         if ($p['last'] !== '' && ($latestPI === null || strcmp($p['last'], $latestPI) > 0)) $latestPI = $p['last'];
@@ -146,6 +154,7 @@ function zpc_load($db)
     $result['ok'] = true;
     $result['rows'] = $rows;
     $result['methods'] = $methodCounts;
+    $result['states'] = $stateCounts;
     $result['piCount'] = count($pi);
     $result['zafiroCount'] = count($rows);
     $result['latestQ412'] = $latestQ412;
@@ -172,15 +181,32 @@ function zpc_selected_methods(array $methodCounts)
     return array_values(array_unique($selected));
 }
 
+function zpc_selected_states(array $stateCounts)
+{
+    $available = array_keys($stateCounts);
+    $stored = zpc_json_pref('zafiro_pi_estados', []);
+    if (!$stored) return $available;
+    $map = [];
+    foreach ($available as $s) $map[zpc_method_key($s)] = $s;
+    $selected = [];
+    foreach ($stored as $s) {
+        $k = zpc_method_key($s);
+        if (isset($map[$k])) $selected[] = $map[$k];
+    }
+    return array_values(array_unique($selected));
+}
+
 function zpc_excluded_wells()
 {
     return array_values(array_unique(array_filter(array_map('strval', zpc_json_pref('zafiro_pi_exclusiones', [])))));
 }
 
-function zpc_apply_filters(array $rows, array $selectedMethods, array $excludedWells, array $query)
+function zpc_apply_filters(array $rows, array $selectedMethods, array $selectedStates, array $excludedWells, array $query)
 {
     $selected = [];
     foreach ($selectedMethods as $m) $selected[zpc_method_key($m)] = true;
+    $states = [];
+    foreach ($selectedStates as $s) $states[zpc_method_key($s)] = true;
     $excluded = [];
     foreach ($excludedWells as $w) $excluded[zpc_norm_pozo($w)] = true;
 
@@ -194,6 +220,7 @@ function zpc_apply_filters(array $rows, array $selectedMethods, array $excludedW
     $out = [];
     foreach ($rows as $r) {
         if (!isset($selected[zpc_method_key($r['metodo'])])) continue;
+        if (!isset($states[zpc_method_key($r['estado'])])) continue;
         $isExcluded = isset($excluded[$r['key']]);
         if ($isExcluded && !$showExcluded) continue;
         if ($zone !== '' && strcasecmp($r['zona'], $zone) !== 0) continue;
