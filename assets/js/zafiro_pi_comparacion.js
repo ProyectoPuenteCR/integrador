@@ -1,18 +1,17 @@
 (function(){
   function toast(msg){var t=document.createElement('div');t.className='zpcToast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove();},1800);}
   function savePref(key,value){var fd=new FormData();fd.append('key',key);fd.append('value',JSON.stringify(value));return fetch('user_prefs_api.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json();});}
-  var methods=document.querySelector('[data-zpc-methods]');
-  if(methods){
-    var checks=Array.prototype.slice.call(methods.querySelectorAll('.zpcMethod input[type=checkbox]'));
-    var all=methods.querySelector('[data-zpc-all]'),none=methods.querySelector('[data-zpc-none]'),save=methods.querySelector('[data-zpc-save]');
+  document.querySelectorAll('[data-zpc-pref-panel]').forEach(function(panel){
+    var key=panel.getAttribute('data-zpc-pref-key')||'',checks=Array.prototype.slice.call(panel.querySelectorAll('.zpcMethod input[type=checkbox]'));
+    var all=panel.querySelector('[data-zpc-all]'),none=panel.querySelector('[data-zpc-none]'),save=panel.querySelector('[data-zpc-save]');
     if(all)all.onclick=function(){checks.forEach(function(c){c.checked=true;});};
     if(none)none.onclick=function(){checks.forEach(function(c){c.checked=false;});};
     if(save)save.onclick=function(){
       var values=checks.filter(function(c){return c.checked;}).map(function(c){return c.value;});
       save.disabled=true;
-      savePref('zafiro_pi_metodos',values).then(function(r){if(!r.ok)throw new Error(r.error||'No se pudo guardar');toast('Configuración guardada');setTimeout(function(){location.reload();},450);}).catch(function(e){alert(e.message);}).finally(function(){save.disabled=false;});
+      savePref(key,values).then(function(r){if(!r.ok)throw new Error(r.error||'No se pudo guardar');toast('Configuración guardada');setTimeout(function(){location.reload();},450);}).catch(function(e){alert(e.message);}).finally(function(){save.disabled=false;});
     };
-  }
+  });
   var excluded=(window.CLEAR_ZPC&&Array.isArray(window.CLEAR_ZPC.excludedWells))?window.CLEAR_ZPC.excludedWells.slice():[];
   document.querySelectorAll('[data-zpc-exclude]').forEach(function(c){
     c.addEventListener('change',function(){
