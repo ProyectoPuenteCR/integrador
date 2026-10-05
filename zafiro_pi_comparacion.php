@@ -22,8 +22,9 @@ $reportEnabled = !$dbError && ns_report_ready($db) && permissions_can_menu('nove
 if (!$data['ok'] && !$dbError) $dbError = $data['error'];
 
 $selectedMethods = $data['ok'] ? zpc_selected_methods($data['methods']) : [];
+$selectedStates = $data['ok'] ? zpc_selected_states($data['states']) : [];
 $excludedWells = zpc_excluded_wells();
-$rowsAllSelected = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, [], ['pi'=>'all','ver_excluidos'=>1]) : [];
+$rowsAllSelected = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, [], ['pi'=>'all','ver_excluidos'=>1]) : [];
 $foundCount = 0; $missingCount = 0;
 foreach ($rowsAllSelected as $r) { if ($r['enPi']) $foundCount++; else $missingCount++; }
 $excludedMethodCount = 0;
@@ -31,11 +32,12 @@ if ($data['ok']) {
     $selectedMap = array_flip(array_map('zpc_method_key', $selectedMethods));
     foreach ($data['methods'] as $method=>$count) if (!isset($selectedMap[zpc_method_key($method)])) $excludedMethodCount += $count;
 }
-$rows = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $excludedWells, $_GET) : [];
+$rows = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, $excludedWells, $_GET) : [];
 $zones = $data['ok'] ? zpc_unique($data['rows'], 'zona') : [];
 $batteries = $data['ok'] ? zpc_unique($data['rows'], 'instalacion') : [];
 $states = $data['ok'] ? zpc_unique($data['rows'], 'estado') : [];
 $selectedMap = array_flip(array_map('zpc_method_key', $selectedMethods));
+$selectedStateMap = array_flip(array_map('zpc_method_key', $selectedStates));
 $excludedMap = [];
 foreach ($excludedWells as $w) $excludedMap[zpc_norm_pozo($w)] = true;
 
@@ -55,7 +57,7 @@ function zpc_dt($v){
 <title>Zafiro vs PI · CLEAR Plataforma</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20261005-zpc1">
 <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
-<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-2">
+<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-3">
 <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
@@ -109,7 +111,8 @@ function zpc_dt($v){
     </div>
   </form>
 
-  <section class="zpcMethods" data-zpc-methods>
+  <div class="zpcComparePanels">
+  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_metodos">
     <div class="zpcMethods__title">Métodos Zafiro a comparar</div>
     <?php foreach($data['methods'] as $method=>$count): $checked=isset($selectedMap[zpc_method_key($method)]); ?>
     <label class="zpcMethod">
@@ -125,6 +128,24 @@ function zpc_dt($v){
     </div>
     <small><?php echo zpc_n(count($excludedWells)); ?> pozo(s) excluido(s) manualmente por este usuario.</small>
   </section>
+
+  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_estados">
+    <div class="zpcMethods__title">Estados Zafiro a comparar</div>
+    <?php foreach($data['states'] as $state=>$count): $checked=isset($selectedStateMap[zpc_method_key($state)]); ?>
+    <label class="zpcMethod">
+      <input type="checkbox" value="<?php echo zpc_h($state); ?>" <?php echo $checked?'checked':''; ?>>
+      <span><?php echo zpc_h($state); ?></span>
+      <b><?php echo zpc_n($count); ?></b>
+    </label>
+    <?php endforeach; ?>
+    <div class="zpcMethods__actions">
+      <button type="button" class="zstBtn is-ghost" data-zpc-all>Seleccionar todos</button>
+      <button type="button" class="zstBtn is-ghost" data-zpc-none>Limpiar</button>
+      <button type="button" class="zstBtn is-primary" data-zpc-save><?php echo icon('check'); ?> Guardar estados</button>
+    </div>
+    <small>Los estados destildados quedan fuera de la comparación con PI para tu usuario.</small>
+  </section>
+  </div>
 </div>
 
 <section class="zpcKpis">
@@ -134,7 +155,7 @@ function zpc_dt($v){
   <div class="zpcKpi is-amber"><span><?php echo icon('history'); ?></span><div><small>Métodos excluidos</small><b><?php echo zpc_n($excludedMethodCount); ?></b><em>Pozos fuera del análisis</em></div></div>
 </section>
 
-<div class="zpcInfo"><?php echo icon('gauge'); ?><span><b>Regla:</b> solo se comparan contra PI los pozos cuyos métodos Zafiro están seleccionados. Por defecto <b>No Posee</b> queda desmarcado. La exclusión por pozo también se guarda para tu usuario.</span></div>
+<div class="zpcInfo"><?php echo icon('gauge'); ?><span><b>Regla:</b> solo se comparan contra PI los pozos cuyos <b>métodos y estados Zafiro</b> están seleccionados. Por defecto <b>No Posee</b> queda desmarcado. Métodos, estados y exclusiones por pozo se guardan por usuario.</span></div>
 
 <section class="zpcGridCard">
   <div class="zpcGridHead">
@@ -203,11 +224,12 @@ function zpc_dt($v){
 <script>
 window.CLEAR_ZPC={
   selectedMethods:<?php echo json_encode(array_values($selectedMethods),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>,
+  selectedStates:<?php echo json_encode(array_values($selectedStates),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>,
   excludedWells:<?php echo json_encode(array_values($excludedWells),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>
 };
 </script>
 <script src="assets/js/app.js?v=20260824-as1"></script>
-<script src="assets/js/zafiro_pi_comparacion.js?v=20261005-2"></script>
+<script src="assets/js/zafiro_pi_comparacion.js?v=20261005-3"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260901-report-chart-2"></script><?php endif; ?>
 </body>
 </html>
