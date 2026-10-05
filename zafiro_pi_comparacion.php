@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/icons.php';
+require_once __DIR__ . '/includes/novedades_semanales_common.php';
 require_once __DIR__ . '/includes/zafiro_pi_comparacion.php';
 
 $MENU_KEY = 'zafiro_pi_comparacion';
@@ -17,6 +18,7 @@ $ACTIVE = $MENU_KEY;
 $db = clear_db();
 $dbError = $db->ok() ? '' : $db->error();
 $data = !$dbError ? zpc_load($db) : ['ok'=>false,'error'=>$dbError,'rows'=>[],'methods'=>[]];
+$reportEnabled = !$dbError && ns_report_ready($db) && permissions_can_menu('novedades_semanales_reporte');
 if (!$data['ok'] && !$dbError) $dbError = $data['error'];
 
 $selectedMethods = $data['ok'] ? zpc_selected_methods($data['methods']) : [];
@@ -53,7 +55,8 @@ function zpc_dt($v){
 <title>Zafiro vs PI · CLEAR Plataforma</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20261005-zpc1">
 <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
-<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-1">
+<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-2">
+<?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
 <div class="app">
@@ -99,6 +102,10 @@ function zpc_dt($v){
       <button class="zstBtn is-primary" type="submit"><?php echo icon('search'); ?> Aplicar</button>
       <a class="zstBtn is-ghost" href="zafiro_pi_comparacion.php">Limpiar</a>
       <a class="zstBtn is-ghost" href="zafiro_pi_comparacion_export.php?<?php echo zpc_h(http_build_query($_GET)); ?>"><?php echo icon('download'); ?> Exportar Excel</a>
+      <?php if($reportEnabled): ?>
+        <button type="button" class="zstBtn is-ghost" data-clear-report-add-selected><?php echo icon('file'); ?> Generar reporte</button>
+        <button type="button" class="zstBtn is-ghost" data-ns-report-open>Ver reporte <span class="nsReportCount" data-ns-report-count hidden>0</span></button>
+      <?php endif; ?>
     </div>
   </form>
 
@@ -138,18 +145,41 @@ function zpc_dt($v){
     <table class="zpcTable" id="zpcTable">
       <thead>
         <tr>
+          <?php if($reportEnabled): ?><th class="zpcReportPick"><input type="checkbox" data-ns-report-select-all aria-label="Seleccionar todos para reporte"></th><?php endif; ?>
           <th>Pozo</th><th>Instalación</th><th>Zona</th><th>Método Zafiro</th><th>Estado Zafiro</th>
           <th>En PI</th><th>Fuente PI / Sistema</th><th>Última telemetría</th><th>Producción petróleo</th><th>Producción líquido</th><th>Excluir</th>
         </tr>
         <tr class="zpcTable__filters">
-          <?php for($i=0;$i<10;$i++): ?><th><input type="search" data-zpc-col="<?php echo $i; ?>" placeholder="<?php echo $i===0?'Filtrar…':''; ?>"></th><?php endfor; ?><th></th>
+          <?php if($reportEnabled): ?><th></th><?php endif; ?><?php for($i=0;$i<10;$i++): ?><th><input type="search" data-zpc-col="<?php echo $i; ?>" placeholder="<?php echo $i===0?'Filtrar…':''; ?>"></th><?php endfor; ?><th></th>
         </tr>
       </thead>
       <tbody>
       <?php if(!$rows): ?>
-        <tr><td colspan="11" class="zpcEmpty">No hay pozos para los filtros y métodos seleccionados.</td></tr>
+        <tr><td colspan="<?php echo $reportEnabled?12:11; ?>" class="zpcEmpty">No hay pozos para los filtros y métodos seleccionados.</td></tr>
       <?php else: foreach($rows as $r): ?>
         <tr class="<?php echo $r['excluded']?'is-excluded':''; ?>">
+          <?php if($reportEnabled):
+            $reportColumns=[
+              'Pozo'=>$r['pozo'],
+              'Instalación'=>$r['instalacion']!==''?$r['instalacion']:'—',
+              'Zona'=>$r['zona']!==''?$r['zona']:'—',
+              'Método Zafiro'=>$r['metodo'],
+              'Estado Zafiro'=>$r['estado']!==''?$r['estado']:'—',
+              'En PI'=>$r['enPi']?'Encontrado en PI':'NO ENCONTRADO EN PI',
+              'Fuente PI / Sistema'=>$r['piSource']!==''?$r['piSource']:'—',
+              'Última telemetría'=>zpc_dt($r['piLast']),
+              'Producción petróleo'=>$r['petroleo']===null?'—':number_format($r['petroleo'],2,',','.'),
+              'Producción líquido'=>$r['liquido']===null?'—':number_format($r['liquido'],2,',','.')
+            ];
+          ?>
+          <td class="zpcReportPick"><?php echo ns_report_pick(
+            ns_report_key('zafiro-vs-pi',[$r['key'],$r['metodo'],$r['enPi']]),
+            'row',
+            'Zafiro vs PI · '.$r['pozo'],
+            ns_report_row_payload($reportColumns),
+            'Incluir'
+          ); ?></td>
+          <?php endif; ?>
           <td><b><?php echo zpc_h($r['pozo']); ?></b></td>
           <td><?php echo zpc_h($r['instalacion']!==''?$r['instalacion']:'—'); ?></td>
           <td><?php echo zpc_h($r['zona']!==''?$r['zona']:'—'); ?></td>
@@ -177,6 +207,7 @@ window.CLEAR_ZPC={
 };
 </script>
 <script src="assets/js/app.js?v=20260824-as1"></script>
-<script src="assets/js/zafiro_pi_comparacion.js?v=20261005-1"></script>
+<script src="assets/js/zafiro_pi_comparacion.js?v=20261005-2"></script>
+<?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260901-report-chart-2"></script><?php endif; ?>
 </body>
 </html>
