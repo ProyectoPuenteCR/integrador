@@ -21,7 +21,7 @@ $telemetriaPozos = [
     ['key'=>'tecss_3sigma','label'=>'3Sigma TECSS','icon'=>'chart','url'=>'tecss_3sigma.php'],
     ['key'=>'tecss_vibraciones','label'=>'Análisis de Vibraciones','icon'=>'wave','url'=>'tecss_vibraciones.php'],
     ['key'=>'gestion_telemetria','label'=>'Gestión de Telemetría','icon'=>'chart','url'=>'gestion_telemetria.php'],
-    ['key'=>'sin_telemetria_zafiro','label'=>'Sin Telemetría en Zafiro','icon'=>'signal-off','url'=>'sin_telemetria_zafiro.php'],
+    ['key'=>'sin_telemetria_zafiro','label'=>'Sin Telemetría en Zafiro','icon'=>'signal-off','url'=>'sin_telemetria_zafiro.php'],\n    ['key'=>'zafiro_pi_comparacion','label'=>'Zafiro vs PI','icon'=>'signal-off','url'=>'zafiro_pi_comparacion.php'],
     ['key'=>'pozos','label'=>'Ficha de pozos','icon'=>'oil','url'=>'list.php?s=pozos'],
     ['key'=>'pozos_tecss','label'=>'Pozos · técnico','icon'=>'gauge','url'=>'list.php?s=pozos_tecss'],
 ];
