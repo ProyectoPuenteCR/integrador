@@ -33,6 +33,10 @@ if ($data['ok']) {
     foreach ($data['methods'] as $method=>$count) if (!isset($selectedMap[zpc_method_key($method)])) $excludedMethodCount += $count;
 }
 $rows = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, $excludedWells, $_GET) : [];
+$productionOilTotal = 0.0;
+foreach ($rows as $rowOil) {
+    if ($rowOil['petroleo'] !== null) $productionOilTotal += (float)$rowOil['petroleo'];
+}
 $zones = $data['ok'] ? zpc_unique($data['rows'], 'zona') : [];
 $batteries = $data['ok'] ? zpc_unique($data['rows'], 'instalacion') : [];
 $states = $data['ok'] ? zpc_unique($data['rows'], 'estado') : [];
@@ -57,7 +61,7 @@ function zpc_dt($v){
 <title>Zafiro vs PI · CLEAR Plataforma</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20261005-zpc1">
 <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
-<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-4">
+<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-5">
 <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
@@ -87,6 +91,8 @@ function zpc_dt($v){
 <div class="zstNotice is-error"><b>No se puede construir la comparación:</b> <?php echo zpc_h($dbError); ?></div>
 <?php else: ?>
 
+<div class="zpcLayout">
+  <div class="zpcMainColumn">
 <div class="zpcTop">
   <form class="zpcFilters" method="get" action="zafiro_pi_comparacion.php">
     <div class="zpcFilters__title">Filtros de análisis</div>
@@ -111,48 +117,15 @@ function zpc_dt($v){
     </div>
   </form>
 
-  <div class="zpcComparePanels">
-  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_metodos">
-    <div class="zpcMethods__title">Métodos Zafiro a comparar</div>
-    <?php foreach($data['methods'] as $method=>$count): $checked=isset($selectedMap[zpc_method_key($method)]); ?>
-    <label class="zpcMethod">
-      <input type="checkbox" value="<?php echo zpc_h($method); ?>" <?php echo $checked?'checked':''; ?>>
-      <span><?php echo zpc_h($method); ?></span>
-      <b><?php echo zpc_n($count); ?></b>
-    </label>
-    <?php endforeach; ?>
-    <div class="zpcMethods__actions">
-      <button type="button" class="zstBtn is-ghost" data-zpc-all>Seleccionar todos</button>
-      <button type="button" class="zstBtn is-ghost" data-zpc-none>Limpiar</button>
-      <button type="button" class="zstBtn is-primary" data-zpc-save><?php echo icon('check'); ?> Guardar configuración</button>
-    </div>
-    <small><?php echo zpc_n(count($excludedWells)); ?> pozo(s) excluido(s) manualmente por este usuario.</small>
-  </section>
-
-  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_estados">
-    <div class="zpcMethods__title">Estados Zafiro a comparar</div>
-    <?php foreach($data['states'] as $state=>$count): $checked=isset($selectedStateMap[zpc_method_key($state)]); ?>
-    <label class="zpcMethod">
-      <input type="checkbox" value="<?php echo zpc_h($state); ?>" <?php echo $checked?'checked':''; ?>>
-      <span><?php echo zpc_h($state); ?></span>
-      <b><?php echo zpc_n($count); ?></b>
-    </label>
-    <?php endforeach; ?>
-    <div class="zpcMethods__actions">
-      <button type="button" class="zstBtn is-ghost" data-zpc-all>Seleccionar todos</button>
-      <button type="button" class="zstBtn is-ghost" data-zpc-none>Limpiar</button>
-      <button type="button" class="zstBtn is-primary" data-zpc-save><?php echo icon('check'); ?> Guardar estados</button>
-    </div>
-    <small>Los estados destildados quedan fuera de la comparación con PI para tu usuario.</small>
-  </section>
-  </div>
 </div>
+
 
 <section class="zpcKpis">
   <div class="zpcKpi is-blue"><span><?php echo icon('grid'); ?></span><div><small>Pozos evaluados</small><b><?php echo zpc_n(count($rowsAllSelected)); ?></b><em>Con métodos seleccionados</em></div></div>
   <div class="zpcKpi is-green"><span><?php echo icon('check'); ?></span><div><small>Encontrados en PI</small><b><?php echo zpc_n($foundCount); ?></b><em><?php echo count($rowsAllSelected)?number_format($foundCount*100/count($rowsAllSelected),1,',','.'):'0,0'; ?> %</em></div></div>
   <div class="zpcKpi is-red"><span><?php echo icon('signal-off'); ?></span><div><small>No encontrados en PI</small><b><?php echo zpc_n($missingCount); ?></b><em><?php echo count($rowsAllSelected)?number_format($missingCount*100/count($rowsAllSelected),1,',','.'):'0,0'; ?> %</em></div></div>
   <div class="zpcKpi is-amber"><span><?php echo icon('history'); ?></span><div><small>Métodos excluidos</small><b><?php echo zpc_n($excludedMethodCount); ?></b><em>Pozos fuera del análisis</em></div></div>
+  <div class="zpcKpi is-oil"><span><?php echo icon('oil'); ?></span><div><small>Producción petróleo</small><b><?php echo number_format($productionOilTotal,2,',','.'); ?></b><em>Total de los pozos mostrados</em></div></div>
 </section>
 
 <div class="zpcInfo"><?php echo icon('gauge'); ?><span><b>Regla:</b> solo se comparan contra PI los pozos cuyos <b>métodos y estados Zafiro</b> están seleccionados. Por defecto <b>No Posee</b> queda desmarcado. Métodos, estados y exclusiones por pozo se guardan por usuario.</span></div>
@@ -218,6 +191,45 @@ function zpc_dt($v){
     </table>
   </div>
 </section>
+  </div>
+  <aside class="zpcSideColumn">
+  <div class="zpcComparePanels">
+  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_metodos">
+    <div class="zpcMethods__title">Métodos Zafiro a comparar</div>
+    <?php foreach($data['methods'] as $method=>$count): $checked=isset($selectedMap[zpc_method_key($method)]); ?>
+    <label class="zpcMethod">
+      <input type="checkbox" value="<?php echo zpc_h($method); ?>" <?php echo $checked?'checked':''; ?>>
+      <span><?php echo zpc_h($method); ?></span>
+      <b><?php echo zpc_n($count); ?></b>
+    </label>
+    <?php endforeach; ?>
+    <div class="zpcMethods__actions">
+      <button type="button" class="zstBtn is-ghost" data-zpc-all>Seleccionar todos</button>
+      <button type="button" class="zstBtn is-ghost" data-zpc-none>Limpiar</button>
+      <button type="button" class="zstBtn is-primary" data-zpc-save><?php echo icon('check'); ?> Guardar configuración</button>
+    </div>
+    <small><?php echo zpc_n(count($excludedWells)); ?> pozo(s) excluido(s) manualmente por este usuario.</small>
+  </section>
+
+  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_estados">
+    <div class="zpcMethods__title">Estados Zafiro a comparar</div>
+    <?php foreach($data['states'] as $state=>$count): $checked=isset($selectedStateMap[zpc_method_key($state)]); ?>
+    <label class="zpcMethod">
+      <input type="checkbox" value="<?php echo zpc_h($state); ?>" <?php echo $checked?'checked':''; ?>>
+      <span><?php echo zpc_h($state); ?></span>
+      <b><?php echo zpc_n($count); ?></b>
+    </label>
+    <?php endforeach; ?>
+    <div class="zpcMethods__actions">
+      <button type="button" class="zstBtn is-ghost" data-zpc-all>Seleccionar todos</button>
+      <button type="button" class="zstBtn is-ghost" data-zpc-none>Limpiar</button>
+      <button type="button" class="zstBtn is-primary" data-zpc-save><?php echo icon('check'); ?> Guardar estados</button>
+    </div>
+    <small>Los estados destildados quedan fuera de la comparación con PI para tu usuario.</small>
+  </section>
+  </div>
+  </aside>
+</div>
 <?php endif; ?>
 </main>
 </div>
