@@ -153,7 +153,9 @@ function permissions_can_menu($key,$usuario=null)
     // Cada operación se limita en servidor a las programaciones del usuario logueado.
     if($key==='mis_reportes') return true;
     // La pantalla consolidada hereda el permiso funcional de lectura de comentarios.
-    if($key==='comentarios')return !empty($p['comment_view']);\n    // Zafiro vs PI hereda el acceso de la grilla general / telemetría Zafiro.\n    if($key==='zafiro_pi_comparacion') return in_array('telemetria_general',$p['menus'],true) || in_array('sin_telemetria_zafiro',$p['menus'],true);
+    if($key==='comentarios')return !empty($p['comment_view']);
+    // Zafiro vs PI hereda el acceso de la grilla general / telemetría Zafiro.
+    if($key==='zafiro_pi_comparacion') return in_array('telemetria_general',$p['menus'],true) || in_array('sin_telemetria_zafiro',$p['menus'],true);
     // Las nuevas gestiones heredan el acceso existente a Novedades semanales.
     if(in_array($key,['novedades_semanales_auditoria','novedades_semanales_requerimientos'],true))return in_array('novedades_semanales_panel',$p['menus'],true);
     if($key==='novedades_semanales_monitoreo_bm')return false;
