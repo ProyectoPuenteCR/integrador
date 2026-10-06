@@ -290,7 +290,7 @@ if($reportReady){
 <?php foreach($errors as $t=>$e):?><div class="dp-error"><?php echo h($t.': '.$e);?></div><?php endforeach;?>
 
 <div class="dp-kpis">
-    <a class="dp-card" style="--accent:#1683e2" href="monitoreo_pozos.php"><span>Total de pozos</span><b><?php echo $total;?></b><small>Pozos con telemetría</small></a>
+    <a class="dp-card" style="--accent:#1683e2" href="telemetria_general.php"><span>Total de pozos</span><b><?php echo $total;?></b><small>Pozos con telemetría</small></a>
     <?php $colors=['SCADA'=>'#1683e2','TECSS'=>'#805ad5'];foreach($summary as $t=>$s):?>
     <a class="dp-card" style="--accent:<?php echo $colors[$t];?>" href="<?php echo h($s['url']);?>"><span>Pozos <?php echo h($t);?></span><b><?php echo $s['count'];?></b><small><?php echo $total?round($s['count']*100/$total,1):0;?>% del total</small></a>
     <?php endforeach;?>
