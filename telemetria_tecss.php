@@ -61,13 +61,13 @@ if ($tecssCacheReady) {
 
     $TELEMETRY['source_sql'] = "
         SELECT
-            R.[POZO],
-            R.[BATERIA],
-            R.[PANTALLA],
+            CONVERT(nvarchar(255),R.[POZO]) COLLATE DATABASE_DEFAULT AS [POZO],
+            CONVERT(nvarchar(255),R.[BATERIA]) COLLATE DATABASE_DEFAULT AS [BATERIA],
+            CONVERT(nvarchar(1000),R.[PANTALLA]) COLLATE DATABASE_DEFAULT AS [PANTALLA],
             R.[HOY],
-            R.[ESTADO],
-            R.[METODO],
-            R.[YAT:COM],
+            CONVERT(nvarchar(255),R.[ESTADO]) COLLATE DATABASE_DEFAULT AS [ESTADO],
+            CONVERT(nvarchar(255),R.[METODO]) COLLATE DATABASE_DEFAULT AS [METODO],
+            CONVERT(nvarchar(255),R.[YAT:COM]) COLLATE DATABASE_DEFAULT AS [YAT:COM],
             R.[PI-005-PL],
             R.[VIBRACION],
             R.[SI-002-SPM],
@@ -77,13 +77,13 @@ if ($tecssCacheReady) {
         UNION ALL
 
         SELECT
-            C.[Pozo] AS [POZO],
-            CAST(NULL AS nvarchar(255)) AS [BATERIA],
-            CAST(NULL AS nvarchar(1000)) AS [PANTALLA],
+            CONVERT(nvarchar(255),C.[Pozo]) COLLATE DATABASE_DEFAULT AS [POZO],
+            CAST(NULL AS nvarchar(255)) COLLATE DATABASE_DEFAULT AS [BATERIA],
+            CAST(NULL AS nvarchar(1000)) COLLATE DATABASE_DEFAULT AS [PANTALLA],
             C.[FechaCarga] AS [HOY],
-            C.[Estado] AS [ESTADO],
-            CAST(NULL AS nvarchar(255)) AS [METODO],
-            C.[Falla de Comunicacion] AS [YAT:COM],
+            CONVERT(nvarchar(255),C.[Estado]) COLLATE DATABASE_DEFAULT AS [ESTADO],
+            CAST(NULL AS nvarchar(255)) COLLATE DATABASE_DEFAULT AS [METODO],
+            CONVERT(nvarchar(255),C.[Falla de Comunicacion]) COLLATE DATABASE_DEFAULT AS [YAT:COM],
             C.[Presion] AS [PI-005-PL],
             C.[Vibracion] AS [VIBRACION],
             CAST(NULL AS float) AS [SI-002-SPM],
