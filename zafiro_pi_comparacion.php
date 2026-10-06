@@ -23,8 +23,9 @@ if (!$data['ok'] && !$dbError) $dbError = $data['error'];
 
 $selectedMethods = $data['ok'] ? zpc_selected_methods($data['methods']) : [];
 $selectedStates = $data['ok'] ? zpc_selected_states($data['states']) : [];
+$selectedZones = $data['ok'] ? zpc_selected_zones($data['rows']) : [];
 $excludedWells = zpc_excluded_wells();
-$rowsAllSelected = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, [], ['pi'=>'all','ver_excluidos'=>1]) : [];
+$rowsAllSelected = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, $selectedZones, [], ['pi'=>'all','ver_excluidos'=>1]) : [];
 $foundCount = 0; $missingCount = 0;
 foreach ($rowsAllSelected as $r) { if ($r['enPi']) $foundCount++; else $missingCount++; }
 $excludedMethodCount = 0;
@@ -32,7 +33,7 @@ if ($data['ok']) {
     $selectedMap = array_flip(array_map('zpc_method_key', $selectedMethods));
     foreach ($data['methods'] as $method=>$count) if (!isset($selectedMap[zpc_method_key($method)])) $excludedMethodCount += $count;
 }
-$rows = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, $excludedWells, $_GET) : [];
+$rows = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, $selectedZones, $excludedWells, $_GET) : [];
 $productionOilTotal = 0.0;
 foreach ($rows as $rowOil) {
     if ($rowOil['petroleo'] !== null) $productionOilTotal += (float)$rowOil['petroleo'];
@@ -42,6 +43,15 @@ $batteries = $data['ok'] ? zpc_unique($data['rows'], 'instalacion') : [];
 $states = $data['ok'] ? zpc_unique($data['rows'], 'estado') : [];
 $selectedMap = array_flip(array_map('zpc_method_key', $selectedMethods));
 $selectedStateMap = array_flip(array_map('zpc_method_key', $selectedStates));
+$selectedZoneMap = array_flip(array_map('zpc_method_key', $selectedZones));
+$zoneCounts = [];
+foreach ($data['rows'] as $zr) {
+    $zv = trim((string)($zr['zona'] ?? ''));
+    if ($zv === '') $zv = 'Sin zona';
+    if (!isset($zoneCounts[$zv])) $zoneCounts[$zv] = 0;
+    $zoneCounts[$zv]++;
+}
+arsort($zoneCounts);
 $excludedMap = [];
 foreach ($excludedWells as $w) $excludedMap[zpc_norm_pozo($w)] = true;
 
@@ -128,7 +138,7 @@ function zpc_dt($v){
   <div class="zpcKpi is-oil"><span><?php echo icon('oil'); ?></span><div><small>Producción petróleo</small><b><?php echo number_format($productionOilTotal,2,',','.'); ?></b><em>Total de los pozos mostrados</em></div></div>
 </section>
 
-<div class="zpcInfo"><?php echo icon('gauge'); ?><span><b>Regla:</b> solo se comparan contra PI los pozos cuyos <b>métodos y estados Zafiro</b> están seleccionados. Por defecto <b>No Posee</b> queda desmarcado. Métodos, estados y exclusiones por pozo se guardan por usuario.</span></div>
+<div class="zpcInfo"><?php echo icon('gauge'); ?><span><b>Regla:</b> solo se comparan contra PI los pozos cuyos <b>métodos, estados Zafiro y zonas</b> están seleccionados. Por defecto <b>No Posee</b> queda desmarcado. Métodos, estados, zonas y exclusiones por pozo se guardan por usuario.</span></div>
 
 <section class="zpcGridCard">
   <div class="zpcGridHead">
@@ -144,7 +154,12 @@ function zpc_dt($v){
           <th>En PI</th><th>Fuente PI / Sistema</th><th>Última telemetría</th><th>Producción petróleo</th><th>Producción líquido</th><th>Excluir</th>
         </tr>
         <tr class="zpcTable__filters">
-          <?php if($reportEnabled): ?><th></th><?php endif; ?><?php for($i=0;$i<10;$i++): ?><th><input type="search" data-zpc-col="<?php echo $i; ?>" placeholder="<?php echo $i===0?'Filtrar…':''; ?>"></th><?php endfor; ?><th></th>
+          <?php if($reportEnabled): ?><th></th><?php endif; ?>
+          <th><input type="search" data-zpc-col="0" placeholder="Filtrar…"></th>
+          <th><select data-zpc-col="1"><option value="">Todas</option><?php foreach($batteries as $v): ?><option value="<?php echo zpc_h($v); ?>"><?php echo zpc_h($v); ?></option><?php endforeach; ?></select></th>
+          <th><select data-zpc-col="2"><option value="">Todas</option><?php foreach($zones as $v): ?><option value="<?php echo zpc_h($v); ?>"><?php echo zpc_h($v); ?></option><?php endforeach; ?></select></th>
+          <?php for($i=3;$i<10;$i++): ?><th><input type="search" data-zpc-col="<?php echo $i; ?>"></th><?php endfor; ?>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -227,6 +242,23 @@ function zpc_dt($v){
     </div>
     <small>Los estados destildados quedan fuera de la comparación con PI para tu usuario.</small>
   </section>
+
+  <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_zonas">
+    <div class="zpcMethods__title">Zonas a incluir en el análisis</div>
+    <?php foreach($zoneCounts as $zone=>$count): $checked=isset($selectedZoneMap[zpc_method_key($zone)]); ?>
+    <label class="zpcMethod">
+      <input type="checkbox" value="<?php echo zpc_h($zone); ?>" <?php echo $checked?'checked':''; ?>>
+      <span><?php echo zpc_h($zone); ?></span>
+      <b><?php echo zpc_n($count); ?></b>
+    </label>
+    <?php endforeach; ?>
+    <div class="zpcMethods__actions">
+      <button type="button" class="zstBtn is-ghost" data-zpc-all>Seleccionar todas</button>
+      <button type="button" class="zstBtn is-ghost" data-zpc-none>Limpiar</button>
+      <button type="button" class="zstBtn is-primary" data-zpc-save><?php echo icon('check'); ?> Guardar zonas</button>
+    </div>
+    <small>Las zonas destildadas no se muestran ni participan de la comparación con PI para tu usuario.</small>
+  </section>
   </div>
   </aside>
 </div>
@@ -237,11 +269,12 @@ function zpc_dt($v){
 window.CLEAR_ZPC={
   selectedMethods:<?php echo json_encode(array_values($selectedMethods),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>,
   selectedStates:<?php echo json_encode(array_values($selectedStates),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>,
+  selectedZones:<?php echo json_encode(array_values($selectedZones),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>,
   excludedWells:<?php echo json_encode(array_values($excludedWells),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>
 };
 </script>
 <script src="assets/js/app.js?v=20260824-as1"></script>
-<script src="assets/js/zafiro_pi_comparacion.js?v=20261005-3"></script>
+<script src="assets/js/zafiro_pi_comparacion.js?v=20261006-1"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260901-report-chart-2"></script><?php endif; ?>
 </body>
 </html>
