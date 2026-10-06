@@ -174,6 +174,7 @@ $table=$TELEMETRY['table'];
 $order=$TELEMETRY['order'] ?? ($columns[0] ?? '');
 if($order!==''&&!isset($availableColumns[$order]))$order=$columns[0]??'';
 $rows=[];$error='';$queryMs=0;
+$rowLimit=array_key_exists('row_limit',$TELEMETRY)?max(0,(int)$TELEMETRY['row_limit']):1000;
 $serverSelectFilters=$TELEMETRY['server_select_filters'] ?? [];
 $activeServerFilters=[];
 $serverDisplayNormalizers=[];
@@ -261,7 +262,8 @@ if($db->ok()&&$columns){
   $select=implode(',',array_map('tg_q',$columns));
   $whereSql=$whereParts ? (' WHERE '.implode(' AND ',$whereParts)) : '';
   $fromSql=$sourceSql!==''?'('.$sourceSql.') AS [CLEAR_SOURCE]':'[dbo].'.tg_q($table);
-  $sql='SELECT TOP (1000) '.$select.' FROM '.$fromSql.$whereSql.($order?' ORDER BY '.tg_q($order):'');
+  $topSql=$rowLimit>0?' TOP ('.$rowLimit.')':'';
+  $sql='SELECT'.$topSql.' '.$select.' FROM '.$fromSql.$whereSql.($order?' ORDER BY '.tg_q($order):'');
   $t=microtime(true); $rows=$db->all($sql,$whereParams); $queryMs=round((microtime(true)-$t)*1000,1);
   if(!$rows&&$db->error())$error=tg_clean_error($db->error());
 }elseif(!$columns){$error='La fuente no contiene ninguna de las columnas configuradas.';}else{$error=tg_clean_error($db->error());}
@@ -623,6 +625,8 @@ if(!$usePrecomputedAlarms && $db->ok()){
 }
 
 $batteryCounts=[];$stateCounts=[];$zafiroStateCounts=[];$zafiroMethodCounts=[];$zafiroActiveCounts=[];$generalCounts=[];$commCounts=[];$remoteStopCounts=[];$remoteStopWells=[];$wellCounts=[];$wellsWithAlarms=0;$totalAlarms24h=0;$commFailWells=[];$commWarnWells=[];
+$sourceSummaryColumn=trim((string)($TELEMETRY['source_summary_column'] ?? ''));
+$sourceSummaryCounts=[];
 $wellCol=$TELEMETRY['well_column'] ?? 'POZO'; $batteryCol=$TELEMETRY['battery_column'] ?? 'BATERIA';
 $stateCol=$TELEMETRY['state_column'] ?? 'ESTADO'; $generalCol=$TELEMETRY['general_column'] ?? '';
 $commCol=$TELEMETRY['communication_column'] ?? ''; $commDateCol=$TELEMETRY['communication_date_column'] ?? '';
@@ -638,6 +642,10 @@ foreach($rows as &$r){
     $za=tg_text($r[$zafiroActiveColumn]??''); if($za!=='')$zafiroActiveCounts[$za]=($zafiroActiveCounts[$za]??0)+1;
   }
   if($generalCol!==''){ $g=tg_text($r[$generalCol]??''); if($g!=='')$generalCounts[$g]=($generalCounts[$g]??0)+1; }
+  if($sourceSummaryColumn!==''){
+    $sourceSummaryValue=tg_text($r[$sourceSummaryColumn]??'');
+    if($sourceSummaryValue!=='')$sourceSummaryCounts[$sourceSummaryValue]=($sourceSummaryCounts[$sourceSummaryValue]??0)+1;
+  }
   if($remoteStopEnabled){
     $remoteStopState=tg_remote_stop_label($r[$remoteStopColumn]??'');
     $r[$remoteStopColumn]=$remoteStopState;
@@ -647,7 +655,7 @@ foreach($rows as &$r){
   if($commCol!==''){ $c=tg_comm_label($r[$commCol]??''); $r['__COMUNICACION']=$c; $commCounts[$c]=($commCounts[$c]??0)+1; if($w!==''&&$c==='Sin comunicación')$commFailWells[$w]=1; if($w!==''&&$c==='Demorada')$commWarnWells[$w]=1; }
   elseif($commDateCol!==''){ $c=tg_comm_from_date($r[$commDateCol]??null); $r['__COMUNICACION']=$c; $commCounts[$c]=($commCounts[$c]??0)+1; if($w!==''&&$c==='Sin comunicación')$commFailWells[$w]=1; if($w!==''&&$c==='Demorada')$commWarnWells[$w]=1; }
 }
-unset($r); foreach([$batteryCounts,$stateCounts,$zafiroStateCounts,$zafiroMethodCounts,$zafiroActiveCounts,$generalCounts,$commCounts,$remoteStopCounts] as &$a)ksort($a,SORT_NATURAL|SORT_FLAG_CASE); unset($a);
+unset($r); foreach([$batteryCounts,$stateCounts,$zafiroStateCounts,$zafiroMethodCounts,$zafiroActiveCounts,$generalCounts,$commCounts,$remoteStopCounts,$sourceSummaryCounts] as &$a)ksort($a,SORT_NATURAL|SORT_FLAG_CASE); unset($a);
 
 /* Comentarios centralizados: una sola consulta para toda la página. De este
    modo la grilla, el reporte y Excel comparten el mismo valor sin consultas
@@ -807,10 +815,10 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
 </style></head><body><div class="app"><?php include __DIR__.'/sidebar.php'; ?><main class="main"><?php include __DIR__.'/topbar.php'; ?>
 <div class="tg">
 <?php if($error): ?><div class="tg-error"><?php echo h($error); ?></div><?php endif; ?>
-<div class="tg-hero"><div class="tg-hero__title"><div class="tg-hero__copy"><div class="tg-hero__eyebrow">Telemetría</div><h1><?php echo h($TELEMETRY['title']); ?></h1><p><?php echo h($TELEMETRY['subtitle'] ?? ('Datos de dbo.'.$table)); ?></p><div class="tg-live"><span class="dot"></span><?php echo count($rows); ?> registros</div></div><?php if($heroImage!==''): ?><div class="tg-hero__visual"><img src="<?php echo h($heroImage); ?>?v=3.1.9" alt="<?php echo h($TELEMETRY['title']); ?>"></div><?php endif; ?></div><div class="tg-cards">
+<div class="tg-hero"><div class="tg-hero__title"><div class="tg-hero__copy"><div class="tg-hero__eyebrow">Telemetría</div><h1><?php echo h($TELEMETRY['title']); ?></h1><p><?php echo h($TELEMETRY['subtitle'] ?? ('Datos de dbo.'.$table)); ?></p><div class="tg-live"><span class="dot"></span><?php echo count($rows); ?> filas cargadas</div></div><?php if($heroImage!==''): ?><div class="tg-hero__visual"><img src="<?php echo h($heroImage); ?>?v=3.1.9" alt="<?php echo h($TELEMETRY['title']); ?>"></div><?php endif; ?></div><div class="tg-cards">
   <div class="tg-card total">
     <span class="tg-card__icon"><?php echo icon('monitor'); ?></span>
-    <div class="tg-card__body"><strong><?php echo count($wellCounts); ?></strong><span>Pozos</span></div>
+    <div class="tg-card__body"><strong><?php echo count($wellCounts); ?></strong><span>Pozos únicos</span></div>
   </div>
   <div class="tg-card alarms">
     <span class="tg-card__icon"><?php echo icon('bell'); ?></span>
@@ -822,8 +830,14 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
   </div>
   <div class="tg-card regs">
     <span class="tg-card__icon"><?php echo icon('grid'); ?></span>
-    <div class="tg-card__body"><strong><?php echo count($rows); ?></strong><span>Registros</span></div>
+    <div class="tg-card__body"><strong><?php echo count($rows); ?></strong><span>Filas / registros</span></div>
   </div>
+  <?php if($sourceSummaryCounts): foreach($sourceSummaryCounts as $sourceSummaryLabel=>$sourceSummaryCount): ?>
+  <div class="tg-card regs">
+    <span class="tg-card__icon"><?php echo icon('grid'); ?></span>
+    <div class="tg-card__body"><strong><?php echo (int)$sourceSummaryCount; ?></strong><span><?php echo h($sourceSummaryLabel); ?></span></div>
+  </div>
+  <?php endforeach; endif; ?>
   <?php if($remoteStopEnabled): ?>
   <button type="button" class="tg-card remote-stop" id="tgRemoteStopCard" data-quick-filter="remote-stop">
     <span class="tg-card__icon"><?php echo icon('shield'); ?></span>
