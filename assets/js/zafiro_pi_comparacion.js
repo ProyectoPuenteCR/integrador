@@ -30,10 +30,18 @@
       Array.prototype.slice.call(body.rows).forEach(function(row){
         if(row.cells.length<10)return;
         var ok=true;
-        filters.forEach(function(inp){var q=(inp.value||'').trim().toLowerCase(),idx=parseInt(inp.getAttribute('data-zpc-col'),10);if(q&&row.cells[idx].textContent.toLowerCase().indexOf(q)<0)ok=false;});
+        filters.forEach(function(inp){
+          var q=(inp.value||'').trim().toLowerCase(),idx=parseInt(inp.getAttribute('data-zpc-col'),10);
+          if(!q)return;
+          var cell=(row.cells[idx]&&row.cells[idx].textContent?row.cells[idx].textContent:'').trim().toLowerCase();
+          if(inp.tagName==='SELECT'){if(cell!==q)ok=false;}
+          else if(cell.indexOf(q)<0)ok=false;
+        });
         row.style.display=ok?'':'none';
       });
     }
-    filters.forEach(function(i){i.addEventListener('input',apply);});
+    filters.forEach(function(i){
+      i.addEventListener(i.tagName==='SELECT'?'change':'input',apply);
+    });
   }
 })();
