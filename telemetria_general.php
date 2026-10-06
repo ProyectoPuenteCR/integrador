@@ -6,6 +6,8 @@ $TELEMETRY = [
     'table' => 'TELEMETRIA_POZOS_GENERAL_CACHE',
     'alarm_column' => 'ALM',
     'order' => 'POZO',
+    'row_limit' => 0,
+    'source_summary_column' => 'TIPO',
     'columns' => [
         'POZO',
         'BATERIA',
@@ -40,7 +42,7 @@ $TELEMETRY = [
     'remote_stop_extra_columns' => ['AF-TIPO-DESC','LINEA_ELECTRICA'],
     'persist_filters' => true,
     'select_filter_columns' => ['AF-TIPO-DESC','LINEA_ELECTRICA'],
-    'column_state_version' => '343',
+    'column_state_version' => '344',
     'filter_columns' => ['BATERIA','COMUNICACION','ESTADO'],
     'server_select_filters' => [
         'TIPO' => [
