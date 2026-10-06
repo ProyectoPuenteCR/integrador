@@ -196,17 +196,34 @@ function zpc_selected_states(array $stateCounts)
     return array_values(array_unique($selected));
 }
 
+function zpc_selected_zones(array $rows)
+{
+    $available = zpc_unique($rows, 'zona');
+    $stored = zpc_json_pref('zafiro_pi_zonas', []);
+    if (!$stored) return $available;
+    $map = [];
+    foreach ($available as $z) $map[zpc_method_key($z)] = $z;
+    $selected = [];
+    foreach ($stored as $z) {
+        $k = zpc_method_key($z);
+        if (isset($map[$k])) $selected[] = $map[$k];
+    }
+    return array_values(array_unique($selected));
+}
+
 function zpc_excluded_wells()
 {
     return array_values(array_unique(array_filter(array_map('strval', zpc_json_pref('zafiro_pi_exclusiones', [])))));
 }
 
-function zpc_apply_filters(array $rows, array $selectedMethods, array $selectedStates, array $excludedWells, array $query)
+function zpc_apply_filters(array $rows, array $selectedMethods, array $selectedStates, array $selectedZones, array $excludedWells, array $query)
 {
     $selected = [];
     foreach ($selectedMethods as $m) $selected[zpc_method_key($m)] = true;
     $states = [];
     foreach ($selectedStates as $s) $states[zpc_method_key($s)] = true;
+    $zones = [];
+    foreach ($selectedZones as $z) $zones[zpc_method_key($z)] = true;
     $excluded = [];
     foreach ($excludedWells as $w) $excluded[zpc_norm_pozo($w)] = true;
 
@@ -221,6 +238,7 @@ function zpc_apply_filters(array $rows, array $selectedMethods, array $selectedS
     foreach ($rows as $r) {
         if (!isset($selected[zpc_method_key($r['metodo'])])) continue;
         if (!isset($states[zpc_method_key($r['estado'])])) continue;
+        if (!isset($zones[zpc_method_key($r['zona'])])) continue;
         $isExcluded = isset($excluded[$r['key']]);
         if ($isExcluded && !$showExcluded) continue;
         if ($zone !== '' && strcasecmp($r['zona'], $zone) !== 0) continue;
