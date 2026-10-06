@@ -70,7 +70,13 @@ function zpc_load($db)
     }
 
     $piRows = $db->all(
-        "SELECT POZO,BATERIA,TIPO,COMUNICACION,ESTADO,FECHA_CACHE
+        "SELECT
+             POZO,
+             BATERIA,
+             TIPO,
+             COMUNICACION,
+             ESTADO,
+             COALESCE(ULTIMA_ACTUALIZACION,FECHA_CACHE) AS FECHA_TELEMETRIA
          FROM dbo.TELEMETRIA_POZOS_GENERAL_CACHE
          WHERE POZO IS NOT NULL"
     );
@@ -85,7 +91,7 @@ function zpc_load($db)
         if ($key === '') continue;
         $source = trim((string)($r['TIPO'] ?? ''));
         if ($source === '') $source = 'PI';
-        $fecha = trim((string)($r['FECHA_CACHE'] ?? ''));
+        $fecha = trim((string)($r['FECHA_TELEMETRIA'] ?? ''));
         if (!isset($pi[$key])) {
             $pi[$key] = [
                 'pozo' => (string)($r['POZO'] ?? ''),
