@@ -10,8 +10,9 @@ if(!$db->ok() || !zpc_ready($db)){http_response_code(503);exit('Datos no disponi
 $data=zpc_load($db);
 $selected=zpc_selected_methods($data['methods']);
 $selectedStates=zpc_selected_states($data['states']);
+$selectedZones=zpc_selected_zones($data['rows']);
 $excluded=zpc_excluded_wells();
-$rows=zpc_apply_filters($data['rows'],$selected,$selectedStates,$excluded,$_GET);
+$rows=zpc_apply_filters($data['rows'],$selected,$selectedStates,$selectedZones,$excluded,$_GET);
 header('Content-Type: text/csv; charset=UTF-8');
 header('Content-Disposition: attachment; filename="zafiro_vs_pi_'.date('Ymd_His').'.csv"');
 echo "\xEF\xBB\xBF";
