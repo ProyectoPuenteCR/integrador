@@ -5,10 +5,23 @@
 .zpcSideColumn{min-width:0;align-self:start}
 .zpcTop{display:block}
 .zpcComparePanels{width:100%;position:sticky;top:82px;align-self:start}
-.zpcKpis{grid-template-columns:repeat(5,minmax(0,1fr));margin:0}
-.zpcKpi.is-oil>span{background:#eef4dc;color:#657a18}
+.zpcKpis{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}
+.zpcKpi.is-oil>span{background:#eef4dc;color:#657a18}.zpcKpi.is-liquid>span{background:#e8f3ff;color:#176ec4}
 .zpcInfo{margin-bottom:0}
 .zpcGridCard{margin:0}
-@media(max-width:1400px){.zpcKpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:1200px){.zpcLayout{grid-template-columns:1fr}.zpcComparePanels{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.zpcKpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1550px){.zpcLayout{grid-template-columns:1fr}.zpcComparePanels{position:static;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.zpcKpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1200px){.zpcComparePanels{grid-template-columns:repeat(2,minmax(0,1fr))}.zpcKpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.zpcComparePanels{grid-template-columns:1fr}.zpcKpis{grid-template-columns:1fr}}
+
+/* Evita solapamientos en capturas/reportes y mantiene los filtros dentro de su panel. */
+.zpcFilters{min-width:0}
+.zpcFilters>*{min-width:0}
+.zpcFilters__actions{justify-content:flex-start}
+.zpcFilters__actions .zstBtn{white-space:nowrap}
+@media print{
+  .zpcLayout{display:block}
+  .zpcSideColumn{margin-top:14px}
+  .zpcComparePanels{position:static!important;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+  .zpcFilters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .zpcKpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
