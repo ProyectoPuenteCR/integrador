@@ -35,8 +35,10 @@ if ($data['ok']) {
 }
 $rows = $data['ok'] ? zpc_apply_filters($data['rows'], $selectedMethods, $selectedStates, $selectedZones, $excludedWells, $_GET) : [];
 $productionOilTotal = 0.0;
-foreach ($rows as $rowOil) {
-    if ($rowOil['petroleo'] !== null) $productionOilTotal += (float)$rowOil['petroleo'];
+$productionLiquidTotal = 0.0;
+foreach ($rows as $rowProduction) {
+    if ($rowProduction['petroleo'] !== null) $productionOilTotal += (float)$rowProduction['petroleo'];
+    if ($rowProduction['liquido'] !== null) $productionLiquidTotal += (float)$rowProduction['liquido'];
 }
 $zones = $data['ok'] ? zpc_unique($data['rows'], 'zona') : [];
 $batteries = $data['ok'] ? zpc_unique($data['rows'], 'instalacion') : [];
@@ -71,7 +73,7 @@ function zpc_dt($v){
 <title>Zafiro vs PI · CLEAR Plataforma</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20261005-zpc1">
 <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
-<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261005-5">
+<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261007-1">
 <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
@@ -135,7 +137,8 @@ function zpc_dt($v){
   <div class="zpcKpi is-green"><span><?php echo icon('check'); ?></span><div><small>Encontrados en PI</small><b><?php echo zpc_n($foundCount); ?></b><em><?php echo count($rowsAllSelected)?number_format($foundCount*100/count($rowsAllSelected),1,',','.'):'0,0'; ?> %</em></div></div>
   <div class="zpcKpi is-red"><span><?php echo icon('signal-off'); ?></span><div><small>No encontrados en PI</small><b><?php echo zpc_n($missingCount); ?></b><em><?php echo count($rowsAllSelected)?number_format($missingCount*100/count($rowsAllSelected),1,',','.'):'0,0'; ?> %</em></div></div>
   <div class="zpcKpi is-amber"><span><?php echo icon('history'); ?></span><div><small>Métodos excluidos</small><b><?php echo zpc_n($excludedMethodCount); ?></b><em>Pozos fuera del análisis</em></div></div>
-  <div class="zpcKpi is-oil"><span><?php echo icon('oil'); ?></span><div><small>Producción petróleo</small><b><?php echo number_format($productionOilTotal,2,',','.'); ?></b><em>Total de los pozos mostrados</em></div></div>
+  <div class="zpcKpi is-oil"><span><?php echo icon('oil'); ?></span><div><small>Producción neta</small><b><?php echo number_format($productionOilTotal,2,',','.'); ?></b><em>Petróleo · según filtros aplicados</em></div></div>
+  <div class="zpcKpi is-liquid"><span><?php echo icon('gauge'); ?></span><div><small>Producción bruta</small><b><?php echo number_format($productionLiquidTotal,2,',','.'); ?></b><em>Líquido · según filtros aplicados</em></div></div>
 </section>
 
 <div class="zpcInfo"><?php echo icon('gauge'); ?><span><b>Regla:</b> solo se comparan contra PI los pozos cuyos <b>métodos, estados Zafiro y zonas</b> están seleccionados. Por defecto <b>No Posee</b> queda desmarcado. Métodos, estados, zonas y exclusiones por pozo se guardan por usuario.</span></div>
