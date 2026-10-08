@@ -4,6 +4,10 @@
    MOTIVO = "Comentario alarma centralizado" son compartidos por todas las
    grillas; los comentarios históricos por evento se conservan como respaldo. */
 
+/* Identidad del autor en texto para compatibilidad con la tabla actual, sin migración SQL. */
+function clear_comment_author($text) { return preg_match('/^Comentario realizado por: ([^\\r\\n]+)\\r?\\n/u', (string)$text, $m) ? trim($m[1]) : ''; }
+function clear_comment_body($text) { return preg_replace('/^Comentario realizado por: [^\\r\\n]+\\r?\\n(?:\\r?\\n)?/u', '', (string)$text); }
+function clear_comment_with_author($comment,$author) { return 'Comentario realizado por: '.trim((string)$author)."\n\n".clear_comment_body($comment); }
 function clear_alarm_comment_reason()
 {
     return 'Comentario alarma centralizado';
@@ -139,6 +143,9 @@ function clear_alarm_comment_upsert_sql(array $payload)
     $subject = trim((string)($payload['subject'] ?? $payload['tag'] ?? ''));
     $comment = trim((string)($payload['comment'] ?? ''));
     $user = trim((string)($payload['user'] ?? 'CLEAR'));
+    $author = trim((string)($payload['author'] ?? ''));
+    if (strlen($author)<3 || strlen($author)>120) return [false,'El nombre y apellido del autor es obligatorio.',null];
+    $comment = clear_comment_with_author($comment,$author);
     if ($subject === '' || $comment === '') return [false, 'La alarma o entidad y el comentario son obligatorios.', null];
     $subject = substr($subject, 0, 255);
     $reason = clear_alarm_comment_reason();
@@ -238,6 +245,9 @@ function clear_alarm_event_comment_upsert_sql(array $payload)
     $timestamp = clear_alarm_event_normalize_datetime($payload['timestamp'] ?? '');
     $comment = trim((string)($payload['comment'] ?? ''));
     $user = trim((string)($payload['user'] ?? 'CLEAR'));
+    $author = trim((string)($payload['author'] ?? ''));
+    if (strlen($author)<3 || strlen($author)>120) return [false,'El nombre y apellido del autor es obligatorio.',null];
+    $comment = clear_comment_with_author($comment,$author);
     if ($tag === '' || $timestamp === '' || $comment === '') {
         return [false, 'TAG, fecha y comentario son obligatorios.'];
     }
