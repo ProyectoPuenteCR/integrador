@@ -25,3 +25,71 @@
   .zpcFilters{grid-template-columns:repeat(2,minmax(0,1fr))}
   .zpcKpis{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+
+/* Responsive Zafiro/PI 2026-10-08: los paneles nunca comprimen los filtros. */
+.zpcLayout{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) minmax(300px, 32%);
+  grid-template-areas:"filters side" "kpis kpis" "info info" "grid grid";
+  gap:14px;
+  align-items:start;
+  min-width:0;
+}
+.zpcMainColumn{display:contents}
+.zpcTop{grid-area:filters;min-width:0}
+.zpcSideColumn{grid-area:side;min-width:0}
+.zpcKpis{grid-area:kpis;grid-template-columns:repeat(3,minmax(0,1fr))}
+.zpcInfo{grid-area:info;min-width:0}
+.zpcGridCard{grid-area:grid;min-width:0}
+.zpcComparePanels{
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  position:static;
+  gap:14px;
+  min-width:0;
+}
+.zpcFilters{
+  min-width:0;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-content:start;
+  gap:14px;
+}
+.zpcFilters label,.zpcFilters label>span,.zpcFilters select,.zpcFilters input[type=search]{min-width:0;max-width:100%}
+.zpcFilters__search{grid-column:1/2}
+.zpcCheckLine{grid-column:2/3;align-self:end;min-height:38px;margin:0;white-space:normal}
+.zpcFilters__actions{grid-column:1/-1;justify-content:flex-start;gap:8px;border-top:1px solid #e5edf1;padding-top:12px}
+.zpcFilters__actions .zstBtn{max-width:100%;min-width:0;white-space:normal;text-align:center}
+.zpcMethod{grid-template-columns:20px minmax(0,1fr) auto}
+.zpcMethod span{min-width:0;overflow-wrap:anywhere}
+.zpcMethods__actions .zstBtn{white-space:normal}
+.zpcHead__title{min-width:0}
+.zpcHead__title>div{min-width:0}
+.zpcSync{flex-shrink:0}
+@media(max-width:1250px){
+  .zpcLayout{grid-template-columns:minmax(0,1fr);grid-template-areas:"filters" "side" "kpis" "info" "grid"}
+  .zpcComparePanels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .zpcKpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .zpcHead{flex-wrap:wrap}
+}
+@media(max-width:900px){
+  .zpcComparePanels{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .zpcKpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .zpcHead{flex-direction:column}
+  .zpcSync{max-width:100%;flex-wrap:wrap}
+}
+@media(max-width:640px){
+  .zpcFilters{grid-template-columns:minmax(0,1fr)}
+  .zpcFilters__search,.zpcCheckLine{grid-column:1}
+  .zpcComparePanels,.zpcKpis{grid-template-columns:minmax(0,1fr)}
+  .zpcFilters__actions .zstBtn{flex:1 1 135px}
+  .zpcHead h1{font-size:21px}
+  .zpcGridHead{flex-wrap:wrap;gap:8px}
+}
+@media print{
+  .zpcLayout{display:block}
+  .zpcMainColumn{display:block}
+  .zpcSideColumn{margin:12px 0}
+  .zpcComparePanels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+}
