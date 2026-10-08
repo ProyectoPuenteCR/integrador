@@ -98,7 +98,9 @@ function clear_alarm_actions_modal()
       </div>
       <div class="alarmQuickComment__body">
         <div class="alarmQuickComment__previous" id="alarmQuickCommentPrevious" hidden></div>
-        <label for="alarmQuickCommentText">Comentario</label>
+        <label for="alarmQuickCommentAuthor">Comentario realizado por (nombre y apellido) *</label>
+        <input id="alarmQuickCommentAuthor" type="text" maxlength="120" autocomplete="name" placeholder="Nombre y apellido" <?php echo $canCreate ? 'required' : 'readonly'; ?> style="width:100%;box-sizing:border-box;min-height:38px;margin:5px 0 12px;padding:8px;border:1px solid #cbd9e0;border-radius:8px;background:var(--bg-card,#fff);color:inherit">
+        <label for="alarmQuickCommentText">Comentario *</label>
         <textarea id="alarmQuickCommentText" maxlength="2000" placeholder="Escribí una observación sobre esta alarma..."<?php echo $canCreate ? '' : ' readonly'; ?>></textarea>
         <div class="alarmQuickComment__status" id="alarmQuickCommentStatus" hidden></div>
       </div>
