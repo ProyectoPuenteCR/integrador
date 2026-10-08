@@ -638,7 +638,7 @@ window.CLEAR_POZOS_ALARMAS_EXPORT_URL=<?php echo json_encode($exportUrl,JSON_UNE
 window.CLEAR_POZOS_ALARMAS_STORAGE_KEY=<?php echo json_encode($historyMode ? 'clear:pozosTodasAlarmas:visibleColumns:v1' : 'clear:pozosAlarmas24:visibleColumns:v3'); ?>;
 </script>
 <script src="assets/js/app.js?v=20260716-pozos3"></script>
-<script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
+<script src="assets/js/alarm_actions.js?v=20261008-author-1"></script>
 <script src="assets/js/pozos_alarmas24.js?v=20260807-history1"></script>
 </body>
 </html>
