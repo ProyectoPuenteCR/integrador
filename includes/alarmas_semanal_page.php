@@ -411,7 +411,7 @@ window.CLEAR_WEEKLY_ALARMS = <?php echo json_encode([
 </script>
 <script src="assets/js/chart.umd.js"></script>
 <script src="assets/js/app.js?v=20260924-columns-1"></script>
-<script src="assets/js/alarm_actions.js?v=20260826-central-1"></script>
+<script src="assets/js/alarm_actions.js?v=20261008-author-1"></script>
 <script src="assets/js/alarmas_semanal.js?v=20260826-perf-safe-2"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260901-report-chart-2"></script><?php endif; ?>
 <?php else: ?><script src="assets/js/app.js?v=20260924-columns-1"></script><?php endif; ?>
