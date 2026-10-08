@@ -73,7 +73,7 @@ function zpc_dt($v){
 <title>Zafiro vs PI · CLEAR Plataforma</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20261005-zpc1">
 <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
-<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261007-1">
+<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261008-responsive-1">
 <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
