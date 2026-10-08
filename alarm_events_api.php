@@ -123,6 +123,8 @@ if ($action === 'save_event_comment') {
     $tag = clean($_POST['tag'] ?? '');
     $timestamp = clean($_POST['timestamp'] ?? '', 100);
     $comment = trim((string)($_POST['comment'] ?? ''));
+    $author = trim((string)($_POST['author'] ?? ''));
+    if (strlen($author) < 3 || strlen($author) > 120) out(['ok'=>false,'error'=>'El nombre y apellido de quien realiza el comentario es obligatorio.'],400);
     if ($tag === '' || $timestamp === '' || $comment === '') {
         out(['ok'=>false,'error'=>'TAG, fecha de la alarma y comentario son obligatorios.'],400);
     }
@@ -130,6 +132,7 @@ if ($action === 'save_event_comment') {
         'tag'=>$tag,
         'timestamp'=>$timestamp,
         'comment'=>$comment,
+        'author'=>$author,
         'user'=>auth_user() ?: 'CLEAR',
     ]);
     if (!$ok) out(['ok'=>false,'error'=>'No se pudo guardar el comentario de la alarma. '.$error],500);
@@ -150,6 +153,8 @@ if ($action === 'save_comment') {
     $tag = clean($_POST['tag'] ?? '');
     $timestamp = clean($_POST['timestamp'] ?? '', 100);
     $comment = trim((string)($_POST['comment'] ?? ''));
+    $author = trim((string)($_POST['author'] ?? ''));
+    if (strlen($author) < 3 || strlen($author) > 120) out(['ok'=>false,'error'=>'El nombre y apellido de quien realiza el comentario es obligatorio.'],400);
 
     if ($key === '' || $subject === '' || $comment === '') {
         out(['ok' => false, 'error' => 'El comentario y la alarma o entidad son obligatorios.'], 400);
@@ -161,6 +166,7 @@ if ($action === 'save_comment') {
         'tag' => $tag,
         'timestamp' => $timestamp,
         'comment' => $comment,
+        'author' => $author,
         'user' => auth_user() ?: 'CLEAR',
     ]);
 
@@ -193,7 +199,8 @@ if ($action === 'get_comment') {
     out([
         'ok' => true,
         'found' => !empty($comment),
-        'comment' => (string)row_value_ci($comment, 'COMENTARIO'),
+        'comment' => clear_comment_body((string)row_value_ci($comment, 'COMENTARIO')),
+        'author' => clear_comment_author((string)row_value_ci($comment, 'COMENTARIO')),
         'user' => (string)row_value_ci($comment, 'USUARIO_CARGA'),
         'created_at' => (string)row_value_ci($comment, 'FECHA_CARGA'),
         'updated_at' => (string)row_value_ci($comment, 'FECHA_MODIFICACION', row_value_ci($comment, 'FECHA_CARGA')),
