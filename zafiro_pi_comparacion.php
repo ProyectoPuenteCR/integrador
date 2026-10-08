@@ -73,7 +73,7 @@ function zpc_dt($v){
 <title>Zafiro vs PI · CLEAR Plataforma</title>
 <link rel="stylesheet" href="assets/css/app.css?v=20261005-zpc1">
 <link rel="stylesheet" href="assets/css/sin_telemetria_zafiro.css?v=20260922-2">
-<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261008-responsive-1">
+<link rel="stylesheet" href="assets/css/zafiro_pi_comparacion.css?v=20261008-modal-2">
 <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-report-common-1"><?php endif; ?>
 </head>
 <body>
@@ -119,6 +119,7 @@ function zpc_dt($v){
     <label class="zpcFilters__search"><span>Buscar pozo</span><input type="search" name="q" value="<?php echo zpc_h($_GET['q']??''); ?>" placeholder="Código de pozo o batería"></label>
     <label class="zpcCheckLine"><input type="checkbox" name="ver_excluidos" value="1" <?php echo !empty($_GET['ver_excluidos'])?'checked':''; ?>> Mostrar pozos excluidos</label>
     <div class="zpcFilters__actions">
+      <button type="button" class="zstBtn zpcConfigButton" data-zpc-config-open aria-haspopup="dialog" aria-controls="zpcConfigDialog"><?php echo icon('settings'); ?> CONFIGURACIONES</button>
       <button class="zstBtn is-primary" type="submit"><?php echo icon('search'); ?> Aplicar</button>
       <a class="zstBtn is-ghost" href="zafiro_pi_comparacion.php">Limpiar</a>
       <a class="zstBtn is-ghost" href="zafiro_pi_comparacion_export.php?<?php echo zpc_h(http_build_query($_GET)); ?>"><?php echo icon('download'); ?> Exportar Excel</a>
@@ -210,7 +211,12 @@ function zpc_dt($v){
   </div>
 </section>
   </div>
-  <aside class="zpcSideColumn">
+  </div>
+  <div class="zpcConfigOverlay" id="zpcConfigDialog" data-zpc-config-modal role="dialog" aria-modal="true" aria-labelledby="zpcConfigTitle" hidden>
+    <div class="zpcConfigBackdrop" data-zpc-config-close></div>
+    <div class="zpcConfigDialog" tabindex="-1">
+      <div class="zpcConfigHeader"><div><h2 id="zpcConfigTitle">Configuraciones de comparación</h2><p>Seleccioná métodos, estados y zonas de Zafiro. Cada sección conserva su guardado por usuario.</p></div><button type="button" class="zpcConfigClose" data-zpc-config-close aria-label="Cerrar configuraciones">&times;</button></div>
+      <div class="zpcConfigBody">
   <div class="zpcComparePanels">
   <section class="zpcMethods" data-zpc-pref-panel data-zpc-pref-key="zafiro_pi_metodos">
     <div class="zpcMethods__title">Métodos Zafiro a comparar</div>
@@ -263,8 +269,10 @@ function zpc_dt($v){
     <small>Las zonas destildadas no se muestran ni participan de la comparación con PI para tu usuario.</small>
   </section>
   </div>
-  </aside>
-</div>
+      </div>
+      <div class="zpcConfigFooter"><button type="button" class="zstBtn is-ghost" data-zpc-config-close>Cerrar</button></div>
+    </div>
+  </div>
 <?php endif; ?>
 </main>
 </div>
@@ -277,7 +285,7 @@ window.CLEAR_ZPC={
 };
 </script>
 <script src="assets/js/app.js?v=20260824-as1"></script>
-<script src="assets/js/zafiro_pi_comparacion.js?v=20261006-1"></script>
+<script src="assets/js/zafiro_pi_comparacion.js?v=20261008-modal-2"></script>
 <?php if($reportEnabled): ?><script src="assets/js/novedades_semanales.js?v=20260901-report-chart-2"></script><?php endif; ?>
 </body>
 </html>
