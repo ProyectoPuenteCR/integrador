@@ -41,6 +41,7 @@
   var saveBtn=document.getElementById('alarmQuickCommentSave');
   var meta=document.getElementById('alarmQuickCommentMeta');
   var textarea=document.getElementById('alarmQuickCommentText');
+  var authorInput=document.getElementById('alarmQuickCommentAuthor');
   var statusBox=document.getElementById('alarmQuickCommentStatus');
   var previous=document.getElementById('alarmQuickCommentPrevious');
   var activeButton=null;
@@ -87,6 +88,7 @@
     if(current.value)metaParts.push(current.value);
     meta.textContent=metaParts.filter(Boolean).join(' · ');
     textarea.value='';textarea.readOnly=!current.can_create;
+    if(authorInput){authorInput.value='';authorInput.readOnly=!current.can_create;}
     if(saveBtn)saveBtn.hidden=!current.can_create;
     if(previous){previous.hidden=true;previous.textContent='';}
     setStatus('Cargando comentario…','loading');
@@ -99,6 +101,7 @@
       .then(function(response){return response.json().then(function(data){if(!response.ok)throw new Error(data.error||'No se pudo cargar');return data;});})
       .then(function(data){
         textarea.value=data.comment||'';
+        if(authorInput)authorInput.value=data.author||'';
         button.classList.toggle('has-comment',!!data.comment);
         window.dispatchEvent(new CustomEvent('clear-alarm-comment-updated',{detail:{subject:button.getAttribute('data-subject')||button.getAttribute('data-tag')||'',comment:data.comment||''}}));
         if(data.comment&&previous){
@@ -115,11 +118,13 @@
     var comment=textarea.value.trim();
     var savedSubject=current.subject||current.tag||'';
     if(!comment){setStatus('Escribí un comentario antes de guardar.','error');return;}
+    var author=authorInput?authorInput.value.trim():'';
+    if(author.length<3){setStatus('Ingresá el nombre y apellido de quien realiza el comentario.','error');if(authorInput)authorInput.focus();return;}
     var data=new FormData();
     data.append('action','save_comment');data.append('event_key',current.event_key||'alarm-event');
     data.append('subject',current.subject);data.append('context',current.context);
     data.append('tag',current.tag);data.append('timestamp',current.timestamp);data.append('value',current.value);
-    data.append('description',current.description);data.append('comment',comment);
+    data.append('description',current.description);data.append('comment',comment);data.append('author',author);
     if(saveBtn)saveBtn.disabled=true;
     setStatus('Guardando comentario…','loading');
     fetch('alarm_events_api.php',{method:'POST',body:data,headers:{'X-Requested-With':'XMLHttpRequest'}})
@@ -127,7 +132,7 @@
       .then(function(payload){
         if(activeButton)activeButton.classList.add('has-comment');
         window.dispatchEvent(new CustomEvent('clear-alarm-comment-updated',{detail:{subject:savedSubject,comment:comment}}));
-        if(previous){previous.textContent='Usuario: '+(payload.user||'—')+' · Guardado: '+formatDate(payload.saved_at||'');previous.hidden=false;}
+        if(previous){previous.textContent='Comentario realizado por: '+author+' · Usuario: '+(payload.user||'—')+' · Guardado: '+formatDate(payload.saved_at||'');previous.hidden=false;}
         setStatus(payload.message||'Comentario guardado.','ok');
       })
       .catch(function(error){setStatus(error.message||'No se pudo guardar el comentario.','error');})
