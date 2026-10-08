@@ -93,3 +93,30 @@
   .zpcSideColumn{margin:12px 0}
   .zpcComparePanels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+/* Zafiro vs PI: configuración modal y grilla con selección visible. */
+.zpcLayout{display:block;min-width:0}
+.zpcMainColumn{display:flex;flex-direction:column;gap:14px;min-width:0}
+.zpcTop,.zpcKpis,.zpcInfo,.zpcGridCard{grid-area:auto}
+.zpcConfigButton{background:#e9edf9!important;color:#374d99!important;border:1px solid #abb9e5!important;font-weight:800!important;letter-spacing:.025em}
+.zpcConfigButton:hover{background:#dce5fb!important}
+.zpcConfigOverlay[hidden]{display:none!important}
+.zpcConfigOverlay{position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px}
+.zpcConfigBackdrop{position:absolute;inset:0;background:rgba(8,28,42,.58)}
+.zpcConfigDialog{position:relative;z-index:1;display:flex;flex-direction:column;width:min(1080px,100%);max-height:min(90vh,900px);background:var(--bg-card,#fff);color:inherit;border-radius:16px;box-shadow:0 18px 55px rgba(0,0,0,.27);overflow:hidden}
+.zpcConfigHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid #dce6ed}
+.zpcConfigHeader h2{margin:0 0 5px;font-size:20px;color:#174357}
+.zpcConfigHeader p{margin:0;font-size:12px;color:#6a8291}
+.zpcConfigClose{border:1px solid #cfdae2;background:transparent;color:inherit;font-size:25px;line-height:1;width:34px;height:34px;border-radius:9px;cursor:pointer}
+.zpcConfigBody{overflow:auto;padding:20px 24px;min-height:0}
+.zpcConfigBody .zpcComparePanels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;position:static;width:100%;align-items:start}
+.zpcConfigBody .zpcMethods{width:100%;min-width:0}
+.zpcConfigFooter{display:flex;justify-content:flex-end;padding:12px 24px;border-top:1px solid #dce6ed}
+.zpcTable tbody tr.is-row-selected>td{background:#dceffc!important;border-top:1px solid #a3d5f4;border-bottom:1px solid #a3d5f4}
+.zpcTable tbody tr.is-row-selected>td:first-child{box-shadow:inset 4px 0 #2187c4}
+.zpcTable tbody tr.is-row-selected:hover>td{background:#d1e8fa!important}
+html[data-theme="dark"] .zpcConfigHeader h2{color:#dcecf6}
+html[data-theme="dark"] .zpcTable tbody tr.is-row-selected>td{background:#244b62!important;border-color:#377b9e}
+@media(max-width:900px){.zpcConfigBody .zpcComparePanels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.zpcConfigOverlay{padding:8px}.zpcConfigBody{padding:12px}.zpcConfigHeader{padding:14px}.zpcConfigBody .zpcComparePanels{grid-template-columns:1fr}}
+@media print{.zpcConfigOverlay{display:none!important}.zpcMainColumn{display:block}.zpcKpis{margin:12px 0}.zpcInfo{margin-bottom:12px}}
