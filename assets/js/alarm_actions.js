@@ -109,7 +109,7 @@
           previous.textContent=detail.join(' · ')||'Comentario cargado';previous.hidden=false;
         }
         setStatus(data.comment?'Comentario central cargado.':'Todavía no hay comentarios para esta alarma o entidad.',data.comment?'ok':'');
-        if(current.can_create)textarea.focus();
+        if(current&&current.can_create)textarea.focus();
       })
       .catch(function(error){setStatus(error.message||'No se pudo cargar el comentario.','error');});
   }
@@ -118,8 +118,9 @@
     var comment=textarea.value.trim();
     var savedSubject=current.subject||current.tag||'';
     if(!comment){setStatus('Escribí un comentario antes de guardar.','error');return;}
-    var author=authorInput?authorInput.value.trim():'';
-    if(author.length<3){setStatus('Ingresá el nombre y apellido de quien realiza el comentario.','error');if(authorInput)authorInput.focus();return;}
+    var authorField=modal ? modal.querySelector('#alarmQuickCommentAuthor') : null;
+    var author=authorField ? authorField.value.replace(/\s+/g,' ').trim() : '';
+    if(author.length<3){setStatus('Ingresá el nombre y apellido de quien realiza el comentario.','error');if(authorField)authorField.focus();return;}
     var data=new FormData();
     data.append('action','save_comment');data.append('event_key',current.event_key||'alarm-event');
     data.append('subject',current.subject);data.append('context',current.context);
