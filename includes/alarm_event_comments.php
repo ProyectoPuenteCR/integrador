@@ -156,11 +156,13 @@ function clear_alarm_comment_upsert_sql(array $payload)
         [$subject, $reason]
     );
     if ($existingId !== null && $existingId !== '') {
-        $ok = $db->execute(
-            "UPDATE dbo.FIXALARMS_COMENTARIOS SET COMENTARIO=?,USUARIO_CARGA=?," .
-            "FECHA_MODIFICACION=GETDATE(),ACTIVO=1 WHERE ID=?",
-            [$comment, $user, (int)$existingId]
-        );
+        // Una edición debe conservar la versión anterior en la auditoría.
+        if ((int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.SP_CLEAR_COMENTARIO_CAMBIAR',N'P') IS NULL THEN 0 ELSE 1 END") !== 1)
+            return [false, 'Instalar SQL/CLEAR_COMENTARIOS_HISTORIAL_20261009.sql antes de editar.', (int)$existingId];
+        $previous = $db->scalar("SELECT COMENTARIO FROM dbo.FIXALARMS_COMENTARIOS WHERE ID=? AND ACTIVO=1",[(int)$existingId]);
+        $result = $db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
+           ['alarmas',(int)$existingId,'EDITAR',$comment,$user,(string)$previous]);
+        $ok = !empty($result) && (int)($result[0]['OK'] ?? 0) === 1;
         return [$ok, $ok ? '' : $db->error(), (int)$existingId];
     }
 
@@ -261,12 +263,12 @@ function clear_alarm_event_comment_upsert_sql(array $payload)
     );
 
     if ($existingId !== null && $existingId !== '') {
-        $ok = $db->execute(
-            "UPDATE dbo.FIXALARMS_COMENTARIOS SET " .
-            "COMENTARIO = ?, USUARIO_CARGA = ?, FECHA_MODIFICACION = GETDATE(), ACTIVO = 1 " .
-            "WHERE ID = ?",
-            [$comment, $user, (int)$existingId]
-        );
+        if ((int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.SP_CLEAR_COMENTARIO_CAMBIAR',N'P') IS NULL THEN 0 ELSE 1 END") !== 1)
+            return [false, 'Instalar SQL/CLEAR_COMENTARIOS_HISTORIAL_20261009.sql antes de editar.', (int)$existingId];
+        $previous = $db->scalar("SELECT COMENTARIO FROM dbo.FIXALARMS_COMENTARIOS WHERE ID=? AND ACTIVO=1",[(int)$existingId]);
+        $result = $db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
+           ['alarmas',(int)$existingId,'EDITAR',$comment,$user,(string)$previous]);
+        $ok = !empty($result) && (int)($result[0]['OK'] ?? 0) === 1;
         return [$ok, $ok ? '' : $db->error(), (int)$existingId];
     }
 
