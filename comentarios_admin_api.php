@@ -36,11 +36,11 @@ if(!in_array($action,['EDITAR','ELIMINAR'],true))cc_response(['ok'=>false,'error
 $comment=trim((string)($_POST['comment']??''));
 $previous=(string)($_POST['previous']??'');
 if($action==='EDITAR'&&($comment===''||strlen($comment)>20000))cc_response(['ok'=>false,'error'=>'Comentario obligatorio (máximo 20000 caracteres)'],400);
-$result=$db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
+$result=$db->all("EXEC dbo.CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
 [$origin,$id,$action,$comment,auth_user(),$previous]);
 if(!$result|| (int)($result[0]['OK']??0)!==1){
  $sqlError=$db->error();$database=(string)$db->scalar("SELECT DB_NAME()");
- cc_response(['ok'=>false,'error'=>'No se guardó el cambio en '.($database?:'la base de datos').'. Error SQL: '.($sqlError?:'revisá permisos EXECUTE sobre dbo.SP_CLEAR_COMENTARIO_CAMBIAR')],409);
+ cc_response(['ok'=>false,'error'=>'No se guardó el cambio en '.($database?:'la base de datos').'. Error SQL: '.($sqlError?:'revisá permisos EXECUTE sobre dbo.CLEAR_COMENTARIO_CAMBIAR')],409);
 }
 audit_log($action==='EDITAR'?'COMENTARIO_EDITADO':'COMENTARIO_ELIMINADO','comentarios',$origin.' #'.$id);
 cc_response(['ok'=>true,'message'=>$action==='EDITAR'?'Comentario actualizado; versión anterior guardada.':'Comentario eliminado del listado; historial conservado.']);
