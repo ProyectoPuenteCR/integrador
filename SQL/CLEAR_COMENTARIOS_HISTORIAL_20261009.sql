@@ -41,7 +41,13 @@ BEGIN
   EXEC sp_executesql @Sql,N'@Id bigint,@Anterior nvarchar(max) OUTPUT,@Existe int OUTPUT',
       @Id=@Id,@Anterior=@Anterior OUTPUT,@Existe=@Existe OUTPUT;
   IF @Existe=0 THROW 51004,N'Comentario inexistente o eliminado',1;
-  IF ISNULL(@Anterior,N'') COLLATE DATABASE_DEFAULT <> ISNULL(@Esperado,N'') COLLATE DATABASE_DEFAULT
+  /* La pantalla ya consulta la versión vigente antes de solicitar ELIMINAR.
+     Para eliminación lógica auditamos el texto real bajo UPDLOCK, evitando falsos
+     conflictos de conversión y saltos de línea con COM/ADODB.
+     Para EDICION mantenemos control optimista de texto normalizado. */
+  IF @Accion=N'EDITAR' AND
+     REPLACE(REPLACE(ISNULL(@Anterior,N''),NCHAR(13)+NCHAR(10),NCHAR(10)),NCHAR(13),NCHAR(10)) COLLATE DATABASE_DEFAULT <>
+     REPLACE(REPLACE(ISNULL(@Esperado,N''),NCHAR(13)+NCHAR(10),NCHAR(10)),NCHAR(13),NCHAR(10)) COLLATE DATABASE_DEFAULT
     THROW 51005,N'El comentario fue actualizado por otro usuario. Recargá la pantalla.',1;
   IF @Accion=N'EDITAR' AND @Anterior COLLATE DATABASE_DEFAULT = @Texto COLLATE DATABASE_DEFAULT
     THROW 51006,N'No hay cambios para guardar',1;
