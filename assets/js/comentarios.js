@@ -45,7 +45,25 @@
   });
   deleteBtn.addEventListener('click',function(){
     if(!current||!current._canDelete||busy)return;
-    if(confirm('¿Eliminar este comentario del registro operativo? El historial será conservado para auditoría.'))request('ELIMINAR','');
+    var target=current,params=new URLSearchParams({origin:target._origin,id:String(target._id),mode:'current'});
+    deleteBtn.disabled=true;
+    fetch('comentarios_admin_api.php?'+params.toString(),{cache:'no-store'})
+      .then(function(response){return response.json().then(function(data){if(!response.ok||!data.ok)throw new Error(data.error||'No se pudo consultar el comentario');return data;});})
+      .then(function(data){
+        if(current!==target)return;
+        var latest=String(data.comment||'');
+        if(latest!==String(target.Comentario||'')){
+          alert('Este comentario cambió desde que se abrió la pantalla. Se mostrará la versión actual. Revisala antes de confirmar la eliminación.');
+          target.Comentario=latest;
+          var item=body.querySelector('.commentsDetail--comment div');
+          if(item)item.textContent=latest;
+          if(selectedRow)selectedRow.setAttribute('data-comment-details',JSON.stringify(target));
+          return;
+        }
+        if(confirm('¿Eliminar este comentario del registro operativo? Se conservará el texto anterior y el usuario en el historial.'))request('ELIMINAR','');
+      })
+      .catch(function(err){alert(err.message||'No se pudo verificar la versión del comentario');})
+      .finally(function(){deleteBtn.disabled=false;});
   });
   historyBtn.addEventListener('click',function(){
     if(!current)return;historyBox.hidden=false;historyBox.textContent='Cargando historial…';
