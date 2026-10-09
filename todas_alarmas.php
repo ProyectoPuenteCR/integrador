@@ -408,7 +408,7 @@ $hasFilters = $tagSearch !== '' || $descSearch !== '' || $dateFrom !== '' || $da
 window.CLEAR_ALL_ALARMS_COLUMNS = <?php echo json_encode(array_map(function($column){return $column==='__TIPO_INSTALACION'?'TIPO DE INSTALACIÓN':$column;},$displayColumns), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="assets/js/app.js?v=20260924-columns-1"></script>
-<script src="assets/js/alarm_actions.js?v=20261008-author-1"></script>
+<script src="assets/js/alarm_actions.js?v=20261009-author-fix-2"></script>
 <script src="assets/js/todas_alarmas.js?v=20260716-msgfilters1"></script>
 <script>
 (function(){
