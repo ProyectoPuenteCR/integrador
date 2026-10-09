@@ -158,11 +158,11 @@ function clear_alarm_comment_upsert_sql(array $payload)
     if ($existingId !== null && $existingId !== '') {
         // Una edición debe conservar la versión anterior en la auditoría.
         $previous = $db->scalar("SELECT COMENTARIO FROM dbo.FIXALARMS_COMENTARIOS WHERE ID=? AND ACTIVO=1",[(int)$existingId]);
-        $result = $db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
+        $result = $db->all("EXEC dbo.CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
            ['alarmas',(int)$existingId,'EDITAR',$comment,$user,(string)$previous]);
         $ok = !empty($result) && (int)($result[0]['OK'] ?? 0) === 1;
         $sqlError = $ok ? '' : $db->error();
-        return [$ok, $ok ? '' : 'No se pudo ejecutar dbo.SP_CLEAR_COMENTARIO_CAMBIAR en la base ' .
+        return [$ok, $ok ? '' : 'No se pudo ejecutar dbo.CLEAR_COMENTARIO_CAMBIAR en la base ' .
             (string)$db->scalar("SELECT DB_NAME()") . '. Detalle SQL: ' . $sqlError, (int)$existingId];
     }
 
@@ -264,11 +264,11 @@ function clear_alarm_event_comment_upsert_sql(array $payload)
 
     if ($existingId !== null && $existingId !== '') {
         $previous = $db->scalar("SELECT COMENTARIO FROM dbo.FIXALARMS_COMENTARIOS WHERE ID=? AND ACTIVO=1",[(int)$existingId]);
-        $result = $db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
+        $result = $db->all("EXEC dbo.CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
            ['alarmas',(int)$existingId,'EDITAR',$comment,$user,(string)$previous]);
         $ok = !empty($result) && (int)($result[0]['OK'] ?? 0) === 1;
         $sqlError = $ok ? '' : $db->error();
-        return [$ok, $ok ? '' : 'No se pudo ejecutar dbo.SP_CLEAR_COMENTARIO_CAMBIAR en la base ' .
+        return [$ok, $ok ? '' : 'No se pudo ejecutar dbo.CLEAR_COMENTARIO_CAMBIAR en la base ' .
             (string)$db->scalar("SELECT DB_NAME()") . '. Detalle SQL: ' . $sqlError, (int)$existingId];
     }
 
