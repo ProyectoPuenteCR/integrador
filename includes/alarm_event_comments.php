@@ -161,8 +161,9 @@ function clear_alarm_comment_upsert_sql(array $payload)
         $result = $db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
            ['alarmas',(int)$existingId,'EDITAR',$comment,$user,(string)$previous]);
         $ok = !empty($result) && (int)($result[0]['OK'] ?? 0) === 1;
+        $sqlError = $ok ? '' : $db->error();
         return [$ok, $ok ? '' : 'No se pudo ejecutar dbo.SP_CLEAR_COMENTARIO_CAMBIAR en la base ' .
-            (string)$db->scalar("SELECT DB_NAME()") . '. Detalle SQL: ' . $db->error(), (int)$existingId];
+            (string)$db->scalar("SELECT DB_NAME()") . '. Detalle SQL: ' . $sqlError, (int)$existingId];
     }
 
     $sql = "INSERT INTO dbo.FIXALARMS_COMENTARIOS " .
@@ -266,8 +267,9 @@ function clear_alarm_event_comment_upsert_sql(array $payload)
         $result = $db->all("EXEC dbo.SP_CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
            ['alarmas',(int)$existingId,'EDITAR',$comment,$user,(string)$previous]);
         $ok = !empty($result) && (int)($result[0]['OK'] ?? 0) === 1;
+        $sqlError = $ok ? '' : $db->error();
         return [$ok, $ok ? '' : 'No se pudo ejecutar dbo.SP_CLEAR_COMENTARIO_CAMBIAR en la base ' .
-            (string)$db->scalar("SELECT DB_NAME()") . '. Detalle SQL: ' . $db->error(), (int)$existingId];
+            (string)$db->scalar("SELECT DB_NAME()") . '. Detalle SQL: ' . $sqlError, (int)$existingId];
     }
 
     $ok = $db->execute(
