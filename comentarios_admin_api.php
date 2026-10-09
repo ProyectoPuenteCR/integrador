@@ -16,6 +16,11 @@ $tables=['alarmas'=>'FIXALARMS_COMENTARIOS','novedades'=>'CLEAR_NOVEDADES_SEMANA
 'instalaciones'=>'FIXALARMS_INSTALACION_COMENTARIOS_SEMANALES','pozos'=>'FIXALARMS_POZO_COMENTARIOS_SEMANALES'];
 if(!isset($tables[$origin])||$id<=0) cc_response(['ok'=>false,'error'=>'Registro inválido'],400);
 if($_SERVER['REQUEST_METHOD']==='GET'){
+ if(($_GET['mode']??'')==='current'){
+  $rows=$db->all("SELECT CONVERT(nvarchar(max),COMENTARIO) AS COMENTARIO FROM dbo.".$tables[$origin]." WHERE ID=? AND ACTIVO=1",[$id]);
+  if(!$rows)cc_response(['ok'=>false,'error'=>'El comentario ya no existe o fue eliminado.'],404);
+  cc_response(['ok'=>true,'comment'=>(string)($rows[0]['COMENTARIO']??'')]);
+ }
  if((int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.CLEAR_COMENTARIOS_HISTORIAL',N'U') IS NULL THEN 0 ELSE 1 END")!==1)
   cc_response(['ok'=>true,'history'=>[],'setup_required'=>true]);
  $items=$db->all("SELECT ACCION,TEXTO_ANTERIOR,TEXTO_NUEVO,USUARIO,CONVERT(varchar(19),FECHA,120) FECHA FROM dbo.CLEAR_COMENTARIOS_HISTORIAL WHERE ORIGEN=? AND COMENTARIO_ID=? ORDER BY ID DESC",[$origin,$id]);
@@ -39,7 +44,7 @@ if($action==='EDITAR'&&($comment===''||strlen($comment)>20000))cc_response(['ok'
 $result=$db->all("EXEC dbo.CLEAR_COMENTARIO_CAMBIAR @Origen=?,@Id=?,@Accion=?,@Texto=?,@Usuario=?,@Esperado=?",
 [$origin,$id,$action,$comment,auth_user(),$previous]);
 if(!$result|| (int)($result[0]['OK']??0)!==1){
- $sqlError=$db->error();$database=(string)$db->scalar("SELECT DB_NAME()");
+ $sqlError=strip_tags($db->error());$database=(string)$db->scalar("SELECT DB_NAME()");
  cc_response(['ok'=>false,'error'=>'No se guardó el cambio en '.($database?:'la base de datos').'. Error SQL: '.($sqlError?:'revisá permisos EXECUTE sobre dbo.CLEAR_COMENTARIO_CAMBIAR')],409);
 }
 audit_log($action==='EDITAR'?'COMENTARIO_EDITADO':'COMENTARIO_ELIMINADO','comentarios',$origin.' #'.$id);
