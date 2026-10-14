@@ -8,6 +8,7 @@ require_once __DIR__ . '/zones.php';
 require_once __DIR__ . '/production_q164.php';
 require_once __DIR__ . '/alarm_actions.php';
 require_once __DIR__ . '/novedades_semanales_common.php';
+require_once __DIR__ . '/color_config.php';
 auth_require();
 permissions_require_menu($TELEMETRY['key']);
 $cfg = require dirname(__DIR__) . '/config.php';
@@ -16,6 +17,7 @@ $APP_USER = auth_user() ?: ($cfg['app']['user'] ?? 'CLEAR01');
 $APP_ROLE = auth_es_admin() ? 'Administrador' : 'Operador';
 $ACTIVE = $TELEMETRY['key'];
 $db = clear_db();
+$colorOverrides=clear_colors_load($db);
 $reportEnabled=$db->ok()&&ns_report_ready($db)&&permissions_can_menu('novedades_semanales_reporte');
 $zoneOptions=clear_zones_all($db);
 $selectedZone=clear_zone_valid((string)($_GET['zona']??''),$zoneOptions);
@@ -812,6 +814,7 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
 @media(max-width:1000px){.tg-filters{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.tg-filters{grid-template-columns:1fr}.tg{padding:0 10px 20px}.tg-cards{grid-template-columns:1fr 1fr}.tg-hero__title{min-width:0}.tg-hero__title h1{font-size:16px}.tg-hero__visual{flex-basis:72px}.tg-hero__visual img{max-width:68px;max-height:64px}}
 @media(max-width:480px){.tg-cards{grid-template-columns:1fr}}
+<?php echo clear_colors_telemetry_css($colorOverrides); ?>
 </style></head><body><div class="app"><?php include __DIR__.'/sidebar.php'; ?><main class="main"><?php include __DIR__.'/topbar.php'; ?>
 <div class="tg">
 <?php if($error): ?><div class="tg-error"><?php echo h($error); ?></div><?php endif; ?>
@@ -880,12 +883,14 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
 <?php if($c==='ALM'):
   $alarmCount=(int)$raw;
   $alarmClass=tg_alarm_class($alarmCount);
+  $alarmColorState=$alarmCount<=0?'0 alarmas':($alarmCount<=5?'1-5 alarmas':($alarmCount<=15?'6-15 alarmas':'16+ alarmas'));
+  $alarmColorStyle=clear_colors_style('ALARMAS',$alarmColorState,$colorOverrides);
   $alarmUrl='pozos_alarmas24.php?'.http_build_query(['pozo'=>$wellName,'desde'=>date('Y-m-d',strtotime('-24 hours')),'hora_desde'=>date('H:i',strtotime('-24 hours')),'hasta'=>date('Y-m-d'),'hora_hasta'=>date('H:i')]);
   $alarmEmbedUrl=$alarmUrl.'&embed=1';
   $alarmCommentSubject=clear_alarm_comment_subject($wellName,'pozo');
 ?>
 <span class="tgAlarmActions">
-<a class="tg-alarm-link <?php echo h($alarmClass); ?>" href="<?php echo h($alarmUrl); ?>"
+<a class="tg-alarm-link <?php echo h($alarmClass); ?>" <?php if($alarmColorStyle!==""): ?>style="<?php echo h($alarmColorStyle); ?>"<?php endif; ?> href="<?php echo h($alarmUrl); ?>"
    data-telemetry-modal-url="<?php echo h($alarmEmbedUrl); ?>"
    data-telemetry-modal-open-url="<?php echo h($alarmUrl); ?>"
    data-telemetry-modal-title="<?php echo h('Alarmas 24 h · '.($wellName!==''?$wellName:'Pozo')); ?>"
@@ -907,8 +912,11 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
    data-telemetry-popup-name="CLEAR_PI_CARTAS"
    title="Abrir carta en ventana emergente"><?php echo icon('chart'); ?></a>
 <?php elseif(($c==='PANTALLA'||$c==='CARTAS')&&!tg_link($raw)): ?>
-<?php elseif($c==='__COMUNICACION'||$c===$stateCol||$c===$zafiroStateColumn||$c===$zafiroActiveColumn||$c===$remoteStopColumn||$c===$rpmStateColumn||($generalCol!==''&&$c===$generalCol)): ?>
-<span class="tg-badge <?php echo h($c===$remoteStopColumn?tg_remote_stop_class($raw):tg_status_class($raw)); ?>"><?php echo h($raw); ?></span>
+<?php elseif($c==='__COMUNICACION'||$c===$stateCol||$c===$zafiroStateColumn||$c===$zafiroActiveColumn||$c===$remoteStopColumn||$c===$rpmStateColumn||($generalCol!==''&&$c===$generalCol)):
+  $colorField=$c==='__COMUNICACION'?'COMUNICACION':($c===$remoteStopColumn?'PARO_REMOTO':($c===$zafiroStateColumn?'ESTADO_ZAFIRO':($c===$zafiroActiveColumn?'ZAFIRO_ACTIVO':($c===$rpmStateColumn?'YT_POZO':($generalCol!==''&&$c===$generalCol?'ESTADO_GENERAL':'ESTADO_POZO')))));
+  $colorStyle=clear_colors_style($colorField,$raw,$colorOverrides);
+?>
+<span class="tg-badge <?php echo h($c===$remoteStopColumn?tg_remote_stop_class($raw):tg_status_class($raw)); ?>" <?php if($colorStyle!==''): ?>style="<?php echo h($colorStyle); ?>"<?php endif; ?>><?php echo h($raw); ?></span>
 <?php else: echo h($isNum?tg_number($r[$c]??''):$raw); endif; ?>
 </td>
 <?php endforeach; ?>
