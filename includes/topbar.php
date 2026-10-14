@@ -89,6 +89,7 @@ html[data-theme="dark"] .menuLayout__drop{background:var(--bg-card);border-color
       <?php if(permissions_can_menu('config_pi')): ?><a href="config_pi.php"><?php echo icon('trend'); ?> Conexión PI Web API</a><?php endif; ?>
       <?php if(permissions_can_menu('config_menu')): ?><a href="config_menu.php"><?php echo icon('grid'); ?> Configurar menú</a><?php endif; ?>
       <?php if(permissions_can_menu('config_alarmas')): ?><a href="config_alarmas.php"><?php echo icon('bell'); ?> Configuración de alarmas</a><?php endif; ?>
+      <?php if(permissions_can_menu('config_colores')): ?><a href="config_colores.php"><?php echo icon('grid'); ?> Colores y estados</a><?php endif; ?>
       <?php if(permissions_can_menu('config_scada_realtime')): ?><a href="scada_realtime_config.php"><?php echo icon('monitor'); ?> Configuración SCADA Real time</a><?php endif; ?>
       <?php if(permissions_can_menu('tags_filtrados')): ?><a href="admin_tags_filtrados.php"><?php echo icon('shield'); ?> Tags filtrados</a><?php endif; ?>
       <?php if(permissions_can_menu('estado_sistema')): ?><a href="estado_sistema.php"><?php echo icon('gauge'); ?> Estado del sistema</a><?php endif; ?>
