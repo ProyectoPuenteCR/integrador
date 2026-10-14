@@ -67,8 +67,8 @@ function tg_remote_stop_label($value){
 }
 function tg_remote_stop_class($value){
   $label=tg_remote_stop_label($value);
-  if($label==='Habilitado')return 'danger';
-  if($label==='Deshabilitado')return 'success';
+  if($label==='Habilitado')return 'success';
+  if($label==='Deshabilitado')return 'danger';
   return 'neutral';
 }
 function tg_clean_error($value){
