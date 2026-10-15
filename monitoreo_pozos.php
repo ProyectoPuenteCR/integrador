@@ -17,4 +17,8 @@ $TELEMETRY = [
     'labels'=>['Fecha'=>'ÚLTIMA ACTUALIZACIÓN','PT:LINEA'=>'PRESIÓN LÍNEA','QT:RPM'=>'RPM','ESTADO_RPM'=>'ESTADO POZO','PRODUCCION_PETROLEO'=>'PRODUCCIÓN PETRÓLEO','PRODUCCION_LIQUIDO'=>'PRODUCCIÓN LÍQUIDO','PRODUCCION_GAS'=>'PRODUCCIÓN GAS'],
     'non_numeric'=>['POZO','BATERIA','ESTADO','Fecha','ECO','ESTADO-GRAL','YAT:COM','PANTALLA','CARTAS','YT:CONTROL','YT:DEVICE','YT:LLAVE','YT:LLAVE-AUTO','ESTADO_RPM']
 ];
-require __DIR__.'/includes/telemetry_grid.php';
+if (isset($_GET['modo']) && (string)$_GET['modo']==='historico') {
+    require __DIR__.'/includes/monitoreo_pozos_historial.php';
+} else {
+    require __DIR__.'/includes/telemetry_grid.php';
+}

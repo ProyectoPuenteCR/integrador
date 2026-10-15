@@ -421,7 +421,7 @@ EXEC dbo.sp_add_job @job_name=N'CLEAR - Reporte Pozos Parados',@enabled=1,
  @description=N'Refresca cada 10 minutos la cache del reporte de pozos parados. La web no consulta RTQP directamente.',
  @owner_login_name=N'sa',@job_id=@JobId OUTPUT;
 EXEC dbo.sp_add_jobstep @job_id=@JobId,@step_name=N'Refrescar cache',@subsystem=N'TSQL',@database_name=N'LC_MDB',
- @command=N'EXEC dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR;',@retry_attempts=2,@retry_interval=2,@on_success_action=1,@on_fail_action=2;
+ @command=N'EXEC dbo.SP_CLEAR_POZOS_PARADOS_REFRESCAR; IF OBJECT_ID(N''dbo.SP_CLEAR_HIST_PAROS_SINCRONIZAR'',N''P'') IS NOT NULL EXEC dbo.SP_CLEAR_HIST_PAROS_SINCRONIZAR;',@retry_attempts=2,@retry_interval=2,@on_success_action=1,@on_fail_action=2;
 EXEC dbo.sp_add_schedule @schedule_name=N'CLEAR - Pozos Parados cada 10 minutos',@enabled=1,
  @freq_type=4,@freq_interval=1,@freq_subday_type=4,@freq_subday_interval=10,@active_start_date=@Fecha,@active_start_time=0;
 EXEC dbo.sp_attach_schedule @job_id=@JobId,@schedule_name=N'CLEAR - Pozos Parados cada 10 minutos';
