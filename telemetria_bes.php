@@ -26,6 +26,7 @@ $TELEMETRY = [
         '__COMUNICACION' => 'FALLA DE COMUNICACIÓN',
         'N-IT:DH' => 'Corriente VSD',
         'N-FP:MOTOR' => 'Factor de potencia',
+        'N-FQ:MOTOR' => 'Frecuencia del motor',
         'N-ET:OUT' => 'Tensión de salida',
         'N-ET:MOTOR' => 'Tensión de Motor',
         'N-IT:MOTOR' => 'Corriente Motor',
