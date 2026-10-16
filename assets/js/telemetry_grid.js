@@ -8,14 +8,7 @@
   const visible=document.getElementById('tgVisible');
   const shown=document.getElementById('tgShown');
   const pageSizeSelect=document.getElementById('tgPageSize');
-  const filterToggle=document.getElementById('tgToggleFilters');
-  const filterGroupsContainer=document.getElementById('tgFilterGroups');
-  if(filterToggle&&filterGroupsContainer){
-    filterToggle.addEventListener('click',()=>{
-      filterGroupsContainer.hidden=!filterGroupsContainer.hidden;
-      filterToggle.setAttribute('aria-expanded',filterGroupsContainer.hidden?'false':'true');
-    });
-  }
+  /* Los filtros desplegables usan <details>/<summary> nativos: no dependen de JS ni del cache. */
   const storage='clear_tg_cols_'+(cfg.key||'telemetry')+'_v'+(cfg.columnStateVersion||'317');
   /* Clave nueva: descarta intervalos agresivos guardados por versiones previas. */
   const refreshKey='clear_tg_refresh_safe_v2_'+(cfg.key||'telemetry');
