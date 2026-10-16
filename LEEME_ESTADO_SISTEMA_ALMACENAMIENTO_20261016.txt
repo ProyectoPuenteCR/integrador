@@ -1,0 +1,102 @@
+CLEAR — ALMACENAMIENTO EN ESTADO DEL SISTEMA
+Fecha: 16/10/2026
+
+ALCANCE
+Se incorpora un bloque debajo de la conectividad y antes de los Jobs.
+La base inicial es la configurada en config.php (LC_MDB en el repositorio).
+El selector permite medir otras bases online, no snapshots, visibles y accesibles
+para la misma cuenta SQL. No se presupone el nombre de una base de logs separada.
+El LDF (log de transacciones) y las tablas de auditoría son conceptos separados.
+
+ARCHIVOS
+Modificado: estado_sistema.php (CSS, inclusión del panel, JS y subtítulo).
+Nuevos:
+  estado_sistema_storage_api.php
+  includes/sql_storage_status.php
+  includes/system_storage_panel.php
+  assets/css/system_storage.css
+  assets/js/system_storage.js
+No se modifica config.php, credenciales, conexión general, Jobs ni consultas RTQP.
+
+INSTALACIÓN
+Hacer Fetch/Pull de main y publicar estos seis archivos respetando las carpetas.
+También puede copiarse el contenido del ZIP de cambios sobre la aplicación.
+No reemplazar config.php con el de otro equipo.
+Abrir Estado del sistema con un administrador y hacer Ctrl+F5.
+No es necesario crear tablas, procedimientos almacenados ni Jobs para este panel.
+
+FUNCIONES
+Cuatro indicadores: datos asignados, datos ocupados, log asignado y ocupación del log.
+Gráfico de las 10 tablas de mayor tamaño reservado, con datos, índices/estructuras
+y reserva sin usar. El filtro por nombre se aplica a la grilla y al gráfico.
+Clic en una barra filtra la tabla. Limpiar filtro restablece el listado.
+Grilla con registros aproximados, datos, índices/estructuras, usado, reservado
+y reserva sin usar. Orden por tamaño, registros o nombre; páginas 50/100/Todas.
+Resaltado de la fila seleccionada.
+Gráfico circular del log: uso, libre interno, modelo de recuperación y espera de
+reutilización. Aviso visual desde 80% y ocupación alta desde 95%; no implica falla.
+Detalle de archivos lógicos, estado, tamaño y autocrecimiento/máximo configurados.
+Funciona sin CDN ni bibliotecas de gráficos externas, con variables de tema.
+
+RENDIMIENTO Y SEGURIDAD
+Sólo lectura de catálogos y DMV. No se cuentan ni recorren filas de negocio para
+obtener tamaños. Son cinco consultas de metadatos por medición no cacheada.
+Agregación por objeto: todas las particiones; filas sólo en heap/índice base
+(index_id 0/1), sin sumarlas nuevamente por cada índice.
+MAXDOP 1 en la agregación. LOCK_TIMEOUT 1500 dentro del lote dinámico; el alcance
+de sp_executesql restaura las opciones SET al retornar.
+No se usa NOLOCK, DBCC SHRINK, DDL, limpieza de tablas ni cambios de recuperación.
+Lectura al abrir el panel o al pulsar Actualizar tamaños, sin sondeo automático.
+Caché de 60 segundos para la última base medida en cada sesión.
+Actualizar tamaños no vuelve a ejecutar las pruebas RTQP ni de Jobs.
+La lista blanca proviene de sys.databases; los identificadores se escapan.
+El endpoint aplica el mismo control de administrador que la pantalla.
+No hay contraseñas nuevas ni credenciales incluidas en este paquete.
+
+INTERPRETACIÓN
+Las unidades MB/GB usan potencias de 1024. El conteo de filas es aproximado.
+Reservado = usado + reserva sin usar (no equivale a libre en el disco).
+Datos = páginas base de datos en fila + LOB + desbordamiento.
+Índices/estructuras = páginas usadas restantes: índices secundarios y administración.
+Los tamaños son físicos, sin filtros operativos de alarmas/fechas/CFN.
+Por eso pueden diferir de los conteos operativos de las otras pantallas.
+Archivos de datos y tablas pueden no coincidir: hay espacio libre, objetos internos,
+vistas indexadas y otros consumos que no integran el ranking de tablas de usuario.
+Las tablas en memoria y almacenamiento externo FILESTREAM no se miden en el ranking.
+Una métrica sin permisos o no disponible no se reemplaza por un cero.
+Todos los archivos de log se combinan para calcular su ocupación; el total utilizable
+de la DMV puede diferir ligeramente del tamaño asignado de los archivos LDF.
+No se mide el espacio libre de la unidad del servidor.
+Es una foto actual: no incluye un histórico de crecimiento que no se haya registrado.
+
+PERMISOS A REVISAR CON EL DBA
+Tablas, SQL Server 2016/2019: VIEW DATABASE STATE y VIEW DEFINITION en cada base.
+Tablas, SQL Server 2022+: VIEW DATABASE PERFORMANCE STATE y VIEW SECURITY DEFINITION.
+Ocupación del log, 2016/2019: VIEW SERVER STATE.
+Ocupación del log, 2022+: VIEW SERVER PERFORMANCE STATE.
+La aplicación no concede permisos. No otorgar sysadmin sólo para este panel.
+Los permisos de servidor tienen alcance amplio; el DBA debe aprobarlos o encapsular
+las consultas en un módulo firmado según la política de la empresa.
+Los archivos/tamaños que sí sean legibles se siguen mostrando aunque falle otra DMV.
+
+VALIDACIÓN REALIZADA
+Sintaxis PHP comprobada con PHP 8.4; el código usa sintaxis compatible con PHP 7.4.
+Sintaxis JavaScript comprobada con Node.
+19 pruebas unitarias con respuestas simuladas: cálculos, nulos COM, permisos,
+base vacía, resultado incompleto, validación de bases e inexistencia de SQL de escritura.
+17 verificaciones de interfaz en Chromium, sin conexión a servidores:
+gráfico, filtros, paginación, unidades, selección de filas, XSS, adaptación móvil,
+permiso denegado, ausencia de ceros ficticios y ocultamiento de datos de otra base.
+Se inspeccionó la vista clara y se generaron pruebas visuales claras/oscuras/móviles.
+No se ejecutó contra el SQL Server de CLEAR ni contra ADODB/COM en Windows.
+Queda pendiente confirmar permisos y lectura real en IIS/SQL Server.
+
+REVERSIÓN
+Restituir estado_sistema.php de la versión previa. Los cinco archivos nuevos de
+ejecución pueden retirarse. No hay objetos SQL que eliminar.
+
+DOCUMENTACIÓN OFICIAL CONSULTADA
+https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-objects/sys-dm-db-partition-stats-transact-sql
+https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-objects/sys-dm-db-log-space-usage-transact-sql
+https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql
+https://learn.microsoft.com/en-us/sql/t-sql/statements/set-statements-transact-sql

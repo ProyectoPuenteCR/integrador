@@ -57,6 +57,7 @@ $runCls = [0 => 'jb--fail', 1 => 'jb--ok', 2 => 'jb--late', 3 => 'jb--late', 4 =
 <title>CLEAR · Estado del sistema</title>
 <link rel="stylesheet" href="assets/css/app.css?v=3.0.0">
 <link rel="stylesheet" href="assets/css/estado_sistema.css?v=20260917-jobs1">
+<link rel="stylesheet" href="assets/css/system_storage.css?v=20261016-1">
 </head>
 <body>
 <div class="app">
@@ -67,7 +68,7 @@ $runCls = [0 => 'jb--fail', 1 => 'jb--ok', 2 => 'jb--late', 3 => 'jb--late', 4 =
 <div class="page__head">
   <div>
     <h1 class="page__title">Estado del sistema</h1>
-    <div class="page__sub">Diagnóstico de conectividad, rendimiento y Jobs de base de datos</div>
+    <div class="page__sub">Diagnóstico de conectividad, almacenamiento y Jobs de base de datos</div>
   </div>
   <div><a class="btn-export" href="estado_sistema.php"><?php echo icon('history'); ?> Actualizar</a></div>
 </div>
@@ -83,6 +84,8 @@ $runCls = [0 => 'jb--fail', 1 => 'jb--ok', 2 => 'jb--late', 3 => 'jb--late', 4 =
     </div>
     <?php endforeach; ?>
   </div>
+
+  <?php include __DIR__ . '/includes/system_storage_panel.php'; ?>
 
   <!-- ===================== JOBS DE BASE DE DATOS ===================== -->
   <div class="jobs" id="jobs">
@@ -233,6 +236,7 @@ $runCls = [0 => 'jb--fail', 1 => 'jb--ok', 2 => 'jb--late', 3 => 'jb--late', 4 =
 </main>
 </div>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/system_storage.js?v=20261016-1"></script>
 <script>
 (function () {
   document.querySelectorAll('.jbtn[data-toggle]').forEach(function (b) {
