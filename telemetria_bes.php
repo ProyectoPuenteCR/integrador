@@ -27,6 +27,7 @@ $TELEMETRY = [
         'N-IT:DH' => 'Corriente VSD',
         'N-FP:MOTOR' => 'Factor de potencia',
         'N-FQ:MOTOR' => 'Frecuencia del motor',
+        'VT-Z' => 'Vibración del eje Z',
         'N-ET:OUT' => 'Tensión de salida',
         'N-ET:MOTOR' => 'Tensión de Motor',
         'N-IT:MOTOR' => 'Corriente Motor',
