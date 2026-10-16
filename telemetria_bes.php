@@ -25,6 +25,7 @@ $TELEMETRY = [
         'FEHA' => 'ÚLTIMA ACTUALIZACIÓN',
         '__COMUNICACION' => 'FALLA DE COMUNICACIÓN',
         'N-IT:DH' => 'Corriente VSD',
+        'N-FP:MOTOR' => 'Factor de potencia',
         'N-ET:OUT' => 'Tensión de salida',
         'N-ET:MOTOR' => 'Tensión de Motor',
         'N-IT:MOTOR' => 'Corriente Motor',
