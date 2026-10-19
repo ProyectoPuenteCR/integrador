@@ -1,0 +1,43 @@
+CLEAR - MOSTRAR U OCULTAR COLUMNAS EN LAS GRILLAS
+Fecha: 2026-10-19
+
+Copiar estos archivos respetando sus carpetas dentro de CLEAR:
+- assets/js/grid_tools.js
+- assets/css/grid_tools.css
+- includes/topbar.php
+- alarm_sql_historico.php
+- tecss_3sigma_historico.php
+
+Guardar una copia de los archivos actuales antes de reemplazarlos.
+No requiere cambios SQL. El selector usa las preferencias de usuario existentes.
+El cambio de versión de los recursos en topbar e históricos evita usar la copia
+anterior del selector que pudiera estar guardada en el navegador.
+
+Comportamiento
+- Cada grilla horizontal con encabezados simples tiene un botón Columnas junto
+  a la tabla, aunque no tenga la clase CSS grid.
+- Permite mostrar u ocultar columnas y volver a mostrar todas.
+- Mantiene al menos una columna visible y conserva filtros y datos alineados.
+- Guarda la selección por grilla y recupera las preferencias del usuario.
+- Reaplica la selección cuando llegan filas nuevas o se reemplaza una grilla.
+- Conserva los selectores propios de Telemetría y Novedades sin duplicarlos.
+- Incluye las vistas de históricos SQL y 3Sigma, también dentro de sus ventanas.
+- No agrega controles a documentos de exportación ni a tablas verticales de
+  detalle sin encabezados de columnas.
+
+Comprobación después de copiar
+1. Abrir Top 20: el botón Columnas debe estar junto a la grilla.
+2. Ocultar Campo ext. y comprobar que encabezado, filtro y datos se ocultan juntos.
+3. Mantener Texto del comentario visible. Recargar y comprobar la selección.
+4. Usar Mostrar todas para recuperar las columnas.
+5. Repetir en una pantalla con varias tablas y en SCADA Real time: las nuevas
+   filas deben respetar las columnas ocultas.
+6. Confirmar que Monitoreo Pozos conserva su menú Columnas original.
+
+Pruebas locales
+Con Node.js y jsdom 26.1.0 disponibles:
+  node --test tests/grid_tools.test.cjs
+  node tests/instalaciones_top20_comments.test.cjs
+  node --check assets/js/grid_tools.js
+
+Reversión: restaurar los cinco archivos respaldados.

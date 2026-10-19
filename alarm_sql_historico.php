@@ -35,6 +35,8 @@ function sql_history_h($value) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Histórico SQL de alarmas</title>
+  <link rel="stylesheet" href="assets/css/grid_tools.css?v=20261019-all-grids-1">
+  <script src="assets/js/grid_tools.js?v=20261019-all-grids-1" defer></script>
   <link rel="stylesheet" href="assets/css/app.css?v=20260807-sql-history">
   <link rel="stylesheet" href="assets/css/chart_preferences.css?v=20260826-chartprefs-2">
   <style>

@@ -12,7 +12,8 @@ $from=$today->modify('-30 days');
 function sigma_hist_h($value){return htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8');}
 ?>
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Histórico 3Sigma · <?php echo sigma_hist_h($well); ?></title>
-<link rel="stylesheet" href="assets/css/app.css?v=20260812-sigma-history"><link rel="stylesheet" href="assets/css/tecss_3sigma_historico.css?v=20260812-sigma-history"><link rel="stylesheet" href="assets/css/chart_preferences.css?v=20260826-chartprefs-2"></head>
+<link rel="stylesheet" href="assets/css/app.css?v=20260812-sigma-history"><link rel="stylesheet" href="assets/css/tecss_3sigma_historico.css?v=20260812-sigma-history"><link rel="stylesheet" href="assets/css/chart_preferences.css?v=20260826-chartprefs-2">
+<link rel="stylesheet" href="assets/css/grid_tools.css?v=20261019-all-grids-1"><script src="assets/js/grid_tools.js?v=20261019-all-grids-1" defer></script></head>
 <body><main class="sigma-history<?php echo $embedded?' is-embedded':''; ?>">
   <header class="sigma-history__head"><div><div class="sigma-history__eyebrow">Histórico SQL</div><h1>3Sigma · <?php echo sigma_hist_h($well!==''?$well:'Pozo'); ?></h1><p>Tendencia obtenida exclusivamente de dbo.TECSS_TECSSAIB_HISTORICO.</p></div><div class="sigma-history__source">Consulta indexada por pozo</div></header>
   <form class="sigma-history__toolbar" id="sigmaHistoryForm">
