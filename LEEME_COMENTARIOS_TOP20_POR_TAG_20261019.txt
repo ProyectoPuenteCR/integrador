@@ -1,0 +1,36 @@
+CLEAR - CORRECCIÓN DE COMENTARIOS DEL TOP 20 POR TAG
+Fecha: 2026-10-19
+
+Problema
+El Top 20 muestra una fila por TAG, pero asociaba el comentario a la instalación.
+BLH002_SBC01_PT001 y BLH002_TKAG1_LT001 usaban ambos INSTALACION:BLH002.
+
+Archivos para copiar al directorio CLEAR del servidor, conservando sus nombres:
+- instalaciones_top20.php
+- instalaciones_top20_export.php
+
+Antes de copiar, guardar una copia de los dos archivos actuales.
+No requiere cambios SQL ni copiar includes, JavaScript o CSS.
+
+Resultado
+- Nueva columna Texto del comentario, con saltos de línea y filtro de texto.
+- El texto de la columna se actualiza al cargar o guardar el comentario del TAG.
+- Cada fila carga y abre el comentario central del TAG completo.
+- El guardado existente usa ese mismo TAG; editar una alarma no edita otra.
+- El CSV y las filas agregadas al reporte usan el comentario del TAG.
+- Los comentarios generales anteriores de instalación no se borran, modifican ni
+  asignan automáticamente a alarmas. Siguen disponibles en Comentarios.
+- Si un TAG aún no tiene comentario propio, no se mostrará el general de BLH002.
+  Revisar el contenido anterior antes de cargarlo en la alarma correspondiente.
+
+Comprobación en el servidor
+1. Abrir Top 20 alarmas, filtrar BLH002 y elegir una semana con ambas alarmas.
+2. Abrir el comentario de presión: la ventana debe identificar BLH002_SBC01_PT001.
+3. Cerrar y abrir el de nivel: debe identificar BLH002_TKAG1_LT001.
+4. Confirmar que los comentarios previos de instalación siguen en Comentarios.
+5. Cuando se cargue o edite un comentario operativo real de un TAG, comprobar que
+   el otro permanece igual y que el CSV y reporte muestran la asociación correcta.
+   No es necesario introducir comentarios de prueba en producción.
+
+Reversión
+Restaurar las copias anteriores de los dos archivos. Los datos no se migran.

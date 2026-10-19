@@ -56,7 +56,7 @@ $topInstallation = '';
 $topInstallationCount = 0;
 $top5Count = 0;
 $top5Pct = 0;
-$weeklyComments = [];
+$alarmComments = [];
 $canViewComments = permissions_can('comments.view');
 $canCreateComments = permissions_can('comments.create');
 $reportEnabled=permissions_can_menu('novedades_semanales_reporte');
@@ -156,11 +156,11 @@ if ($db->ok()) {
     if (($canViewComments || $canCreateComments) && $rows) {
         $commentSubjects = [];
         foreach ($rows as $commentSourceRow) {
-            $commentInstallation = trim((string)($commentSourceRow['INSTALACION'] ?? $commentSourceRow['instalacion'] ?? ''));
-            $commentType = clear_installation_type_normalize($commentSourceRow['TIPO_INSTALACION'] ?? $commentSourceRow['tipo_instalacion'] ?? '');
-            if ($commentInstallation !== '') $commentSubjects[] = clear_alarm_comment_subject($commentInstallation, $commentType === 'POZO' ? 'pozo' : 'instalacion');
+            $commentTag = trim((string)($commentSourceRow['TAG'] ?? $commentSourceRow['tag'] ?? ''));
+            // Cada fila representa un TAG; los comentarios generales de instalación se conservan aparte.
+            if ($commentTag !== '') $commentSubjects[] = clear_alarm_comment_subject($commentTag);
         }
-        $weeklyComments = clear_alarm_comments_load_subjects_sql($commentSubjects);
+        $alarmComments = clear_alarm_comments_load_subjects_sql($commentSubjects);
     }
 }
 ?>
@@ -175,6 +175,7 @@ if ($db->ok()) {
   <link rel="stylesheet" href="assets/css/installation_type.css?v=20260824-1">
   <?php if($reportEnabled): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260826-select-all-1"><?php endif; ?>
   <style>
+    .it20Table td.it20CommentText{min-width:260px;max-width:420px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
     .it20Toolbar{display:grid;grid-template-columns:minmax(250px,1fr) repeat(3,minmax(150px,.48fr)) minmax(260px,.65fr) auto auto auto;gap:12px;align-items:center;margin-bottom:15px}.it20Input,.it20Select,.it20Week{display:flex;align-items:center;gap:9px;background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:10px;min-height:42px;padding:0 12px;overflow:hidden}.it20Input svg,.it20Select svg{width:16px!important;height:16px!important;min-width:16px!important}.it20Input span,.it20Select span,.it20Week span{font-size:9px;font-weight:800;letter-spacing:.7px;color:var(--text-mut);text-transform:uppercase}.it20Input input,.it20Select select,.it20Week select{border:0;outline:0;background:transparent;color:var(--text);font:inherit;min-width:0;flex:1}.it20Week select{min-width:190px}.it20Cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}.it20Table .alarmCell__text{font-weight:700}.it20CommentButton{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:38px;height:31px;padding:0 10px;border:1px solid var(--line-mid);border-radius:8px;background:var(--surface,#fff);color:var(--petrol);cursor:pointer}.it20CommentButton svg{width:15px;height:15px}.it20CommentButton:hover,.it20CommentButton:focus-visible{border-color:var(--petrol);background:var(--petrol-soft);outline:0}.it20CommentButton.has-comment{background:var(--petrol);border-color:var(--petrol);color:#fff}.it20CommentButton__dot{display:none;width:7px;height:7px;border-radius:50%;background:#38d58b}.it20CommentButton.has-comment .it20CommentButton__dot{display:block}.it20CommentOverlay{position:fixed;inset:0;z-index:151;background:rgba(12,35,44,.45);backdrop-filter:blur(3px)}.it20CommentModal{position:fixed;z-index:152;left:50%;top:50%;width:min(590px,calc(100vw - 28px));transform:translate(-50%,-46%) scale(.985);background:var(--surface,#fff);border:1px solid var(--line-mid);border-radius:18px;box-shadow:0 28px 72px rgba(12,35,44,.32);opacity:0;pointer-events:none;transition:.17s ease;overflow:hidden}.it20CommentModal.is-open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}.it20CommentModal__head{display:flex;justify-content:space-between;gap:18px;padding:20px 22px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(26,77,92,.08),transparent)}.it20CommentModal__eyebrow{margin-bottom:4px;color:var(--text-mut);font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase}.it20CommentModal h2{margin:0;color:var(--petrol);font-family:var(--font-head);font-size:26px}.it20CommentModal__head p{margin:5px 0 0;color:var(--text-soft);font-size:12px}.it20CommentModal__close{width:38px;height:38px;border:1px solid var(--line-mid);border-radius:10px;background:var(--surface,#fff);color:var(--text-soft);font-size:24px;cursor:pointer}.it20CommentModal__body{padding:18px 22px}.it20CommentModal__body label{display:block;margin-bottom:7px;color:var(--text-soft);font-size:11px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}.it20CommentModal textarea{width:100%;min-height:145px;resize:vertical;border:1px solid var(--line-mid);border-radius:11px;padding:11px 13px;background:var(--surface,#fff);color:var(--text);font:inherit;line-height:1.5;outline:0}.it20CommentModal textarea:focus{border-color:var(--petrol);box-shadow:0 0 0 3px var(--petrol-soft)}.it20CommentModal__previous,.it20CommentModal__status{margin-bottom:12px;padding:10px 12px;border-radius:10px;font-size:12px}.it20CommentModal__previous{border:1px solid #cae4d6;background:#f2fbf6;color:var(--green-tx)}.it20CommentModal__status{margin:10px 0 0;background:#eef6f9;color:var(--petrol)}.it20CommentModal__status.is-error{background:#fff1ef;color:var(--red)}.it20CommentModal__status.is-ok{background:#edf9f3;color:var(--green-tx)}.it20CommentModal__foot{display:flex;justify-content:flex-end;gap:10px;padding:0 22px 20px}.it20CommentModal__foot button{min-height:40px;padding:0 15px;border-radius:10px;font:inherit;cursor:pointer}.it20CommentModal__cancel{border:1px solid var(--line-mid);background:var(--surface,#fff);color:var(--text)}.it20CommentModal__save{border:0;background:var(--petrol);color:#fff;font-weight:700}.it20CommentModal__save:disabled{opacity:.58;cursor:wait}body.has-it20-comment{overflow:hidden}@media(max-width:1550px){.it20Toolbar{grid-template-columns:repeat(2,1fr)}}@media(max-width:900px){.it20Cards{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.it20Toolbar,.it20Cards{grid-template-columns:1fr}}
   </style>
 </head>
@@ -215,7 +216,7 @@ if ($db->ok()) {
         <?php if (!$rows): ?><div class="empty"><p>No se encontraron alarmas para la semana y los filtros seleccionados.</p></div><?php else: ?>
         <div class="tablescroll"><table class="grid grid--sortable js-sortable it20Table" id="instalacionesTop20Table">
           <thead>
-            <tr><th>TIPO DE INSTALACIÓN ↕</th><th>INSTALACIÓN ↕</th><th>TAG ↕</th><th>DESCRIPCIÓN ↕</th><th>TOTAL ALARMAS ↕</th><th>CAMPO EXT.</th><th>COMENTARIO</th><?php if($reportEnabled): ?><th>REPORTE</th><?php endif; ?></tr>
+            <tr><th>TIPO DE INSTALACIÓN ↕</th><th>INSTALACIÓN ↕</th><th>TAG ↕</th><th>DESCRIPCIÓN ↕</th><th>TOTAL ALARMAS ↕</th><th>CAMPO EXT.</th><th>COMENTARIO</th><th>TEXTO DEL COMENTARIO</th><?php if($reportEnabled): ?><th>REPORTE</th><?php endif; ?></tr>
             <tr class="gridFilterRow" aria-label="Filtros por columna">
               <th><select data-it20-column-filter="0" aria-label="Filtrar tipo"><option value="">Todos</option><?php foreach ($installationTypeOptions as $typeLabel): ?><option value="<?php echo h($typeLabel); ?>"><?php echo h($typeLabel); ?></option><?php endforeach; ?></select></th>
               <th><select aria-label="Filtrar instalación" onchange="var f=document.querySelector('#instalacionesTop20Filters select[name=instalacion]');if(f){f.value=this.value;f.form.submit();}"><option value="">Todas</option><?php foreach($installations as $installationValue): ?><option value="<?php echo h($installationValue); ?>" <?php echo $installationFilter===$installationValue?'selected':''; ?>><?php echo h($installationValue); ?></option><?php endforeach; ?></select></th>
@@ -224,6 +225,7 @@ if ($db->ok()) {
               <th><input type="text" data-it20-column-filter="4" placeholder="Filtrar" aria-label="Filtrar cantidad"></th>
               <th><input type="text" data-it20-column-filter="5" placeholder="Filtrar" aria-label="Filtrar campo externo"></th>
               <th class="gridFilterRow__empty"></th>
+              <th><input type="text" data-it20-column-filter="7" placeholder="Filtrar" aria-label="Filtrar texto del comentario"></th>
               <?php if($reportEnabled): ?><th class="gridFilterRow__empty"></th><?php endif; ?>
             </tr>
           </thead>
@@ -232,9 +234,9 @@ if ($db->ok()) {
             $tag = trim((string)($row['TAG'] ?? $row['tag'] ?? ''));
             $installation = trim((string)($row['INSTALACION'] ?? $row['instalacion'] ?? ''));
             $rowType = clear_installation_type_normalize($row['TIPO_INSTALACION'] ?? $row['tipo_instalacion'] ?? 'SIN CLASIFICAR'); if ($rowType === '') $rowType = 'SIN CLASIFICAR';
-            $commentSubject = clear_alarm_comment_subject($installation, $rowType === 'POZO' ? 'pozo' : 'instalacion');
-            $hasWeeklyComment = isset($weeklyComments[strtoupper($commentSubject)]);
-            $commentRow=$weeklyComments[strtoupper($commentSubject)]??[];$commentText=trim((string)($commentRow['COMENTARIO']??$commentRow['comentario']??''));
+            $commentSubject = clear_alarm_comment_subject($tag);
+            $hasAlarmComment = isset($alarmComments[strtoupper($commentSubject)]);
+            $commentRow=$alarmComments[strtoupper($commentSubject)]??[];$commentText=trim((string)($commentRow['COMENTARIO']??$commentRow['comentario']??''));
             $reportColumns=['Semana'=>date('d/m/Y',strtotime($fromDate)).' al '.date('d/m/Y',strtotime($toDate)),'Tipo de instalación'=>$installationTypeOptions[$rowType]??$rowType,'Entidad'=>$installation,'TAG'=>$tag,'Descripción'=>$row['DESCRIPCION']??$row['descripcion']??'','Total alarmas'=>$row['TOTAL_ALARMAS']??$row['total_alarmas']??0,'Campo externo'=>$row['CAMPO_EXT']??$row['campo_ext']??''];if($commentText!=='')$reportColumns['Comentario']=$commentText;
           ?>
             <tr>
@@ -244,7 +246,8 @@ if ($db->ok()) {
               <td><?php echo h((string)($row['DESCRIPCION'] ?? $row['descripcion'] ?? '')); ?></td>
               <td><?php echo it20_num($row['TOTAL_ALARMAS'] ?? $row['total_alarmas'] ?? 0); ?></td>
               <td><?php echo h((string)($row['CAMPO_EXT'] ?? $row['campo_ext'] ?? '')); ?></td>
-              <td><?php echo clear_alarm_actions_cell(['display'=>'Comentario','tag'=>$tag,'subject'=>$commentSubject,'subject_label'=>($rowType === 'POZO' ? 'Pozo ' : 'Instalación ').$installation,'context'=>'instalaciones_top20','preserve_pi_link'=>false,'show_history'=>false,'show_comment'=>true,'has_comment'=>$hasWeeklyComment]); ?></td>
+              <td><?php echo clear_alarm_actions_cell(['display'=>'Comentario','tag'=>$tag,'subject'=>$commentSubject,'subject_label'=>$tag,'context'=>'instalaciones_top20','preserve_pi_link'=>false,'show_history'=>false,'show_comment'=>true,'has_comment'=>$hasAlarmComment]); ?></td>
+              <td class="it20CommentText" data-it20-comment-subject="<?php echo h($commentSubject); ?>"><?php echo h(clear_comment_body($commentText) !== '' ? clear_comment_body($commentText) : (($canViewComments || $canCreateComments) ? 'Sin comentario' : '—')); ?></td>
               <?php if($reportEnabled): ?><td><?php echo ns_report_pick(ns_report_key('top20-semanal',[$fromDate,$installation,$tag]),'row','Top 20 semanal · '.$installation.' · '.$tag,ns_report_row_payload($reportColumns),'Incluir'); ?></td><?php endif; ?>
             </tr>
           <?php endforeach; ?>
@@ -277,6 +280,18 @@ if ($db->ok()) {
       row.hidden=!visible;
     });
   }
+  window.addEventListener('clear-alarm-comment-updated',function(event){
+    var detail=event.detail||{};
+    var subject=String(detail.subject||'').trim().toUpperCase();
+    if(!subject)return;
+    var comment=String(detail.comment||'');
+    Array.prototype.forEach.call(table.querySelectorAll('[data-it20-comment-subject]'),function(cell){
+      if((cell.getAttribute('data-it20-comment-subject')||'').trim().toUpperCase()===subject){
+        cell.textContent=comment||'Sin comentario';
+      }
+    });
+    apply();
+  });
   filters.forEach(function(filter){filter.addEventListener(filter.tagName==='SELECT'?'change':'input',apply);filter.addEventListener('click',function(e){e.stopPropagation()})});
 })();
 </script>

@@ -78,9 +78,8 @@ $canExportComments = permissions_can('comments.view') || permissions_can('commen
 if ($canExportComments) {
     $subjects = [];
     foreach ($rows as $commentRow) {
-        $entity = trim((string)($commentRow['INSTALACION'] ?? $commentRow['instalacion'] ?? ''));
-        $type = clear_installation_type_normalize($commentRow['TIPO_INSTALACION'] ?? $commentRow['tipo_instalacion'] ?? '');
-        if ($entity !== '') $subjects[] = clear_alarm_comment_subject($entity, $type === 'POZO' ? 'pozo' : 'instalacion');
+        $commentTag = trim((string)($commentRow['TAG'] ?? $commentRow['tag'] ?? ''));
+        if ($commentTag !== '') $subjects[] = clear_alarm_comment_subject($commentTag);
     }
     foreach (clear_alarm_comments_load_subjects_sql($subjects) as $key => $commentRow) {
         $comments[$key] = [
@@ -98,8 +97,8 @@ $out = fopen('php://output', 'w');
 fputcsv($out, ['SEMANA_DESDE','SEMANA_HASTA','TIPO_INSTALACION','ENTIDAD','TAG','DESCRIPCION','TOTAL_ALARMAS','CAMPO_EXT','COMENTARIO','USUARIO_COMENTARIO'], ';');
 foreach ($rows as $row) {
     $installation = (string)($row['INSTALACION'] ?? $row['instalacion'] ?? '');
-    $rowType = clear_installation_type_normalize($row['TIPO_INSTALACION'] ?? $row['tipo_instalacion'] ?? '');
-    $comment = $comments[strtoupper(clear_alarm_comment_subject($installation, $rowType === 'POZO' ? 'pozo' : 'instalacion'))] ?? ['comment'=>'','user'=>''];
+    $commentTag = trim((string)($row['TAG'] ?? $row['tag'] ?? ''));
+    $comment = $comments[strtoupper(clear_alarm_comment_subject($commentTag))] ?? ['comment'=>'','user'=>''];
     fputcsv($out, [
         $fromDate,
         $toDate,
