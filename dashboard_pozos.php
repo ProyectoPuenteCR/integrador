@@ -6,7 +6,6 @@ require_once __DIR__.'/includes/icons.php';
 require_once __DIR__.'/includes/novedades_semanales_common.php';
 require_once __DIR__.'/includes/dashboard_pozos_data.php';
 require_once __DIR__.'/includes/dashboard_pozos_kpi.php';
-require_once __DIR__.'/includes/pozos_falla_report.php';
 
 auth_require();
 permissions_require_menu('dashboard_pozos');
@@ -45,7 +44,29 @@ foreach($all as $row){
 $den=max(1,$total);
 $bad=dp_top_without_comm($all,$data['now']);
 $comparisons=dp_kpi_comparisons($data['daily'],$data['now'],$data['config']['hora_corte']);
-$faultReport=pf_build_report($data,$_GET,true);
+$faultReport=null;
+$faultReportHtml='';
+$faultReportStyles='';
+$faultReportItems=[];
+$faultReportError='';
+$faultOutputLevel=ob_get_level();
+try{
+    $faultReportFile=__DIR__.'/includes/pozos_falla_report.php';
+    if(!is_readable($faultReportFile))throw new RuntimeException('Falta actualizar includes/pozos_falla_report.php.');
+    require_once $faultReportFile;
+    foreach(['dpf_build_report','dpf_render_panel','dpf_render_styles','dpf_report_items'] as $faultFunction){
+        if(!function_exists($faultFunction))throw new RuntimeException('La versión de includes/pozos_falla_report.php no coincide con el dashboard.');
+    }
+    $faultReport=dpf_build_report($data,$_GET,true);
+    ob_start();dpf_render_styles();$faultReportStyles=ob_get_clean();
+    ob_start();dpf_render_panel($faultReport,$reportReady,true);$faultReportHtml=ob_get_clean();
+    if($reportReady)$faultReportItems=dpf_report_items($faultReport);
+}catch(Throwable $e){
+    while(ob_get_level()>$faultOutputLevel)ob_end_clean();
+    $faultReport=null;$faultReportHtml='';$faultReportStyles='';$faultReportItems=[];
+    $faultReportError='No se pudo cargar el reporte de pozos en falla. Completá la actualización de los archivos del módulo.';
+    error_log('CLEAR Dashboard Pozos - reporte de fallas: '.$e->getMessage());
+}
 function dp_number($value,$decimals=1){return $value===null?'—':number_format((float)$value,$decimals,',','.');}
 function dp_days_label(array $row){
     if($row['dias_sin_com']===null)return 'Sin histórico';
@@ -109,7 +130,7 @@ if($reportReady){
         'Conteo'=>'Pozos únicos. Los resúmenes por fuente pueden compartir pozos.',
         'Duración sin comunicación'=>'Desde detección; ≥ indica inicio anterior desconocido.']);
     foreach($errors as $i=>$error)$reportRow('errores','Advertencias',(string)$i,['Detalle'=>$error]);
-    $dashboardReportItems=array_merge($dashboardReportItems,pf_report_items($faultReport));
+    $dashboardReportItems=array_merge($dashboardReportItems,$faultReportItems);
 }
 ?>
 <!doctype html>
@@ -120,7 +141,7 @@ if($reportReady){
 <title>CLEAR · Dashboard Pozos</title>
 <link rel="stylesheet" href="assets/css/app.css?v=3.0.0">
 <?php if($reportReady): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260904-dashboard-full-1"><?php endif; ?>
-<?php pf_render_styles(); ?>
+<?php echo $faultReportStyles; ?>
 <style>
 .dp{padding:0 22px 28px}
 .dp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
@@ -222,8 +243,10 @@ if($reportReady){
 
 <section class="dp-panel dp-failures pf" id="pozos-en-falla" aria-labelledby="dp-failures-title">
     <h2 id="dp-failures-title">Pozos en falla</h2>
+    <?php if($faultReport!==null): ?>
     <p class="dp-panel-sub">Detalle del estado actual · Día operativo: <?php echo h($faultReport['dayLabel']); ?></p>
-    <?php pf_render_panel($faultReport,$reportReady,true); ?>
+    <?php echo $faultReportHtml; ?>
+    <?php else: ?><p class="dp-error" role="status"><?php echo h($faultReportError); ?></p><?php endif; ?>
 </section>
 
 <div class="dp-bottom">

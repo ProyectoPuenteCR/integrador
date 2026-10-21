@@ -18,10 +18,10 @@ $ACTIVE='dashboard_pozos';
 $db=clear_db();
 $data=dp_data_load($db);
 
-$model=pf_build_report($data,$_GET);
+$model=dpf_build_report($data,$_GET);
 extract($model,EXTR_SKIP);
 
-if(pf_input($_GET,'exportar')==='csv'){
+if(dpf_input($_GET,'exportar')==='csv'){
     if(!$hasTelemetry){
         http_response_code(503);header('Content-Type: text/plain; charset=UTF-8');
         exit('No hay una lectura de pozos disponible para exportar el reporte de fallas.');
@@ -32,20 +32,20 @@ if(pf_input($_GET,'exportar')==='csv'){
     $out=fopen('php://output','w');
     fwrite($out,"\xEF\xBB\xBF");
     fputcsv($out,['Día operativo',$dayLabel],';');
-    $columns=pf_columns(['pozo'=>'','fallas_dia'=>null]);
+    $columns=dpf_columns(['pozo'=>'','fallas_dia'=>null]);
     fputcsv($out,array_keys($columns),';');
-    foreach($filtered as $row)fputcsv($out,array_map('pf_csv_value',array_values(pf_columns($row))),';');
+    foreach($filtered as $row)fputcsv($out,array_map('dpf_csv_value',array_values(dpf_columns($row))),';');
     fclose($out);exit;
 }
 
 $reportReady=ns_report_ready($db)&&permissions_can_menu('novedades_semanales_reporte');
-$reportItems=$reportReady?pf_report_items($model):[];
+$reportItems=$reportReady?dpf_report_items($model):[];
 ?>
 <!doctype html><html lang="es"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CLEAR · Pozos en falla</title>
 <link rel="stylesheet" href="assets/css/app.css?v=3.0.0">
-<?php pf_render_styles(); ?>
+<?php dpf_render_styles(); ?>
 <?php if($reportReady): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260904-dashboard-full-1"><?php endif; ?>
 </head><body><div class="app">
 <?php include __DIR__.'/includes/sidebar.php'; ?>
@@ -55,7 +55,7 @@ $reportItems=$reportReady?pf_report_items($model):[];
 <a class="pf-button pf-noprint" href="dashboard_pozos.php#pozos-en-falla">Volver al dashboard</a></div>
 <section class="pf">
 <?php foreach(($data['errors']??[]) as $error): ?><div class="pf-notice" role="status"><?php echo h($error); ?></div><?php endforeach; ?>
-<?php pf_render_panel($model,$reportReady); ?>
+<?php dpf_render_panel($model,$reportReady); ?>
 </section></main></div>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/pozos_falla.js?v=20261021-1"></script>

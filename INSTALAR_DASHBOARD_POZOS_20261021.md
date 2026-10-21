@@ -1,5 +1,21 @@
 # Dashboard Pozos: comunicación, fallas e indicadores
 
+## Corrección de carga del reporte integrado (21/10/2026)
+
+Si el dashboard dejó de abrir después de integrar el reporte, actualizar la copia de la aplicación desde `main` con **Pull** y publicar juntos estos archivos, conservando las rutas:
+
+- `dashboard_pozos.php`
+- `pozos_falla.php`
+- `includes/pozos_falla_report.php`
+- `assets/css/pozos_falla.css`
+- `assets/js/pozos_falla.js`
+
+Esta corrección **no requiere ejecutar SQL otra vez**. Tampoco reemplaza `config.php`. Si el repositorio está en una carpeta distinta de la que publica IIS, copiar esos archivos a la carpeta de la aplicación `CLEAR` y recargar `dashboard_pozos.php`.
+
+El reporte utiliza ahora el prefijo de funciones `dpf_`, para evitar una colisión con `pf_columns()` del módulo PUMP OFF. Además, el dashboard captura los errores de carga y preparación del bloque de fallas: si falta el componente o su versión no coincide, conserva el resto del dashboard y muestra un aviso dentro del bloque. El detalle técnico se escribe en el registro de errores de PHP con el prefijo `CLEAR Dashboard Pozos - reporte de fallas`. Los estilos tienen una copia de respaldo incorporada al componente para conservar el formato si falta el CSS.
+
+La colisión de nombres se reprodujo en una prueba local, pero no se ha confirmado como causa del error 500 observado en IIS. Si el error persiste después de actualizar todos los archivos, obtener del registro de PHP la entrada correspondiente a la hora de apertura de la página. La pantalla genérica de IIS no identifica el archivo ni la línea que fallaron.
+
 ## Instalación
 
 1. Actualizar desde Git los archivos de esta modificación. No reemplazar `config.php` ni volver a instalar scripts anteriores.
@@ -78,6 +94,9 @@ Incluye pruebas PHP para consolidación, metadatos, antigüedad, períodos, cobe
 ```text
 php tests/dashboard_pozos_data.test.php
 php tests/dashboard_pozos_kpi_test.php
+php tests/dashboard_pozos_report_bootstrap.test.php
 ```
+
+La prueba de carga del reporte utiliza procesos PHP aislados, los módulos reales PUMP OFF y fallas en ambos órdenes, y el constructor común de reportes. Comprueba que ambos módulos conserven sus columnas y que cero fallas y un conteo desconocido sigan siendo valores distintos.
 
 La revisión local valida PHP, el comportamiento del reporte con datos de prueba y el SQL por inspección. La conexión real con `LC_MDB`, los permisos del servidor y la ejecución del job se verifican durante la instalación; no se han ejecutado sobre el servidor productivo desde este entorno.
