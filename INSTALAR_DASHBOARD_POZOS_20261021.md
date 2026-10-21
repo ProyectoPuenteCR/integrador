@@ -5,7 +5,7 @@
 1. Actualizar desde Git los archivos de esta modificación. No reemplazar `config.php` ni volver a instalar scripts anteriores.
 2. En SQL Server Management Studio, con una cuenta autorizada para crear objetos en `LC_MDB` y jobs en `msdb`, ejecutar **`SQL/CLEAR_DASHBOARD_POZOS_20261021.sql`** una vez. El script también realiza una primera captura real.
 3. Confirmar que SQL Server Agent esté iniciado y que el job **CLEAR - Dashboard Pozos e historico** termine correctamente. Se programa cada cinco minutos, separado del refresco existente de telemetría.
-4. Abrir `dashboard_pozos.php` y pulsar **Actualizar**. La tarjeta **Pozos en falla** abre `pozos_falla.php`.
+4. Abrir `dashboard_pozos.php` y pulsar **Actualizar**. El reporte **Pozos en falla** aparece al pie del dashboard. La tarjeta superior lleva directamente a ese bloque.
 
 El script se puede ejecutar nuevamente: conserva los datos y utiliza sus propios objetos. No modifica la estructura ni la carga de `dbo.FIXALARMS`, las vistas RTQP, el refresco de telemetría o los jobs de otros módulos. El usuario SQL `fix`, si existe, recibe solamente lectura sobre las nuevas tablas; si IIS usa otro principal, otorgarle esos mismos permisos de lectura.
 
@@ -29,9 +29,13 @@ Las fechas siguen la hora local del servidor SQL, igual que las cachés existent
 - Se retiran las tarjetas de producción de petróleo, líquido y gas, baterías activas, comunicación promedio y registros procesados.
 - Se retira el gráfico Top 10 de producción y también sus datos del resumen incorporable al reporte. El dashboard deja de consultar Query 164.
 - El Top de pozos sin comunicación ordena por días observados sin comunicación, de mayor a menor. La fecha de refresco nunca se toma como inicio retrospectivo de la pérdida.
-- La tarjeta Pozos en falla abre un reporte con tarjetas BM, BES y PCP; filtros, ordenamiento, selector de columnas, 50/100/Todas las filas, exportación CSV para Excel, impresión/PDF e incorporación al reporte común.
+- El reporte Pozos en falla aparece debajo de los gráficos y resúmenes del dashboard, con tarjetas Total, BM, BES y PCP; filtros, ordenamiento, selector de columnas, 50/100/Todas las filas, exportación CSV para Excel, impresión/PDF e incorporación al reporte común. Los filtros y la paginación permanecen en el dashboard. `pozos_falla.php` conserva la vista independiente para exportar e imprimir.
 - La grilla contiene Zona, Instalación, Supervisor, Detalle de falla, Cant. de fallas acumuladas durante el día operativo y Método de extracción. Instalación identifica el pozo y puede mostrar su batería como dato adicional.
 - Se agregan Semana vs semana y Mes vs mes para pozos sin comunicación, comunicando y en falla.
+
+### Actualización de presentación: reporte integrado
+
+Si el SQL de esta modificación ya está instalado, integrar el reporte al dashboard **no requiere volver a ejecutarlo**. Actualizar los archivos de este commit, incluyendo `includes/pozos_falla_report.php` y `assets/css/pozos_falla.css`, y recargar la página. Ambas vistas comparten el mismo reporte y sus estilos se incorporan en el HTML generado por PHP. El dashboard reutiliza la lectura de telemetría ya realizada: filtrar el bloque de fallas no modifica los indicadores generales ni agrega una segunda carga de datos. «Incluir resumen completo» incorpora también los pozos en falla filtrados de todas las páginas.
 
 ## Reglas de cálculo
 

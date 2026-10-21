@@ -6,6 +6,7 @@ require_once __DIR__.'/includes/icons.php';
 require_once __DIR__.'/includes/novedades_semanales_common.php';
 require_once __DIR__.'/includes/dashboard_pozos_data.php';
 require_once __DIR__.'/includes/dashboard_pozos_kpi.php';
+require_once __DIR__.'/includes/pozos_falla_report.php';
 
 auth_require();
 permissions_require_menu('dashboard_pozos');
@@ -44,6 +45,7 @@ foreach($all as $row){
 $den=max(1,$total);
 $bad=dp_top_without_comm($all,$data['now']);
 $comparisons=dp_kpi_comparisons($data['daily'],$data['now'],$data['config']['hora_corte']);
+$faultReport=pf_build_report($data,$_GET,true);
 function dp_number($value,$decimals=1){return $value===null?'—':number_format((float)$value,$decimals,',','.');}
 function dp_days_label(array $row){
     if($row['dias_sin_com']===null)return 'Sin histórico';
@@ -107,6 +109,7 @@ if($reportReady){
         'Conteo'=>'Pozos únicos. Los resúmenes por fuente pueden compartir pozos.',
         'Duración sin comunicación'=>'Desde detección; ≥ indica inicio anterior desconocido.']);
     foreach($errors as $i=>$error)$reportRow('errores','Advertencias',(string)$i,['Detalle'=>$error]);
+    $dashboardReportItems=array_merge($dashboardReportItems,pf_report_items($faultReport));
 }
 ?>
 <!doctype html>
@@ -117,6 +120,7 @@ if($reportReady){
 <title>CLEAR · Dashboard Pozos</title>
 <link rel="stylesheet" href="assets/css/app.css?v=3.0.0">
 <?php if($reportReady): ?><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260904-dashboard-full-1"><?php endif; ?>
+<?php pf_render_styles(); ?>
 <style>
 .dp{padding:0 22px 28px}
 .dp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
@@ -157,10 +161,12 @@ if($reportReady){
 .dp-legend a{color:inherit;text-decoration:none}.dp-legend a:hover{text-decoration:underline}
 .dp-error{background:#fff4d6;padding:10px;border-radius:9px;margin-bottom:10px;color:#8b5800}
 .dp-empty{padding:22px;text-align:center;color:var(--text-mut);background:var(--surface-2);border-radius:10px}
+.dp-failures{margin-top:18px;scroll-margin-top:24px}.dp-failures h2{margin-bottom:7px}.dp-failures .dp-panel-sub{margin:0 0 16px;line-height:1.5}.dp-failures .pf-kpi{min-height:118px;border-radius:14px}.dp-failures .pf-kpi strong{font-size:33px}.dp-failures .pf-grid-panel{padding:14px 0 0;border:0;border-radius:0}.dp-failures .pf-kpis{margin-bottom:14px}
 @media(max-width:1300px){.dp-grid{grid-template-columns:1fr 1fr}.dp-grid .wide{grid-column:1/-1}}
 @media(max-width:1100px){.dp-lower,.dp-comparisons{grid-template-columns:1fr}}
 @media(max-width:800px){.dp-grid,.dp-lower{grid-template-columns:1fr}.dp{padding:0 10px}.dp-donut{width:120px;height:120px;flex-shrink:0}.dp-donut:after{inset:29px}.dp-kpi-table th,.dp-kpi-table td{padding:9px 4px}.dp-kpi-table td strong{font-size:16px}}
 @media print{.sidebar,.topbar,.dashboardReportHead,.dp-refresh{display:none!important}.main{margin:0!important}.dp{padding:0}.dp-panel,.dp-card{box-shadow:none;break-inside:avoid}.dp-grid,.dp-comparisons,.dp-lower{display:block}.dp-panel{margin-top:12px}.dp-table-wrap{overflow:visible}.dp-table{font-size:9px}.dp-kpis{grid-template-columns:repeat(5,1fr)}}
+@media print{.dp-failures{break-inside:auto}}
 </style>
 </head>
 <body>
@@ -181,7 +187,7 @@ if($reportReady){
     <a class="dp-card" style="--accent:<?php echo $colors[$t];?>" href="<?php echo h($s['url']);?>"><span>Pozos <?php echo h($t);?></span><b><?php echo $s['count'];?></b><small><?php echo $total?round($s['count']*100/$total,1):0;?>% del total</small></a>
     <?php endforeach;?>
     <a class="dp-card" style="--accent:#ef4444" href="monitoreo_pozos.php?comunicacion=Sin%20comunicaci%C3%B3n"><span>Sin comunicación</span><b><?php echo $commTot['Sin comunicación'];?></b><small><?php echo round($commTot['Sin comunicación']*100/$den,1);?>% de pozos únicos</small></a>
-    <a class="dp-card" style="--accent:#d73953" href="pozos_falla.php"><span>Pozos en falla</span><b><?php echo $stateTot['En falla'];?></b><small>Ver reporte BM · BES · PCP</small></a>
+    <a class="dp-card" style="--accent:#d73953" href="#pozos-en-falla"><span>Pozos en falla</span><b><?php echo $stateTot['En falla'];?></b><small>Ver detalle debajo · BM · BES · PCP</small></a>
 </div>
 
 <div class="dp-comparisons" aria-label="Indicadores comparativos">
@@ -201,8 +207,8 @@ if($reportReady){
 </div>
 
 <div class="dp-grid">
-    <div class="dp-panel"><h2>Estado de comunicación</h2><?php $a=round($commTot['Comunicando']*100/$den,1);$b=$a+round($commTot['Intermitente']*100/$den,1);$c=$b+round($commTot['Sin comunicación']*100/$den,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($commTot as $k=>$v):?><div><span><?php if($k==='En falla'):?><a href="pozos_falla.php"><?php echo h($k);?></a><?php else:?><?php echo h($k);?><?php endif;?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
-    <div class="dp-panel"><h2>Estado operativo de pozos</h2><?php $sd=max(1,array_sum($stateTot));$a=round($stateTot['En marcha']*100/$sd,1);$b=$a+round($stateTot['Parado']*100/$sd,1);$c=$b+round($stateTot['En falla']*100/$sd,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($stateTot as $k=>$v):?><div><span><?php if($k==='En falla'):?><a href="pozos_falla.php"><?php echo h($k);?></a><?php else:?><?php echo h($k);?><?php endif;?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
+    <div class="dp-panel"><h2>Estado de comunicación</h2><?php $a=round($commTot['Comunicando']*100/$den,1);$b=$a+round($commTot['Intermitente']*100/$den,1);$c=$b+round($commTot['Sin comunicación']*100/$den,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($commTot as $k=>$v):?><div><span><?php if($k==='En falla'):?><a href="#pozos-en-falla"><?php echo h($k);?></a><?php else:?><?php echo h($k);?><?php endif;?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
+    <div class="dp-panel"><h2>Estado operativo de pozos</h2><?php $sd=max(1,array_sum($stateTot));$a=round($stateTot['En marcha']*100/$sd,1);$b=$a+round($stateTot['Parado']*100/$sd,1);$c=$b+round($stateTot['En falla']*100/$sd,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($stateTot as $k=>$v):?><div><span><?php if($k==='En falla'):?><a href="#pozos-en-falla"><?php echo h($k);?></a><?php else:?><?php echo h($k);?><?php endif;?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
     <div class="dp-panel wide"><h2>Fallas de comunicación</h2><div class="dp-bars"><?php $mx=max(1,max(array_map(function($s){return $s['comm']['Sin comunicación'];},$summary)));foreach($summary as $t=>$s):$n=$s['comm']['Sin comunicación'];?><div class="bar"><b><?php echo h($t);?></b><div class="dp-track"><div class="dp-fill" style="width:<?php echo round($n*100/$mx);?>%"></div></div><b><?php echo $n;?></b></div><?php endforeach;?></div></div>
 </div>
 
@@ -214,6 +220,12 @@ if($reportReady){
     <p class="dp-helper">Ordenado de mayor a menor duración observada, hasta la última lectura. <strong>≥</strong> indica que el pozo ya estaba sin comunicación al comenzar el seguimiento; su antigüedad previa no está disponible.</p></div>
 </div>
 
+<section class="dp-panel dp-failures pf" id="pozos-en-falla" aria-labelledby="dp-failures-title">
+    <h2 id="dp-failures-title">Pozos en falla</h2>
+    <p class="dp-panel-sub">Detalle del estado actual · Día operativo: <?php echo h($faultReport['dayLabel']); ?></p>
+    <?php pf_render_panel($faultReport,$reportReady,true); ?>
+</section>
+
 <div class="dp-bottom">
     <span>Última actualización: <strong><?php echo $last?date('d/m/Y H:i:s',$last):'Sin fecha';?></strong><?php echo !empty($data['stale'])?' · Datos pendientes de actualización':''; ?></span>
     <span>Corte del día operativo: <strong><?php echo h(substr($data['config']['hora_corte'],0,5)); ?></strong> · Hora de Argentina</span>
@@ -222,6 +234,7 @@ if($reportReady){
 </main>
 </div>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/pozos_falla.js?v=20261021-2"></script>
 <?php if($reportReady): ?><script>window.CLEAR_WEEKLY_NEWS={};window.CLEAR_DASHBOARD_REPORT=<?php echo json_encode(['items'=>$dashboardReportItems,'addedMessage'=>'Dashboard Pozos completo agregado al reporte.','removedMessage'=>'Dashboard Pozos quitado del reporte.'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;</script><script src="assets/js/novedades_semanales.js?v=20260904-dashboard-full-1"></script><script src="assets/js/dashboard_report.js?v=20260904-dashboard-full-1"></script><?php endif; ?>
 <!-- Actualización automática desactivada: el usuario actualiza manualmente para no sobrecargar SQL. -->
 </body>
