@@ -3,8 +3,9 @@ require_once __DIR__.'/includes/db.php';
 require_once __DIR__.'/includes/auth.php';
 require_once __DIR__.'/includes/permissions.php';
 require_once __DIR__.'/includes/icons.php';
-require_once __DIR__.'/includes/production_q164.php';
 require_once __DIR__.'/includes/novedades_semanales_common.php';
+require_once __DIR__.'/includes/dashboard_pozos_data.php';
+require_once __DIR__.'/includes/dashboard_pozos_kpi.php';
 
 auth_require();
 permissions_require_menu('dashboard_pozos');
@@ -15,215 +16,97 @@ $APP_ROLE=auth_es_admin()?'Administrador':'Operador';
 $ACTIVE='dashboard_pozos';
 $db=clear_db();
 $reportReady=$db->ok()&&ns_report_ready($db)&&permissions_can_menu('novedades_semanales_reporte');
-
-$defs=[
-    'SCADA'=>['url'=>'telemetria_general.php?tipo=SCADA'],
-    'TECSS'=>['url'=>'telemetria_tecss.php']
-];
-
-function dp_comm($v){
-    $x=strtoupper(trim((string)$v));
-    if($x==='')return 'Sin dato';
-    if(preg_match('/BAD|FALL|NO DATA|DESC|ERROR|SIN COM|NO COM/',$x)||$x==='0')return 'Sin comunicación';
-    if(preg_match('/INTER|DEMOR/',$x))return 'Intermitente';
-    return 'Comunicando';
-}
-function dp_state($v){
-    $x=strtoupper(trim((string)$v));
-    if($x==='')return 'Desconocido';
-    if(preg_match('/FALL|ALAR|ERROR|EMER/',$x))return 'En falla';
-    if(preg_match('/PARO|OFF|INACT|DETEN/',$x))return 'Parado';
-    if(preg_match('/MARCH|NORMAL|OPER|RUN|BOMB|OK/',$x))return 'En marcha';
-    return 'Desconocido';
-}
-function dp_prod($value){
-    return $value===null||$value===''||!is_numeric($value)?'—':number_format((float)$value,2,',','.');
-}
-function dp_clean_error($value){
-    $text=html_entity_decode((string)$value,ENT_QUOTES|ENT_HTML5,'UTF-8');
-    $text=preg_replace('~<br\\s*/?>~i',' · ',$text);
-    $text=strip_tags($text);
-    $text=preg_replace('/\\s+/u',' ',$text);
-    return trim($text);
-}
-
-$summary=[];
-$all=[];
-$bats=[];
+$data=dp_data_load($db);
+$all=$data['rows'];
+$total=count($all);
 $last=null;
-$errors=[];
-foreach($defs as $type=>$d){
-    $summary[$type]=[
-        'count'=>0,
-        'comm'=>['Comunicando'=>0,'Intermitente'=>0,'Sin comunicación'=>0,'Sin dato'=>0],
-        'state'=>['En marcha'=>0,'Parado'=>0,'En falla'=>0,'Desconocido'=>0],
-        'url'=>$d['url']
-    ];
-}
-
-$cacheReady=$db->ok() && (int)$db->scalar("SELECT CASE WHEN OBJECT_ID(N'dbo.TELEMETRIA_POZOS_GENERAL_CACHE',N'U') IS NULL THEN 0 ELSE 1 END")===1;
-$telemetryRows=[];
-if($cacheReady){
-    $telemetryRows=$db->all(
-        "SELECT TOP (5000) POZO,BATERIA,TIPO,COMUNICACION,ESTADO,FECHA_CACHE " .
-        "FROM dbo.TELEMETRIA_POZOS_GENERAL_CACHE WHERE POZO IS NOT NULL AND LTRIM(RTRIM(CONVERT(nvarchar(255),POZO)))<>'' " .
-        "ORDER BY POZO"
-    );
-}else{
-    $errors['CACHE']='No está disponible TELEMETRIA_POZOS_GENERAL_CACHE. Se evitó consultar RTQP/OPENQUERY desde el dashboard para no bloquear la página.';
-}
-
-$seenByType=[];
-$seenAll=[];
-foreach($telemetryRows as $r){
-    $pozo=trim((string)($r['POZO']??''));
-    if($pozo==='')continue;
-    $rawType=strtoupper(trim((string)($r['TIPO']??'')));
-    $type=in_array($rawType,['TECSS','TECCS'],true)?'TECSS':'SCADA';
-    $key=strtoupper($pozo);
-    if(isset($seenByType[$type][$key]))continue;
-    $seenByType[$type][$key]=1;
-    $seenAll[$key]=1;
-
-    $bat=trim((string)($r['BATERIA']??''));
-    if($bat!=='')$bats[$bat]=1;
-    $cv=dp_comm($r['COMUNICACION']??'');
-    $sv=dp_state($r['ESTADO']??'');
-    $summary[$type]['count']++;
-    $summary[$type]['comm'][$cv]++;
-    $summary[$type]['state'][$sv]++;
-    $dt=strtotime((string)($r['FECHA_CACHE']??''))?:0;
-    if($dt&&(!$last||$dt>$last))$last=$dt;
-    $all[]=['pozo'=>$pozo,'tipo'=>$type,'bateria'=>$bat,'comm'=>$cv,'state'=>$sv,'date'=>$dt];
-}
-
-$total=count($seenAll);
+$errors=$data['errors'];
 $commTot=['Comunicando'=>0,'Intermitente'=>0,'Sin comunicación'=>0,'Sin dato'=>0];
 $stateTot=['En marcha'=>0,'Parado'=>0,'En falla'=>0,'Desconocido'=>0];
-foreach($summary as $s){
-    foreach($commTot as $k=>$_)$commTot[$k]+=$s['comm'][$k];
-    foreach($stateTot as $k=>$_)$stateTot[$k]+=$s['state'][$k];
+$summary=[];
+foreach(['SCADA'=>'telemetria_general.php?tipo=SCADA','TECSS'=>'telemetria_tecss.php'] as $type=>$url){
+    $summary[$type]=['count'=>0,'comm'=>$commTot,'state'=>$stateTot,'url'=>$url];
 }
-$den=max(1,array_sum($commTot));
-$pComm=round($commTot['Comunicando']*100/$den,1);
-
-/* =============================================================
-   INFOIL Query 164 - ultimo test aprobado por pozo
-   Se cruza por nombre de POZO y se evita duplicar pozos que aparezcan en
-   mas de un tipo de telemetria.
-============================================================= */
-$productionMap=$all ? clear_q164_latest_map($db) : [];
-$telemetryWells=[];
 foreach($all as $row){
-    $key=clear_q164_well_key($row['pozo']);
-    if($key!=='')$telemetryWells[$key]=$row['pozo'];
-}
-
-$productionTotals=['PRODUCCION_PETROLEO'=>0.0,'PRODUCCION_LIQUIDO'=>0.0,'PRODUCCION_GAS'=>0.0];
-$productionWellCount=0;
-$topProduction=[];
-foreach($telemetryWells as $key=>$wellName){
-    if(!isset($productionMap[$key]))continue;
-    $p=$productionMap[$key];
-    $hasProduction=false;
-    foreach(array_keys($productionTotals) as $field){
-        if($p[$field]!==null){
-            $productionTotals[$field]+=(float)$p[$field];
-            $hasProduction=true;
-        }
-    }
-    if($hasProduction)$productionWellCount++;
-    $oil=$p['PRODUCCION_PETROLEO'];
-    if($oil!==null && (float)$oil>0){
-        $topProduction[]=[
-            'pozo'=>$wellName,
-            'petroleo'=>(float)$oil,
-            'liquido'=>$p['PRODUCCION_LIQUIDO'],
-            'gas'=>$p['PRODUCCION_GAS']
-        ];
+    $comm=isset($commTot[$row['comm']])?$row['comm']:'Sin dato';
+    $state=isset($stateTot[$row['state']])?$row['state']:'Desconocido';
+    $commTot[$comm]++;$stateTot[$state]++;
+    if(!empty($row['date']))$last=max((int)$last,(int)$row['date']);
+    foreach(['SCADA'=>'scada','TECSS'=>'tecss'] as $type=>$prefix){
+        if(empty($row['en_'.$prefix]))continue;
+        $summary[$type]['count']++;
+        $sourceComm=$row[$prefix.'_comm']??$comm;
+        $sourceState=$row[$prefix.'_state']??$state;
+        $summary[$type]['comm'][isset($commTot[$sourceComm])?$sourceComm:'Sin dato']++;
+        $summary[$type]['state'][isset($stateTot[$sourceState])?$sourceState:'Desconocido']++;
     }
 }
-usort($topProduction,function($a,$b){return $b['petroleo']<=>$a['petroleo'];});
-$topProduction=array_slice($topProduction,0,10);
-$maxProduction=1.0;
-foreach($topProduction as $p){if($p['petroleo']>$maxProduction)$maxProduction=$p['petroleo'];}
-
-$bad=array_values(array_filter($all,function($r){return $r['comm']==='Sin comunicación';}));
-usort($bad,function($a,$b){return ($a['date']?:0)<=>($b['date']?:0);});
-$bad=array_slice($bad,0,10);
-foreach($bad as &$badRow){
-    $key=clear_q164_well_key($badRow['pozo']);
-    $badRow['produccion_petroleo']=$productionMap[$key]['PRODUCCION_PETROLEO']??null;
+$den=max(1,$total);
+$bad=dp_top_without_comm($all,$data['now']);
+$comparisons=dp_kpi_comparisons($data['daily'],$data['now'],$data['config']['hora_corte']);
+function dp_number($value,$decimals=1){return $value===null?'—':number_format((float)$value,$decimals,',','.');}
+function dp_days_label(array $row){
+    if($row['dias_sin_com']===null)return 'Sin histórico';
+    return (!empty($row['sin_com_estimado'])?'≥ ':'').dp_number($row['dias_sin_com'],2).' días';
 }
-unset($badRow);
-
+function dp_delta_label(array $metric){
+    if($metric['delta']===null)return 'Sin comparación';
+    $d=$metric['delta'];
+    $sign=$d>0?'+':'';
+    $text=$sign.dp_number($d).' pozos';
+    if($metric['percent']!==null)$text.=' ('.($metric['percent']>0?'+':'').dp_number($metric['percent']).'%)';
+    elseif($metric['previous']==0)$text.=' · base anterior 0';
+    return $text;
+}
 $dashboardReportItems=[];
 if($reportReady){
     $reportRow=function($sectionKey,$sectionTitle,$identity,array $columns)use(&$dashboardReportItems){
         $payload=ns_report_row_payload($columns);
         $payload['group']='dashboard_pozos_'.$sectionKey;
         $payload['group_title']='Dashboard Pozos · '.$sectionTitle;
-        $dashboardReportItems[]=[
-            'key'=>ns_report_key('dashboard-pozos',[$sectionKey,(string)$identity]),
-            'type'=>'row',
-            'title'=>'Dashboard Pozos · '.$sectionTitle.($identity!==''?' · '.$identity:''),
-            'payload'=>$payload,
-        ];
+        $dashboardReportItems[]=['key'=>ns_report_key('dashboard-pozos',[$sectionKey,(string)$identity]),'type'=>'row',
+            'title'=>'Dashboard Pozos · '.$sectionTitle.($identity!==''?' · '.$identity:''),'payload'=>$payload];
     };
-    $reportChart=function($sectionKey,$title,array $labels,array $datasets,$type='bar',$unit='pozos')use(&$dashboardReportItems){
-        $dashboardReportItems[]=[
-            'key'=>ns_report_key('dashboard-pozos-chart',[$sectionKey]),
-            'type'=>'chart',
-            'title'=>'Dashboard Pozos · '.$title,
-            'payload'=>['kind'=>'chart','labels'=>$labels,'datasets'=>$datasets,'chart_type'=>$type,'unit'=>$unit,'palette'=>'multicolor','context'=>'Resumen completo del Dashboard Pozos'],
-        ];
+    $reportChart=function($sectionKey,$title,array $labels,array $datasets,$type='bar')use(&$dashboardReportItems){
+        $dashboardReportItems[]=['key'=>ns_report_key('dashboard-pozos-chart',[$sectionKey]),'type'=>'chart','title'=>'Dashboard Pozos · '.$title,
+            'payload'=>['kind'=>'chart','labels'=>$labels,'datasets'=>$datasets,'chart_type'=>$type,'unit'=>'pozos','palette'=>'multicolor','context'=>'Resumen del Dashboard Pozos']];
     };
-
     $main=['Total de pozos'=>$total];
-    foreach($summary as $type=>$data)$main['Pozos '.$type]=$data['count'];
+    foreach($summary as $type=>$entry)$main['Pozos '.$type]=$entry['count'];
     $main['Sin comunicación']=$commTot['Sin comunicación'];
-    $main['Producción petróleo total']=dp_prod($productionTotals['PRODUCCION_PETROLEO']).' m³';
-    $main['Producción líquido total']=dp_prod($productionTotals['PRODUCCION_LIQUIDO']).' m³';
-    $main['Producción gas total']=dp_prod($productionTotals['PRODUCCION_GAS']).' m³';
+    $main['Pozos en falla']=$stateTot['En falla'];
     $reportRow('indicadores','Indicadores principales','',$main);
-
-    $reportChart('comunicacion','Estado de comunicación',array_keys($commTot),[['label'=>'Pozos','values'=>array_values($commTot)]],'doughnut','pozos');
+    $reportChart('comunicacion','Estado de comunicación',array_keys($commTot),[['label'=>'Pozos','values'=>array_values($commTot)]],'doughnut');
     foreach($commTot as $state=>$value)$reportRow('comunicacion_detalle','Estado de comunicación',$state,['Estado'=>$state,'Cantidad'=>$value,'Porcentaje'=>round($value*100/$den,1).'%']);
-
-    $stateDen=max(1,array_sum($stateTot));
-    $reportChart('estado_operativo','Estado operativo de pozos',array_keys($stateTot),[['label'=>'Pozos','values'=>array_values($stateTot)]],'doughnut','pozos');
-    foreach($stateTot as $state=>$value)$reportRow('estado_detalle','Estado operativo de pozos',$state,['Estado'=>$state,'Cantidad'=>$value,'Porcentaje'=>round($value*100/$stateDen,1).'%']);
-
-    $failureLabels=[];$failureValues=[];
-    foreach($summary as $type=>$data){$failureLabels[]=$type;$failureValues[]=$data['comm']['Sin comunicación'];}
-    $reportChart('fallas_comunicacion','Fallas de comunicación',$failureLabels,[['label'=>'Sin comunicación','values'=>$failureValues]],'bar','pozos');
-
-    foreach($summary as $type=>$data){
-        $typeDen=max(1,array_sum($data['comm']));
-        $reportRow('resumen_tipo','Resumen por tipo de telemetría',$type,[
-            'Tipo'=>$type,'Pozos'=>$data['count'],'Con comunicación'=>$data['comm']['Comunicando'],'Intermitente'=>$data['comm']['Intermitente'],
-            'Sin comunicación'=>$data['comm']['Sin comunicación'],'% comunicación'=>round($data['comm']['Comunicando']*100/$typeDen,1).'%',
-            'En marcha'=>$data['state']['En marcha'],'Parados'=>$data['state']['Parado'],'En falla'=>$data['state']['En falla'],
-        ]);
+    $reportChart('estado_operativo','Estado operativo de pozos',array_keys($stateTot),[['label'=>'Pozos','values'=>array_values($stateTot)]],'doughnut');
+    foreach($stateTot as $state=>$value)$reportRow('estado_detalle','Estado operativo de pozos',$state,['Estado'=>$state,'Cantidad'=>$value,'Porcentaje'=>round($value*100/$den,1).'%']);
+    foreach($summary as $type=>$entry){
+        $reportRow('resumen_tipo','Resumen por tipo de telemetría',$type,['Tipo'=>$type,'Pozos'=>$entry['count'],
+            'Con comunicación'=>$entry['comm']['Comunicando'],'Intermitente'=>$entry['comm']['Intermitente'],
+            'Sin comunicación'=>$entry['comm']['Sin comunicación'],'En marcha'=>$entry['state']['En marcha'],
+            'Parados'=>$entry['state']['Parado'],'En falla'=>$entry['state']['En falla']]);
     }
-
-    if($bad){foreach($bad as $row)$reportRow('top_sin_comunicacion','Top pozos sin comunicación',$row['pozo'],[
-        'Pozo'=>$row['pozo'],'Producción petróleo'=>dp_prod($row['produccion_petroleo']).($row['produccion_petroleo']!==null?' m³':''),'Tipo'=>$row['tipo'],
-        'Batería'=>$row['bateria'],'Último dato'=>$row['date']?date('d/m/Y H:i',$row['date']):'Sin fecha',
-    ]);}else{$reportRow('top_sin_comunicacion','Top pozos sin comunicación','sin-datos',['Estado'=>'Sin pozos detectados']);}
-
-    if($topProduction){
-        $reportChart('top_produccion','Top 10 pozos con mayor producción de petróleo',array_column($topProduction,'pozo'),[['label'=>'Petróleo','values'=>array_map(function($row){return(float)$row['petroleo'];},$topProduction)]],'bar','m³');
-        foreach($topProduction as $index=>$row)$reportRow('top_produccion_detalle','Top 10 pozos con mayor producción de petróleo',$row['pozo'],[
-            'Posición'=>$index+1,'Pozo'=>$row['pozo'],'Petróleo'=>dp_prod($row['petroleo']).' m³','Líquido'=>dp_prod($row['liquido']).' m³','Gas'=>dp_prod($row['gas']).' m³',
-        ]);
-    }else{$reportRow('top_produccion_detalle','Top 10 pozos con mayor producción de petróleo','sin-datos',['Estado'=>'Sin datos disponibles en Query 164']);}
-
-    $reportRow('estado_fuentes','Estado y actualización','',[
-        'Baterías activas'=>count($bats),'Comunicación promedio'=>$pComm.'%','Última actualización'=>$last?date('d/m/Y H:i:s',$last):'Sin fecha',
-        'Registros procesados'=>count($all),'Pozos con último test aprobado'=>$productionWellCount,
-    ]);
-    foreach($errors as $type=>$error)$reportRow('errores','Advertencias de fuentes',$type,['Fuente'=>$type,'Detalle'=>$error]);
+    $failureValues=array_map(static function($entry){return $entry['comm']['Sin comunicación'];},array_values($summary));
+    $reportChart('fallas_comunicacion','Fallas de comunicación por fuente',array_keys($summary),[['label'=>'Sin comunicación','values'=>$failureValues]]);
+    foreach($bad as $row)$reportRow('top_sin_comunicacion','Top pozos sin comunicación',$row['pozo'],[
+        'Pozo'=>$row['pozo'],'Días sin comunicación'=>dp_days_label($row),'Tipo'=>$row['tipo'],'Batería'=>$row['bateria'],
+        'Detectado desde'=>$row['sin_com_desde']?date('d/m/Y H:i',$row['sin_com_desde']):'Sin histórico',
+        'Última observación'=>$row['date']?date('d/m/Y H:i',$row['date']):'Sin fecha']);
+    if(!$bad)$reportRow('top_sin_comunicacion','Top pozos sin comunicación','sin-datos',['Estado'=>'Sin pozos detectados']);
+    foreach($comparisons as $comparison){
+        foreach($comparison['metrics'] as $metric)$reportRow('kpi_'.$comparison['key'],$comparison['title'],$metric['label'],[
+            'Indicador'=>$metric['label'],'Período reciente'=>$comparison['current']['label'],
+            'Promedio diario reciente'=>dp_number($metric['current']),'Período anterior'=>$comparison['previous']['label'],
+            'Promedio diario anterior'=>dp_number($metric['previous']),'Variación'=>dp_delta_label($metric),
+            'Cobertura reciente'=>$comparison['current']['available'].'/'.$comparison['current']['expected'].' días',
+            'Cobertura anterior'=>$comparison['previous']['available'].'/'.$comparison['previous']['expected'].' días']);
+    }
+    $reportRow('estado_fuentes','Actualización y criterios','',[
+        'Última actualización'=>$last?date('d/m/Y H:i:s',$last):'Sin fecha',
+        'Corte del día operativo'=>substr($data['config']['hora_corte'],0,5),
+        'Conteo'=>'Pozos únicos. Los resúmenes por fuente pueden compartir pozos.',
+        'Duración sin comunicación'=>'Desde detección; ≥ indica inicio anterior desconocido.']);
+    foreach($errors as $i=>$error)$reportRow('errores','Advertencias',(string)$i,['Detalle'=>$error]);
 }
 ?>
 <!doctype html>
@@ -242,7 +125,6 @@ if($reportReady){
 .dp-card span{font-size:11px;font-weight:800;color:var(--accent,var(--petrol));text-transform:uppercase;letter-spacing:.4px}
 .dp-card b{display:block;font-size:33px;margin:9px 0 2px;line-height:1}
 .dp-card small{color:var(--text-mut)}
-.dp-prod-card b{font-size:27px}
 .dp-grid{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:14px;margin-top:14px}
 .dp-panel{padding:17px}
 .dp-panel h2{font-size:14px;color:var(--petrol);margin:0 0 15px;text-transform:uppercase}
@@ -260,21 +142,25 @@ if($reportReady){
 .dp-table th,.dp-table td{padding:9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 .dp-table th{color:var(--text-mut);font-size:10px;text-transform:uppercase;letter-spacing:.03em}
 .dp-type{padding:3px 8px;border-radius:999px;background:var(--petrol-soft);color:var(--petrol);font-weight:800}
-.dp-production{margin-top:14px}
-.dp-prod-chart{display:flex;flex-direction:column;gap:8px}
-.dp-prod-row{display:grid;grid-template-columns:28px minmax(125px,220px) minmax(180px,1fr) 92px;gap:10px;align-items:center;font-size:12px}
-.dp-prod-rank{width:24px;height:24px;border-radius:8px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--text-mut)}
-.dp-prod-well{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dp-prod-track{height:20px;background:var(--surface-2);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
-.dp-prod-fill{height:100%;min-width:3px;border-radius:999px;background:linear-gradient(90deg,#0f7a64,#32ad7c)}
-.dp-prod-value{text-align:right;font-weight:800;color:#0f6f5c}
-.dp-bottom{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
-.dp-mini{padding:18px}.dp-mini b{font-size:28px}
+.dp-bottom{margin-top:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--text-mut);font-size:12px}
+.dp-table-wrap{overflow:auto;max-width:100%}.dp-panel{min-width:0}
+.dp-comparisons{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.dp-comparison h2{margin-bottom:7px}.dp-comparison-sub{color:var(--text-mut);font-size:12px;margin:0 0 14px}
+.dp-kpi-table{font-size:12px;table-layout:fixed;width:100%;border-collapse:collapse}
+.dp-kpi-table th,.dp-kpi-table td{padding:11px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+.dp-kpi-table th:first-child,.dp-kpi-table td:first-child{text-align:left;width:27%}
+.dp-kpi-table th{font-size:11px;color:var(--text-mut);font-weight:700}.dp-kpi-table th small{display:block;font-size:10px;font-weight:400;margin-top:4px}
+.dp-kpi-table td strong{font-size:19px;display:block;font-variant-numeric:tabular-nums}
+.dp-change{font-size:11px;color:var(--text-mut)}.dp-change.good{color:var(--status-green,#168349)}.dp-change.bad{color:var(--status-red,#d22f42)}
+.dp-coverage{font-size:11px;margin:12px 0 0;color:var(--text-mut);line-height:1.6}.dp-pending{padding:10px 12px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;color:var(--text-mut);font-size:12px;margin:12px 0 0}
+.dp-helper{font-size:11px;color:var(--text-mut);margin:10px 0 0;line-height:1.6}.dp-strong{font-variant-numeric:tabular-nums;white-space:nowrap}.dp-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.dp-refresh{cursor:pointer;padding:9px 13px;border:1px solid var(--line);border-radius:9px;color:var(--petrol);background:var(--surface);font-weight:700}
+.dp-legend a{color:inherit;text-decoration:none}.dp-legend a:hover{text-decoration:underline}
 .dp-error{background:#fff4d6;padding:10px;border-radius:9px;margin-bottom:10px;color:#8b5800}
 .dp-empty{padding:22px;text-align:center;color:var(--text-mut);background:var(--surface-2);border-radius:10px}
 @media(max-width:1300px){.dp-grid{grid-template-columns:1fr 1fr}.dp-grid .wide{grid-column:1/-1}}
-@media(max-width:900px){.dp-prod-row{grid-template-columns:28px minmax(115px,170px) 1fr 82px}.dp-lower{grid-template-columns:1fr}}
-@media(max-width:800px){.dp-grid,.dp-lower,.dp-bottom{grid-template-columns:1fr}.dp{padding:0 10px}.dp-prod-row{grid-template-columns:28px 1fr 80px}.dp-prod-track{grid-column:2/4}}
+@media(max-width:1100px){.dp-lower,.dp-comparisons{grid-template-columns:1fr}}
+@media(max-width:800px){.dp-grid,.dp-lower{grid-template-columns:1fr}.dp{padding:0 10px}.dp-donut{width:120px;height:120px;flex-shrink:0}.dp-donut:after{inset:29px}.dp-kpi-table th,.dp-kpi-table td{padding:9px 4px}.dp-kpi-table td strong{font-size:16px}}
+@media print{.sidebar,.topbar,.dashboardReportHead,.dp-refresh{display:none!important}.main{margin:0!important}.dp{padding:0}.dp-panel,.dp-card{box-shadow:none;break-inside:avoid}.dp-grid,.dp-comparisons,.dp-lower{display:block}.dp-panel{margin-top:12px}.dp-table-wrap{overflow:visible}.dp-table{font-size:9px}.dp-kpis{grid-template-columns:repeat(5,1fr)}}
 </style>
 </head>
 <body>
@@ -283,62 +169,60 @@ if($reportReady){
 <main class="main">
 <?php include __DIR__.'/includes/topbar.php';?>
 <div class="page__head">
-    <div><h1 class="page__title">Dashboard Pozos</h1><div class="page__sub">Resumen general desde caché local de telemetría · sin consultas RTQP en línea</div></div>
-    <div class="dashboardReportHead"><div class="page__live"><span class="dot"></span>Actualización automática · 30 s</div><?php if($reportReady): ?><div class="dashboardReportTools"><label class="dashboardReportToggle"><input type="checkbox" data-dashboard-report-toggle><span data-dashboard-report-label>Incluir resumen completo</span></label><button type="button" class="nsButton is-secondary" data-ns-report-open>Ver reporte <span data-ns-report-count class="nsReportCount" hidden>0</span></button></div><small class="dashboardReportStatus" data-dashboard-report-status></small><?php endif; ?></div>
+    <div><h1 class="page__title">Dashboard Pozos</h1><div class="page__sub">Comunicación, estado operativo y evolución de los pozos</div></div>
+    <div class="dashboardReportHead"><div class="dp-tools"><span class="page__live"><?php echo !empty($data['stale'])?'Último estado disponible':'Caché de telemetría'; ?></span><button class="dp-refresh" type="button" onclick="window.location.reload()">Actualizar</button></div><?php if($reportReady): ?><div class="dashboardReportTools"><label class="dashboardReportToggle"><input type="checkbox" data-dashboard-report-toggle><span data-dashboard-report-label>Incluir resumen completo</span></label><button type="button" class="nsButton is-secondary" data-ns-report-open>Ver reporte <span data-ns-report-count class="nsReportCount" hidden>0</span></button></div><small class="dashboardReportStatus" data-dashboard-report-status></small><?php endif; ?></div>
 </div>
 <section class="dp">
-<?php foreach($errors as $t=>$e):?><div class="dp-error"><?php echo h($t.': '.$e);?></div><?php endforeach;?>
+<?php foreach($errors as $e):?><div class="dp-error" role="status"><?php echo h($e);?></div><?php endforeach;?>
 
 <div class="dp-kpis">
     <a class="dp-card" style="--accent:#1683e2" href="telemetria_general.php"><span>Total de pozos</span><b><?php echo $total;?></b><small>Pozos con telemetría</small></a>
     <?php $colors=['SCADA'=>'#1683e2','TECSS'=>'#805ad5'];foreach($summary as $t=>$s):?>
     <a class="dp-card" style="--accent:<?php echo $colors[$t];?>" href="<?php echo h($s['url']);?>"><span>Pozos <?php echo h($t);?></span><b><?php echo $s['count'];?></b><small><?php echo $total?round($s['count']*100/$total,1):0;?>% del total</small></a>
     <?php endforeach;?>
-    <a class="dp-card" style="--accent:#ef4444" href="monitoreo_pozos.php?comunicacion=Sin%20comunicaci%C3%B3n"><span>Sin comunicación</span><b><?php echo $commTot['Sin comunicación'];?></b><small><?php echo round($commTot['Sin comunicación']*100/$den,1);?>% de registros</small></a>
-    <div class="dp-card dp-prod-card" style="--accent:#0f7a64"><span>Producción petróleo total</span><b><?php echo number_format($productionTotals['PRODUCCION_PETROLEO'],2,',','.');?></b><small>m³ · <?php echo $productionWellCount;?> pozos con último test aprobado</small></div>
-    <div class="dp-card dp-prod-card" style="--accent:#1683e2"><span>Producción líquido total</span><b><?php echo number_format($productionTotals['PRODUCCION_LIQUIDO'],2,',','.');?></b><small>m³ · Query 164</small></div>
-    <div class="dp-card dp-prod-card" style="--accent:#805ad5"><span>Producción gas total</span><b><?php echo number_format($productionTotals['PRODUCCION_GAS'],2,',','.');?></b><small>m³ · Query 164</small></div>
+    <a class="dp-card" style="--accent:#ef4444" href="monitoreo_pozos.php?comunicacion=Sin%20comunicaci%C3%B3n"><span>Sin comunicación</span><b><?php echo $commTot['Sin comunicación'];?></b><small><?php echo round($commTot['Sin comunicación']*100/$den,1);?>% de pozos únicos</small></a>
+    <a class="dp-card" style="--accent:#d73953" href="pozos_falla.php"><span>Pozos en falla</span><b><?php echo $stateTot['En falla'];?></b><small>Ver reporte BM · BES · PCP</small></a>
+</div>
+
+<div class="dp-comparisons" aria-label="Indicadores comparativos">
+<?php foreach($comparisons as $comparison): ?>
+    <section class="dp-panel dp-comparison">
+        <h2><?php echo h($comparison['title']); ?></h2>
+        <p class="dp-comparison-sub"><?php echo h($comparison['basis']); ?> · Promedio diario de pozos al cierre</p>
+        <table class="dp-kpi-table" data-grid-columns="off"><thead><tr><th>Indicador</th><th>Período reciente<small><?php echo h($comparison['current']['label']); ?></small></th><th>Período anterior<small><?php echo h($comparison['previous']['label']); ?></small></th><th>Variación</th></tr></thead><tbody>
+        <?php foreach($comparison['metrics'] as $metric): ?>
+        <tr><td><?php echo h($metric['label']); ?></td><td><strong><?php echo dp_number($metric['current']); ?></strong></td><td><strong><?php echo dp_number($metric['previous']); ?></strong></td><td class="dp-change<?php echo $metric['favorable']===null?'':($metric['favorable']?' good':' bad'); ?>"><?php echo h(dp_delta_label($metric)); ?></td></tr>
+        <?php endforeach; ?>
+        </tbody></table>
+        <?php if(!$comparison['ready']): ?><p class="dp-pending">Histórico insuficiente para comparar ambos períodos completos.</p><?php endif; ?>
+        <p class="dp-coverage">Días con cobertura completa: reciente <?php echo $comparison['current']['available'].'/'.$comparison['current']['expected']; ?> · anterior <?php echo $comparison['previous']['available'].'/'.$comparison['previous']['expected']; ?>. Se excluye el período en curso.</p>
+    </section>
+<?php endforeach; ?>
 </div>
 
 <div class="dp-grid">
-    <div class="dp-panel"><h2>Estado de comunicación</h2><?php $a=round($commTot['Comunicando']*100/$den,1);$b=$a+round($commTot['Intermitente']*100/$den,1);$c=$b+round($commTot['Sin comunicación']*100/$den,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($commTot as $k=>$v):?><div><span><?php echo h($k);?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
-    <div class="dp-panel"><h2>Estado operativo de pozos</h2><?php $sd=max(1,array_sum($stateTot));$a=round($stateTot['En marcha']*100/$sd,1);$b=$a+round($stateTot['Parado']*100/$sd,1);$c=$b+round($stateTot['En falla']*100/$sd,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($stateTot as $k=>$v):?><div><span><?php echo h($k);?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
+    <div class="dp-panel"><h2>Estado de comunicación</h2><?php $a=round($commTot['Comunicando']*100/$den,1);$b=$a+round($commTot['Intermitente']*100/$den,1);$c=$b+round($commTot['Sin comunicación']*100/$den,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($commTot as $k=>$v):?><div><span><?php if($k==='En falla'):?><a href="pozos_falla.php"><?php echo h($k);?></a><?php else:?><?php echo h($k);?><?php endif;?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
+    <div class="dp-panel"><h2>Estado operativo de pozos</h2><?php $sd=max(1,array_sum($stateTot));$a=round($stateTot['En marcha']*100/$sd,1);$b=$a+round($stateTot['Parado']*100/$sd,1);$c=$b+round($stateTot['En falla']*100/$sd,1);?><div class="dp-donutrow"><div class="dp-donut" style="--a:<?php echo $a;?>%;--b:<?php echo $b;?>%;--c:<?php echo $c;?>%"></div><div class="dp-legend"><?php foreach($stateTot as $k=>$v):?><div><span><?php if($k==='En falla'):?><a href="pozos_falla.php"><?php echo h($k);?></a><?php else:?><?php echo h($k);?><?php endif;?></span><b><?php echo $v;?></b></div><?php endforeach;?></div></div></div>
     <div class="dp-panel wide"><h2>Fallas de comunicación</h2><div class="dp-bars"><?php $mx=max(1,max(array_map(function($s){return $s['comm']['Sin comunicación'];},$summary)));foreach($summary as $t=>$s):$n=$s['comm']['Sin comunicación'];?><div class="bar"><b><?php echo h($t);?></b><div class="dp-track"><div class="dp-fill" style="width:<?php echo round($n*100/$mx);?>%"></div></div><b><?php echo $n;?></b></div><?php endforeach;?></div></div>
 </div>
 
 <div class="dp-lower">
-    <div class="dp-panel"><h2>Resumen por tipo de telemetría</h2><table class="dp-table"><thead><tr><th>Tipo</th><th>Pozos</th><th>Con com.</th><th>Intermitente</th><th>Sin com.</th><th>% com.</th><th>En marcha</th><th>Parados</th><th>En falla</th></tr></thead><tbody><?php foreach($summary as $t=>$s):$d=max(1,array_sum($s['comm']));?><tr><td><span class="dp-type"><?php echo h($t);?></span></td><td><b><?php echo $s['count'];?></b></td><td><?php echo $s['comm']['Comunicando'];?></td><td><?php echo $s['comm']['Intermitente'];?></td><td><?php echo $s['comm']['Sin comunicación'];?></td><td><?php echo round($s['comm']['Comunicando']*100/$d,1);?>%</td><td><?php echo $s['state']['En marcha'];?></td><td><?php echo $s['state']['Parado'];?></td><td><?php echo $s['state']['En falla'];?></td></tr><?php endforeach;?></tbody></table></div>
-    <div class="dp-panel"><h2>Top pozos sin comunicación</h2><table class="dp-table"><thead><tr><th>Pozo</th><th>Prod. petróleo</th><th>Tipo</th><th>Batería</th><th>Último dato</th></tr></thead><tbody><?php foreach($bad as $r):?><tr><td><b><?php echo h($r['pozo']);?></b></td><td><b><?php echo dp_prod($r['produccion_petroleo']);?></b><?php echo $r['produccion_petroleo']!==null?' m³':'';?></td><td><span class="dp-type"><?php echo h($r['tipo']);?></span></td><td><?php echo h($r['bateria']);?></td><td><?php echo $r['date']?date('d/m/Y H:i',$r['date']):'Sin fecha';?></td></tr><?php endforeach;?><?php if(!$bad):?><tr><td colspan="5">Sin pozos detectados</td></tr><?php endif;?></tbody></table></div>
-</div>
-
-<div class="dp-panel dp-production">
-    <h2>Top 10 pozos con mayor producción de petróleo</h2>
-    <div class="dp-panel-sub">Último Test de Pozos Productores Aprobados · Query 164 · valores en m³</div>
-    <?php if($topProduction): ?>
-    <div class="dp-prod-chart">
-        <?php foreach($topProduction as $idx=>$p): $width=max(1,round($p['petroleo']*100/$maxProduction,1)); ?>
-        <div class="dp-prod-row" title="Líquido: <?php echo h(dp_prod($p['liquido'])); ?> m³ · Gas: <?php echo h(dp_prod($p['gas'])); ?> m³">
-            <div class="dp-prod-rank"><?php echo $idx+1;?></div>
-            <div class="dp-prod-well"><?php echo h($p['pozo']);?></div>
-            <div class="dp-prod-track"><div class="dp-prod-fill" style="width:<?php echo $width;?>%"></div></div>
-            <div class="dp-prod-value"><?php echo number_format($p['petroleo'],2,',','.');?> m³</div>
-        </div>
-        <?php endforeach;?>
-    </div>
-    <?php else: ?><div class="dp-empty">No hay datos de producción disponibles en Query 164 para los pozos de telemetría.</div><?php endif;?>
+    <div class="dp-panel"><h2>Resumen por tipo de telemetría</h2><div class="dp-table-wrap"><table class="dp-table"><thead><tr><th>Tipo</th><th>Pozos</th><th>Con com.</th><th>Intermitente</th><th>Sin com.</th><th>% com.</th><th>En marcha</th><th>Parados</th><th>En falla</th></tr></thead><tbody><?php foreach($summary as $t=>$s):$d=max(1,array_sum($s['comm']));?><tr><td><span class="dp-type"><?php echo h($t);?></span></td><td><b><?php echo $s['count'];?></b></td><td><?php echo $s['comm']['Comunicando'];?></td><td><?php echo $s['comm']['Intermitente'];?></td><td><?php echo $s['comm']['Sin comunicación'];?></td><td><?php echo round($s['comm']['Comunicando']*100/$d,1);?>%</td><td><?php echo $s['state']['En marcha'];?></td><td><?php echo $s['state']['Parado'];?></td><td><?php echo $s['state']['En falla'];?></td></tr><?php endforeach;?></tbody></table></div><p class="dp-helper">Un pozo puede figurar en ambas fuentes. Los indicadores generales lo cuentan una sola vez; comunica si al menos una fuente comunica.</p></div>
+    <div class="dp-panel"><h2>Top pozos sin comunicación</h2><div class="dp-table-wrap"><table class="dp-table" id="dp-top-sin-com"><thead><tr><th>Pozo</th><th>Días sin comunicación</th><th>Tipo</th><th>Batería</th><th>Detectado desde</th></tr></thead><tbody>
+    <?php foreach($bad as $r):?><tr><td><b><?php echo h($r['pozo']);?></b></td><td class="dp-strong"><?php echo h(dp_days_label($r));?></td><td><span class="dp-type"><?php echo h($r['tipo']);?></span></td><td><?php echo h($r['bateria']?:'Sin dato');?></td><td><?php echo $r['sin_com_desde']?date('d/m/Y H:i',$r['sin_com_desde']):'Sin histórico';?></td></tr><?php endforeach;?>
+    <?php if(!$bad):?><tr><td colspan="5">Sin pozos detectados</td></tr><?php endif;?></tbody></table></div>
+    <p class="dp-helper">Ordenado de mayor a menor duración observada, hasta la última lectura. <strong>≥</strong> indica que el pozo ya estaba sin comunicación al comenzar el seguimiento; su antigüedad previa no está disponible.</p></div>
 </div>
 
 <div class="dp-bottom">
-    <div class="dp-card dp-mini"><span>Baterías activas</span><b><?php echo count($bats);?></b><small>Con al menos un pozo</small></div>
-    <div class="dp-card dp-mini" style="--accent:#35b45a"><span>Comunicación promedio</span><b><?php echo $pComm;?>%</b><small>Disponibilidad general</small></div>
-    <div class="dp-card dp-mini"><span>Última actualización</span><b style="font-size:20px"><?php echo $last?date('d/m H:i:s',$last):'Sin fecha';?></b><small>Caché SQL local</small></div>
-    <div class="dp-card dp-mini" style="--accent:#805ad5"><span>Registros procesados</span><b><?php echo count($all);?></b><small>Caché de telemetría</small></div>
+    <span>Última actualización: <strong><?php echo $last?date('d/m/Y H:i:s',$last):'Sin fecha';?></strong><?php echo !empty($data['stale'])?' · Datos pendientes de actualización':''; ?></span>
+    <span>Corte del día operativo: <strong><?php echo h(substr($data['config']['hora_corte'],0,5)); ?></strong> · Hora de Argentina</span>
 </div>
 </section>
 </main>
 </div>
 <script src="assets/js/app.js"></script>
-<?php if($reportReady): ?><script>window.CLEAR_WEEKLY_NEWS={};window.CLEAR_DASHBOARD_REPORT=<?php echo json_encode(['items'=>$dashboardReportItems,'addedMessage'=>'Dashboard Pozos completo agregado al reporte.','removedMessage'=>'Dashboard Pozos quitado del reporte.'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script><script src="assets/js/novedades_semanales.js?v=20260904-dashboard-full-1"></script><script src="assets/js/dashboard_report.js?v=20260904-dashboard-full-1"></script><?php endif; ?>
+<?php if($reportReady): ?><script>window.CLEAR_WEEKLY_NEWS={};window.CLEAR_DASHBOARD_REPORT=<?php echo json_encode(['items'=>$dashboardReportItems,'addedMessage'=>'Dashboard Pozos completo agregado al reporte.','removedMessage'=>'Dashboard Pozos quitado del reporte.'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>;</script><script src="assets/js/novedades_semanales.js?v=20260904-dashboard-full-1"></script><script src="assets/js/dashboard_report.js?v=20260904-dashboard-full-1"></script><?php endif; ?>
 <!-- Actualización automática desactivada: el usuario actualiza manualmente para no sobrecargar SQL. -->
 </body>
 </html>
