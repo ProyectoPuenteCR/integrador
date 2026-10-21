@@ -27,8 +27,11 @@ html[data-theme="dark"] .ia-table tbody tr.ia-row-negative:hover td{background:r
 html[data-theme="dark"] .ia-satellite-modal__backdrop{background:rgba(0,0,0,.74)}html[data-theme="dark"] .ia-satellite-table tbody tr.is-negative td{background:rgba(185,56,48,.18)}
 
 /* Ajuste 3.2.5: popup opaco, exportación y alarmas 24 h */
-.ia-well-cell{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:165px}
-.ia-well-cell>span{overflow:hidden;text-overflow:ellipsis}
+/* El nombre ocupa su propia línea; las acciones no lo comprimen. */
+.ia-well-cell{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:4px 8px;min-width:0}
+.ia-well-cell>span{flex:0 0 100%;min-width:0;max-width:100%;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.ia-well-cell>.alarmCell{flex:0 0 auto;width:auto}
+.ia-well-cell>.alarmCell .alarmCell__actions{margin-left:0;padding-left:0;border-left:0}
 .ia-alarm-bell{display:inline-flex;min-width:38px;height:25px;padding:0 7px;gap:5px;align-items:center;justify-content:center;border-radius:8px;text-decoration:none;font-weight:800;font-size:11px;font-variant-numeric:tabular-nums;flex:0 0 auto;transition:transform .15s ease,filter .15s ease}
 .ia-alarm-bell svg{width:14px;height:14px}
 .ia-alarm-bell.success{background:#dff4ea;color:#14754f}

@@ -231,7 +231,7 @@ unset($counts);
   <link rel="stylesheet" href="assets/css/app.css?v=20260803-grid1">
   <link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
-  <link rel="stylesheet" href="assets/css/inyeccion_agua.css?v=3.2.6">
+  <link rel="stylesheet" href="assets/css/inyeccion_agua.css?v=20261021-pozo-visible">
 </head>
 <body>
 <div class="app">
