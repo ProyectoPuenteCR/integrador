@@ -231,7 +231,7 @@ unset($counts);
   <link rel="stylesheet" href="assets/css/app.css?v=20260803-grid1">
   <link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9">
   <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1">
-  <link rel="stylesheet" href="assets/css/inyeccion_agua.css?v=20261021-pozo-visible">
+  <link rel="stylesheet" href="assets/css/inyeccion_agua.css?v=20261021-pozo-layout-2">
 </head>
 <body>
 <div class="app">
@@ -376,18 +376,20 @@ unset($counts);
                   <td data-column="<?php echo h($column); ?>" data-raw="<?php echo h($raw); ?>" class="<?php echo $isNumeric ? 'num' : ''; ?>">
                     <?php if ($column === 'POZO'): ?>
                       <div class="ia-well-cell">
-                        <span><?php echo h($raw); ?></span>
-                        <a class="ia-alarm-bell <?php echo h(ia_alarm_class($alarmCount)); ?>"
-                           href="<?php echo h($alarmUrl); ?>"
-                           data-telemetry-modal-url="<?php echo h($alarmEmbedUrl); ?>"
-                           data-telemetry-modal-open-url="<?php echo h($alarmUrl); ?>"
-                           data-telemetry-modal-title="<?php echo h('Alarmas 24 h · ' . ($raw !== '' ? $raw : 'Pozo')); ?>"
-                           data-telemetry-modal-subtitle="Consulta operativa de las alarmas del pozo"
-                           data-telemetry-modal-eyebrow="Alarmas de pozo"
-                           title="<?php echo h($alarmCount . ' alarmas en las últimas 24 horas'); ?>">
-                          <?php echo icon('bell'); ?><span><?php echo $alarmCount; ?></span>
-                        </a>
-                        <?php echo clear_alarm_actions_cell(['display'=>'','subject'=>$alarmCommentSubject,'subject_label'=>'Pozo '.$rowWell,'context'=>'inyeccion_agua','show_history'=>false,'show_comment'=>true,'icon_only'=>true]); ?>
+                        <span class="ia-well-name"><?php echo h($raw); ?></span>
+                        <div class="ia-well-actions">
+                          <a class="ia-alarm-bell <?php echo h(ia_alarm_class($alarmCount)); ?>"
+                             href="<?php echo h($alarmUrl); ?>"
+                             data-telemetry-modal-url="<?php echo h($alarmEmbedUrl); ?>"
+                             data-telemetry-modal-open-url="<?php echo h($alarmUrl); ?>"
+                             data-telemetry-modal-title="<?php echo h('Alarmas 24 h · ' . ($raw !== '' ? $raw : 'Pozo')); ?>"
+                             data-telemetry-modal-subtitle="Consulta operativa de las alarmas del pozo"
+                             data-telemetry-modal-eyebrow="Alarmas de pozo"
+                             title="<?php echo h($alarmCount . ' alarmas en las últimas 24 horas'); ?>">
+                            <?php echo icon('bell'); ?><span><?php echo $alarmCount; ?></span>
+                          </a>
+                          <?php echo clear_alarm_actions_cell(['display'=>'','subject'=>$alarmCommentSubject,'subject_label'=>'Pozo '.$rowWell,'context'=>'inyeccion_agua','show_history'=>false,'show_comment'=>true,'icon_only'=>true]); ?>
+                        </div>
                       </div>
                     <?php elseif ($column === 'SATELITE' && $raw !== ''): ?>
                       <button type="button" class="ia-satellite-link"
