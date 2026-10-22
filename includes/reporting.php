@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/report_schedule.php';
 
 function report_ensure_tables(){
     static $checked=null;if($checked!==null)return $checked;
@@ -41,20 +42,6 @@ function report_contact_save($name,$email,$user=''){
     if($id!==null&&$id!=='')$ok=$db->execute("UPDATE dbo.CLEAR_REPORT_CONTACTS SET NOMBRE=?,EMAIL=?,ACTIVO=1,FECHA_MODIFICACION=SYSDATETIME() WHERE ID=?",[$name,$email,(int)$id]);
     else $ok=$db->execute("INSERT INTO dbo.CLEAR_REPORT_CONTACTS(NOMBRE,EMAIL,USUARIO_CARGA) VALUES(?,?,?)",[$name,$email,$user]);
     return $ok?[true,'Contacto guardado en la libreta común.']:[false,'No se pudo guardar el contacto. '.$db->error()];
-}
-function report_next_run(array $r,$from=null){
-    $tz=new DateTimeZone($r['ZONA_HORARIA']??'America/Argentina/Buenos_Aires'); $now=$from?:new DateTime('now',$tz); $times=array_filter(array_map('trim',explode(',',(string)($r['HORARIOS']??'08:00')))); if(!$times)$times=['08:00']; sort($times);
-    $freq=strtolower((string)($r['FRECUENCIA']??'daily')); $days=array_map('intval',array_filter(explode(',',(string)($r['DIAS_SEMANA']??''))));
-    for($i=0;$i<370;$i++){
-        $d=(clone $now)->modify('+'.$i.' day'); $dow=(int)$d->format('N');
-        $allowed=true;
-        if($freq==='weekdays')$allowed=$dow<=5;
-        elseif($freq==='weekly'||$freq==='custom')$allowed=!$days||in_array($dow,$days,true);
-        elseif($freq==='monthly')$allowed=((int)$d->format('j')===1);
-        if(!$allowed)continue;
-        foreach($times as $t){ if(!preg_match('/^(\d{1,2}):(\d{2})$/',$t,$m))continue; $cand=(clone $d)->setTime((int)$m[1],(int)$m[2],0); if($cand>$now)return $cand; }
-    }
-    return (clone $now)->modify('+1 day')->setTime(8,0);
 }
 function report_log($id,$to,$status,$file='',$error='',$seconds=0,$user='scheduler'){
     return clear_db()->execute("INSERT INTO dbo.CLEAR_REPORT_LOG(ID_REPORTE,DESTINATARIOS,ESTADO,ARCHIVO,ERROR,DURACION_SEGUNDOS,USUARIO_EJECUCION) VALUES(?,?,?,?,?,?,?)",[$id,$to,$status,$file,$error,$seconds,$user]);

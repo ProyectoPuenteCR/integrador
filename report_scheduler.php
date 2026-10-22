@@ -90,10 +90,10 @@ try {
         WHERE ACTIVO = 1
           AND (
               PROXIMA_EJECUCION IS NULL
-              OR PROXIMA_EJECUCION <= SYSDATETIME()
+              OR PROXIMA_EJECUCION <= CONVERT(datetime2,?,126)
           )
         ORDER BY PROXIMA_EJECUCION
-    ");
+    ", [date('Y-m-d H:i:s')]);
 
     if (!is_array($rows)) {
         $rows = [];
@@ -118,60 +118,33 @@ try {
         ];
 
         try {
-            [$ok, $msg] = report_execute($r, 'scheduler');
+            $claimed = report_schedule_claim($db, $reportId);
+            if ($claimed === null) continue; // Otro ejecutor o una edición ganó la reserva.
+            $next = $claimed['RESERVED_NEXT'];
+            $item['next'] = $next;
 
-            $nextRun = report_next_run($r);
-            $next = $nextRun->format('Y-m-d H:i:s');
+            // La reserva queda persistida ANTES de generar/enviar: una caída o
+            // un error al guardar el resultado no debe reenviar el mismo turno.
+            try {
+                [$ok, $msg] = report_execute($claimed, 'scheduler');
+            } catch (Throwable $e) {
+                $ok = false;
+                $msg = $e->getMessage();
+            }
 
             $updated = $db->execute("
                 UPDATE dbo.CLEAR_REPORT_SCHEDULES
-                SET
-                    ULTIMA_EJECUCION = SYSDATETIME(),
-                    ULTIMO_ESTADO = ?,
-                    ULTIMO_ERROR = ?,
-                    PROXIMA_EJECUCION = ?
-                WHERE ID = ?
-            ", [
-                $ok ? 'ENVIADO' : 'ERROR',
-                $ok ? '' : (string) $msg,
-                $next,
-                $reportId
-            ]);
+                SET ULTIMA_EJECUCION=SYSDATETIME(), ULTIMO_ESTADO=?, ULTIMO_ERROR=?
+                WHERE ID=? AND PROXIMA_EJECUCION=CONVERT(datetime2,?,126)
+            ", [$ok ? 'ENVIADO' : 'ERROR', $ok ? '' : (string)$msg, $reportId, $next]);
 
-            $item['ok'] = (bool) $ok;
-            $item['message'] = (string) $msg;
-            $item['next'] = $next;
-            $item['schedule_updated'] = (bool) $updated;
+            $item['ok'] = (bool)$ok;
+            $item['message'] = (string)$msg;
+            $item['schedule_updated'] = (bool)$updated;
+            if (!$updated) $item['update_error'] = $db->error();
         } catch (Throwable $e) {
-            $errorMessage = $e->getMessage();
-
-            $item['ok'] = false;
-            $item['message'] = $errorMessage;
-
-            try {
-                $nextRun = report_next_run($r);
-                $next = $nextRun->format('Y-m-d H:i:s');
-
-                $db->execute("
-                    UPDATE dbo.CLEAR_REPORT_SCHEDULES
-                    SET
-                        ULTIMA_EJECUCION = SYSDATETIME(),
-                        ULTIMO_ESTADO = 'ERROR',
-                        ULTIMO_ERROR = ?,
-                        PROXIMA_EJECUCION = ?
-                    WHERE ID = ?
-                ", [
-                    $errorMessage,
-                    $next,
-                    $reportId
-                ]);
-
-                $item['next'] = $next;
-            } catch (Throwable $updateException) {
-                $item['update_error'] = $updateException->getMessage();
-            }
+            $item['message'] = $e->getMessage();
         }
-
         $response['items'][] = $item;
         $response['processed']++;
     }

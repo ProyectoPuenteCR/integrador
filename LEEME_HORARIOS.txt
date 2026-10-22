@@ -1,0 +1,52 @@
+CLEAR - Horarios múltiples para Mis Reportes
+
+Entrega basada en los archivos de la rama principal del repositorio conectado
+ProyectoPuenteCR/integrador, consultados el 21/10/2026.
+Solo se incluyen archivos nuevos o modificados para esta funcionalidad.
+
+Archivos de aplicación (copiar conservando estas rutas):
+  mis_reportes.php
+  mis_reportes_api.php
+  report_scheduler.php
+  includes/reporting.php
+  includes/report_schedule.php (nuevo)
+
+No requiere scripts SQL ni cambios de esquema. Mantiene HORARIOS como CSV
+(ejemplo: 08:00,16:00) y acepta horarios individuales existentes. Máximo 33
+horarios, compatible con el campo NVARCHAR(200) instalado.
+Mantiene diario, lunes a viernes, semanal, días seleccionados y mensual.
+Cada horario se aplica a todos los días de la frecuencia elegida.
+La próxima ejecución se guarda en la zona app.tz de config.php; los horarios
+se interpretan en la zona elegida en la programación.
+
+Programador:
+Conservar la tarea existente; se recomienda invocarla cada minuto.
+Cada invocación procesa un turno pendiente por programación. Si hubo demora,
+las siguientes invocaciones recuperan los demás turnos en orden, sin saltarlos.
+La reserva se realiza con UPDATE ... OUTPUT y compara el turno y la fecha de
+modificación. Solo quien obtiene la reserva genera y envía el informe.
+Un guardado concurrente invalida la reserva sobre la versión anterior.
+El envío manual sigue siendo una acción independiente de la programación.
+
+Política ante fallos:
+Se avanza la próxima ejecución ANTES de enviar para impedir el reenvío del
+mismo turno por procesos simultáneos o por fallos al guardar el resultado.
+Los errores de envío no se reintentan automáticamente para ese turno.
+Si PHP se interrumpe después de reservar y antes de finalizar el envío, ese
+turno puede no enviarse; quedará EN_PROCESO hasta otro envío o intervención.
+SMTP no ofrece una transacción con SQL Server: no se garantiza entrega
+exactamente una vez ante una interrupción. Revisar el envío antes de repetir
+manualmente un turno interrumpido.
+
+Verificación local realizada:
+  PHP 8.3.36: sintaxis de todos los archivos PHP correcta.
+  php tests/report_schedule_test.php: 48 comprobaciones aprobadas.
+  node tests/mis_reportes_times_test.cjs: pruebas de formulario en Edge
+  mediante Playwright aprobadas. Requiere Playwright instalado; se puede
+  elegir otro navegador con PLAYWRIGHT_CHANNEL.
+Las pruebas de reservas usan un doble de base de datos para intercalar
+procesos y ediciones. No se ejecutaron contra SQL Server, IIS ni SMTP reales.
+Antes de activar en el servidor, validar allí dos horarios y dos invocaciones
+simultáneas con una programación de prueba y destinatarios controlados.
+
+No se desplegó, no se hizo push y no se modificó producción.

@@ -101,6 +101,7 @@ function mr_screen_summary($value, $catalog, $allowedDefs)
 .mrField textarea{min-height:82px;resize:vertical}.mrReadOnly{background:var(--bg,#f6f9fa)!important;color:var(--text-soft)!important}
 .mrDays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.mrDay{border:1px solid var(--line-mid);border-radius:9px;padding:8px 6px;background:var(--bg,#f8fbfc);text-align:center;font-size:11px;font-weight:700;color:var(--text-soft)}
 .mrDay input{display:block;margin:0 auto 5px}
+.mrTimes{display:flex;flex-direction:column;gap:7px;margin-bottom:8px}.mrTime{display:flex;gap:7px;align-items:center}.mrTime input{flex:1;min-width:0}.mrTime button{flex-shrink:0}
 .mrSectionTitle{margin:17px 0 9px;padding-top:15px;border-top:1px solid var(--line);font-size:13px;font-weight:800;color:var(--petrol)}
 .mrScreenTools{display:flex;gap:8px;margin-bottom:8px}.mrScreenTools input{flex:1;border:1px solid var(--line-mid);border-radius:9px;padding:9px 11px}
 .mrScreens{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:360px;overflow:auto}
@@ -161,7 +162,13 @@ function mr_screen_summary($value, $catalog, $allowedDefs)
       <div class="mrField full"><label>Cuerpo del correo</label><textarea name="cuerpo" id="mrCuerpo">Se adjunta mi reporte programado de CLEAR Petroleum.</textarea></div>
       <div class="mrField"><label>Formato</label><input class="mrReadOnly" value="PDF" readonly></div>
       <div class="mrField"><label>Frecuencia</label><select name="frecuencia" id="mrFrecuencia"><option value="daily">Diario</option><option value="weekdays">Lunes a viernes</option><option value="weekly">Semanal</option><option value="custom">Días seleccionados</option><option value="monthly">Primer día del mes</option></select></div>
-      <div class="mrField"><label>Horarios</label><input required name="horarios" id="mrHorarios" value="08:00" placeholder="08:00 o 08:00,20:00"></div>
+      <div class="mrField">
+        <label id="mrTimesLabel">Horarios de envío</label>
+        <input type="hidden" name="horarios" id="mrHorarios" value="08:00">
+        <div class="mrTimes" id="mrTimes" role="group" aria-labelledby="mrTimesLabel"></div>
+        <button type="button" class="mrBtn" id="mrAddTime">Agregar horario</button>
+        <div class="mrMuted" style="margin-top:7px">Ej. 08:00 y 16:00. Se enviará una vez por horario en los días de la frecuencia elegida. Máximo 33 horarios.</div>
+      </div>
       <div class="mrField"><label>Zona horaria</label><input name="zona_horaria" id="mrZona" value="America/Argentina/Buenos_Aires"></div>
       <div class="mrField full"><label>Estado</label><select name="activo" id="mrActivo"><option value="1">Activo</option><option value="0">Pausado</option></select></div>
       <div class="mrField full">
@@ -241,6 +248,32 @@ function mr_screen_summary($value, $catalog, $allowedDefs)
   var msg=document.getElementById('mrMessage');
   var screenSearch=document.getElementById('mrScreenSearch');
   var scheduleSearch=document.getElementById('mrScheduleSearch');
+  var times=document.getElementById('mrTimes');
+  var addTime=document.getElementById('mrAddTime');
+  function updateTimeButtons(){
+    var rows=times.querySelectorAll('.mrTime');
+    rows.forEach(function(row){row.querySelector('button').disabled=rows.length===1;});
+    addTime.disabled=rows.length>=33;
+  }
+  function appendTime(value){
+    if(times.children.length>=33)return;
+    var row=document.createElement('div');row.className='mrTime';
+    var input=document.createElement('input');input.type='time';input.required=true;input.step='60';input.value=value||'';input.setAttribute('aria-label','Horario de envío');
+    var remove=document.createElement('button');remove.type='button';remove.className='mrBtn';remove.textContent='Quitar';remove.setAttribute('aria-label','Quitar horario');
+    remove.addEventListener('click',function(){if(times.children.length>1){row.remove();updateTimeButtons();}});
+    row.appendChild(input);row.appendChild(remove);times.appendChild(row);updateTimeButtons();
+    return input;
+  }
+  function loadTimes(value){
+    times.textContent='';
+    var values=String(value||'08:00').split(/[;,]+/).map(function(t){
+      t=t.trim();return /^\d:\d{2}$/.test(t)?'0'+t:t;
+    }).filter(Boolean);
+    Array.from(new Set(values)).sort().forEach(appendTime);
+    if(!times.children.length)appendTime('08:00');
+  }
+  addTime.addEventListener('click',function(){var input=appendTime('');if(input)input.focus();});
+  loadTimes(document.getElementById('mrHorarios').value);
 
   function note(text,ok){
     msg.innerHTML='<div class="mrNotice '+(ok?'ok':'err')+'">'+text+'</div>';
@@ -258,6 +291,8 @@ function mr_screen_summary($value, $catalog, $allowedDefs)
   }
   form.addEventListener('submit',function(e){
     e.preventDefault();
+    var selected=Array.from(times.querySelectorAll('input')).map(function(input){return input.value;});
+    document.getElementById('mrHorarios').value=Array.from(new Set(selected)).sort().join(',');
     var button=form.querySelector('button[type=submit]');
     button.disabled=true;
     post(new FormData(form)).then(function(d){note(d.message||'Programación guardada.',true);setTimeout(function(){location.reload();},500);})
@@ -284,7 +319,7 @@ function mr_screen_summary($value, $catalog, $allowedDefs)
     document.getElementById('mrAsunto').value=r.ASUNTO||'';
     document.getElementById('mrCuerpo').value=r.CUERPO||'';
     document.getElementById('mrFrecuencia').value=r.FRECUENCIA||'daily';
-    document.getElementById('mrHorarios').value=r.HORARIOS||'08:00';
+    loadTimes(r.HORARIOS||'08:00');
     document.getElementById('mrZona').value=r.ZONA_HORARIA||'America/Argentina/Buenos_Aires';
     document.getElementById('mrActivo').value=Number(r.ACTIVO||0)?'1':'0';
     var days=String(r.DIAS_SEMANA||'').split(',');

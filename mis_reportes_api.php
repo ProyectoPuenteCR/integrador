@@ -45,19 +45,6 @@ try {
         }
         return implode('; ',array_values(array_unique($items)));
     };
-    $normalizeTimes=function($text){
-        $items=array_values(array_filter(array_map('trim',preg_split('/[;,]+/',(string)$text))));
-        if(!$items) throw new Exception('Ingresá al menos un horario.');
-        $out=[];
-        foreach($items as $time){
-            if(!preg_match('/^(?:[01]?\d|2[0-3]):[0-5]\d$/',$time)) throw new Exception('Horario inválido: '.$time.'. Usá HH:MM.');
-            list($h,$m)=array_map('intval',explode(':',$time));
-            $norm=sprintf('%02d:%02d',$h,$m);
-            if(!in_array($norm,$out,true))$out[]=$norm;
-        }
-        sort($out);
-        return implode(',',$out);
-    };
 
     if($action==='save_schedule'){
         $id=(int)($_POST['id']??0);
@@ -81,7 +68,7 @@ try {
         if(in_array($frequency,['weekly','custom'],true) && !$days) throw new Exception('Seleccioná al menos un día de semana.');
         $daysCsv=implode(',',$days);
 
-        $times=$normalizeTimes($_POST['horarios']??'08:00');
+        $times=report_normalize_times($_POST['horarios']??'08:00');
         $timezone=trim((string)($_POST['zona_horaria']??'America/Argentina/Buenos_Aires'));
         try { new DateTimeZone($timezone); } catch(Throwable $e) { throw new Exception('Zona horaria inválida.'); }
 
@@ -97,7 +84,7 @@ try {
 
         $active=(int)!empty($_POST['activo']);
         $runData=['ZONA_HORARIA'=>$timezone,'FRECUENCIA'=>$frequency,'DIAS_SEMANA'=>$daysCsv,'HORARIOS'=>$times];
-        $next=report_next_run($runData)->format('Y-m-d H:i:s');
+        $next=report_schedule_next_storage($runData);
 
         $params=[$name,$screens[0],$screensCsv,$to,$cc,$cco,$subject,$body,$frequency,$daysCsv,$times,$active,$timezone,$next];
         if($id>0){
@@ -140,7 +127,7 @@ try {
         $copyName='Copia de '.trim((string)$row['NOMBRE']);
         if(strlen($copyName)>180)$copyName=substr($copyName,0,180);
         $runData=['ZONA_HORARIA'=>$row['ZONA_HORARIA'],'FRECUENCIA'=>$row['FRECUENCIA'],'DIAS_SEMANA'=>$row['DIAS_SEMANA'],'HORARIOS'=>$row['HORARIOS']];
-        $next=report_next_run($runData)->format('Y-m-d H:i:s');
+        $next=report_schedule_next_storage($runData);
         $screensCsv=implode(',',$screens);
         $ok=$db->execute(
             "INSERT INTO dbo.CLEAR_REPORT_SCHEDULES(NOMBRE,TIPO_REPORTE,PANTALLAS,DESTINATARIOS,CC,CCO,ASUNTO,CUERPO,FRECUENCIA,DIAS_SEMANA,HORARIOS,ACTIVO,ZONA_HORARIA,PROXIMA_EJECUCION,USUARIO_CARGA) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
