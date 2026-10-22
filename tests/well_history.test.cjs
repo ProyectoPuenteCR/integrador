@@ -12,7 +12,7 @@ function fixture(){
 }
 const catalog={};for(const column of ['QT:RPM','FP','ECO'])catalog[column]={available:true,tag:fields.POZO+'(RPC)_'+column+'.PV',unit:column==='QT:RPM'?'rpm':'',type:column==='ECO'?'Digital':'Float32'};
 catalog.Fecha={available:false,reason:'Sin tag verificado'};catalog['PT:LINEA']={available:false,reason:'Sin tag verificado'};
-function response(columns){return {ok:true,well:fields.POZO,start:'2026-10-21T00:00:00-03:00',end:'2026-10-22T00:00:00-03:00',series:columns.map((column,index)=>({column,tag:catalog[column].tag,unit:catalog[column].unit,type:catalog[column].type,step:column==='ECO',reportKey:'well_history:'+String(index+1).repeat(40),samples:[0,1,2].map(hour=>({timestamp:'2026-10-21T0'+(hour+3)+':00:00Z',value:column==='ECO'?(hour?'ALARMA':'NORMAL'):column==='FP'?0.85:750+hour,good:hour!==1,questionable:false,substituted:false}))}))};}
+function response(columns){return {ok:true,well:fields.POZO,combinedReportKey:'well_history_combined:'+ 'a'.repeat(40),start:'2026-10-21T00:00:00-03:00',end:'2026-10-22T00:00:00-03:00',series:columns.map((column,index)=>({column,tag:catalog[column].tag,unit:catalog[column].unit,type:catalog[column].type,step:column==='ECO',reportKey:'well_history:'+String(index+1).repeat(40),samples:[0,1,2].map(hour=>({timestamp:'2026-10-21T0'+(hour+3)+':00:00Z',value:column==='ECO'?(hour?'ALARMA':'NORMAL'):column==='FP'?0.85:750+hour,good:hour!==1,questionable:false,substituted:false})).filter((sample,index)=>column!=='FP'||index!==1)}))};}
 // Leer los miembros ZIP almacenados para verificar que la descarga sea XLSX real.
 function zipEntries(bytes){const entries={};let at=0;while(bytes.readUInt32LE(at)===0x04034b50){const length=bytes.readUInt32LE(at+18),nameLength=bytes.readUInt16LE(at+26),extra=bytes.readUInt16LE(at+28),name=bytes.subarray(at+30,at+30+nameLength).toString(),start=at+30+nameLength+extra;entries[name]=bytes.subarray(start,start+length).toString();at=start+length;}return entries;}
 for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y reporte '+(mobile?'móvil':'escritorio'),async()=>{
@@ -29,7 +29,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
         if(delay)await new Promise(resolve=>setTimeout(resolve,150));
         return route.fulfill({status:fail?422:200,json:fail?{ok:false,error:'El rango debe ser de hasta 31 días.'}:response(request.columns)});
       }
-      if(url.pathname.endsWith('/novedades_semanales_report_api.php')){reports.push(route.request().postDataJSON());return route.fulfill({json:{ok:true,count:3,message:'3 gráficos agregados al reporte.'}});}
+      if(url.pathname.endsWith('/novedades_semanales_report_api.php')){reports.push(route.request().postDataJSON());return route.fulfill({json:{ok:true,count:3,message:'Tendencias agregadas al reporte.'}});}
       return route.fulfill({contentType:'text/html; charset=utf-8',body:fixture()});
     });
     await page.goto('http://clear.test/monitoreo_pozos.php');
@@ -41,16 +41,17 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(await detail.getByRole('checkbox',{name:'Seleccionar Fecha para histórico',exact:true}).isDisabled(),true);
     for(const column of ['QT:RPM','FP','ECO'])await detail.getByRole('checkbox',{name:'Seleccionar '+column+' para histórico',exact:true}).check();
     await detail.getByRole('button',{name:'Histórico (3)',exact:true}).click();
-    await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===3&&document.querySelector('[data-wh-export]').disabled===false);
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===1&&document.querySelector('[data-wh-export]').disabled===false);
     assert.equal(requests.length,1);assert.deepEqual(requests[0].columns,['QT:RPM','FP','ECO']);
-    assert.equal(await history.locator('.wh-chart').count(),3);
+    assert.equal(await history.locator('.wh-chart').count(),1);
+    assert.equal(await history.locator('input[type=number]').count(),0);
+    assert.equal(await history.locator('.wh-scale').count(),0);
+    const chartState=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return chart.data.datasets.map(dataset=>({label:dataset.label,color:dataset.borderColor,axis:dataset.yAxisID,data:dataset.data}));});
+    assert.equal(chartState.length,3);assert.equal(new Set(chartState.map(item=>item.color)).size,3);assert.equal(new Set(chartState.map(item=>item.axis)).size,3);
+    assert.deepEqual(chartState[1].data,[0.85,null,0.85]);
+    assert.deepEqual(chartState[2].data,['NORMAL',null,'ALARMA']);
     const data=await history.locator('canvas').first().evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
     assert.deepEqual(data,[750,null,752]);
-    assert.equal(await history.locator('.wh-chart').last().locator('.wh-scale').isVisible(),false);
-    await history.getByRole('checkbox',{name:'Escala automática de QT:RPM',exact:true}).uncheck();
-    await history.getByRole('spinbutton',{name:'Mínimo de QT:RPM',exact:true}).fill('0');
-    await history.getByRole('spinbutton',{name:'Máximo de QT:RPM',exact:true}).fill('900');
-    const scale=await history.locator('canvas').first().evaluate(canvas=>{const y=Chart.getChart(canvas).options.scales.y;return {min:y.min,max:y.max};});assert.deepEqual(scale,{min:0,max:900});
     const download=page.waitForEvent('download');await history.getByRole('button',{name:'Exportar Excel',exact:true}).click();
     const file=await download,downloadPath=await file.path();assert.ok(file.suggestedFilename().endsWith('.xlsx'));
     const entries=zipEntries(fs.readFileSync(downloadPath));assert.equal(Object.keys(entries).length,5);
@@ -62,16 +63,23 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
       await page.screenshot({path:path.join(process.env.WELL_HISTORY_QA_DIR,'historicos-'+(mobile?'movil':'escritorio')+'.png')});
     }
     await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
-    await page.waitForFunction(()=>document.querySelector('.wh-status').textContent.includes('agregados al reporte'));
-    assert.equal(reports.length,1);assert.equal(reports[0].items.length,3);
+    await page.waitForFunction(()=>document.querySelector('.wh-status').textContent.includes('agregadas al reporte'));
+    assert.equal(reports.length,1);assert.equal(reports[0].items.length,1);
     assert.ok(reports[0].items[0].payload.image_data.startsWith('data:image/png;base64,'));
-    assert.deepEqual(reports[0].items[0].payload.scale,{auto:false,min:0,max:900});assert.deepEqual(reports[0].items[0].payload.datasets[0].values,[750,null,752]);
-    await history.getByRole('checkbox',{name:'Escala automática de QT:RPM',exact:true}).check();
-    assert.equal(await history.locator('canvas').first().evaluate(canvas=>Chart.getChart(canvas).options.scales.y.min),undefined);
+    assert.deepEqual(reports[0].items[0].payload.scale,{auto:true,independent:true});
+    assert.match(reports[0].items[0].key,/^[a-z0-9_-]+:[a-f0-9]{40}$/);assert.equal(reports[0].items[0].payload.datasets.length,3);assert.deepEqual(reports[0].items[0].payload.datasets[0].values,[750,null,752]);
+    // La leyenda oculta series sin borrar sus datos ni alterar Excel.
+    await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);chart.hide(1);});
+    await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('[data-wh-report]').disabled===false);
+    assert.equal(reports[1].items[0].payload.datasets.length,2);
+    await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);chart.data.datasets.forEach((item,index)=>chart.hide(index));});
+    await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
+    assert.equal(reports.length,2);assert.ok((await history.locator('.wh-status').textContent()).includes('Mostrá al menos'));
     await history.getByLabel('Histórico desde',{exact:true}).fill('2026-10-01T00:00');
     await history.getByLabel('Histórico hasta',{exact:true}).fill('2026-10-02T00:00');
     await history.getByRole('button',{name:'Traer históricos',exact:true}).click();
-    await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===3&&document.querySelector('[data-wh-export]').disabled===false);
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===1&&document.querySelector('[data-wh-export]').disabled===false);
     assert.equal(requests[1].from,'2026-10-01T00:00');assert.equal(requests[1].to,'2026-10-02T00:00');
     fail=true;await history.getByRole('button',{name:'Traer históricos',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('.wh-status').textContent.includes('31 días'));

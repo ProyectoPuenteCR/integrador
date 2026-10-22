@@ -41,6 +41,8 @@ try{
     };
     $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request);
     foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode([$well,$series['column'],$result['start'],$result['end']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
+    $columns=array_column($result['series'],'column');sort($columns);
+    $result['combinedReportKey']='well_history_combined:'.sha1(json_encode([$well,$columns,$result['start'],$result['end']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
     wh_out(['ok'=>true,'well'=>$well]+$result);
 }catch(InvalidArgumentException $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],422);}
 catch(Throwable $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],502);}

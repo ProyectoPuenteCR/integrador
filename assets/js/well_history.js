@@ -88,7 +88,7 @@
       if(number!==requestNumber||!dialog.open)return;
       result=data;
       if(typeof window.Chart!=='function')throw Error('No se pudo cargar el componente de gráficos. Recargá la página.');
-      data.series.forEach((series,index)=>render(series,index));
+      render(data.series);
       const usable=data.series.filter(series=>series.samples.length&&!series.error).length;
       const samples=data.series.reduce((count,series)=>count+series.samples.length,0);
       const bad=data.series.reduce((count,series)=>count+series.samples.filter(sample=>!sample.good||sample.questionable).length,0);
@@ -96,39 +96,52 @@
       exportButton.disabled=!samples;reportButton.disabled=!usable;
     }catch(error){if(number!==requestNumber||error.name==='AbortError')return;status.textContent=error.message;status.classList.add('is-error');}
   }
-  function render(series,index){
-    const label=context.variables.find(item=>item.column===series.column)?.label||series.column;
-    const card=element('article','wh-chart');card.append(element('h3','',label+(series.unit?' · '+series.unit:'')),element('p','wh-tag',series.tag));chartBox.append(card);
-    if(series.derivation_label)card.append(element('p','wh-tag',series.derivation_label));
-    if(series.error){card.append(element('p','wh-status is-error',series.error));return;}
-    const numeric=!/digital|string/i.test(series.type)&&series.samples.every(sample=>sample.value===null||typeof sample.value==='number');
-    const valid=sample=>sample.good&&!sample.questionable;
-    const values=series.samples.map(sample=>valid(sample)?sample.value:null);
-    const states=Array.from(new Set(values.filter(value=>value!==null).map(String)));
-    const labels=series.samples.map(sample=>format(sample.timestamp));
-    const wrapper=element('div','wh-canvas');const canvas=element('canvas');canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Histórico de '+label);wrapper.append(canvas);
-    card.append(wrapper);
-    const color=['#1b687e','#bd6b19','#526cc6','#15956f','#a94c84','#558724'][index%6];
-    const chart=new Chart(canvas,{type:'line',data:{labels,datasets:[{label,data:values.map(value=>numeric?value:(value===null?null:String(value))),borderColor:color,backgroundColor:color,borderWidth:2,pointRadius:2,spanGaps:false,stepped:!numeric||series.step}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#24424f',plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:item=>series.samples[item.dataIndex]?.substituted?'Dato sustituido':''}}},scales:{x:{ticks:{color:'#47616c',maxTicksLimit:8,maxRotation:0},grid:{color:'#edf1f4'}},y:numeric?{type:'linear',ticks:{color:'#47616c'},grid:{color:'#e5ecf0'}}:{type:'category',labels:states,ticks:{color:'#47616c'},grid:{color:'#e5ecf0'}}}},plugins:[{id:'whWhite',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle='#fff';ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
-    const scale=element('div','wh-scale'),auto=element('input');auto.type='checkbox';auto.checked=true;auto.setAttribute('aria-label','Escala automática de '+label);
-    const autoLabel=element('label');autoLabel.append(auto,document.createTextNode('Escala automática'));
-    const min=element('input'),max=element('input');for(const [input,name] of [[min,'Mínimo'],[max,'Máximo']]){input.type='number';input.step='any';input.placeholder=name;input.disabled=true;input.setAttribute('aria-label',name+' de '+label);}
-    const scaleError=element('span','wh-scale-error');scaleError.setAttribute('role','status');
-    scale.append(autoLabel,min,max,scaleError);if(!numeric){scale.hidden=true;card.append(element('p','wh-tag','Estados discretos · escala por categorías'));}
-    const apply=()=>{
-      min.disabled=max.disabled=auto.checked;scaleError.textContent='';
-      if(auto.checked){delete chart.options.scales.y.min;delete chart.options.scales.y.max;}
-      else{
-        const low=min.value.trim(),high=max.value.trim();
-        if(low===''||high===''||!Number.isFinite(+low)||!Number.isFinite(+high)||+low>=+high){scaleError.textContent='Ingresá mínimo y máximo; el mínimo debe ser menor.';return;}
-        chart.options.scales.y.min=+low;chart.options.scales.y.max=+high;
-      }
-      chart.update('none');
-    };
-    auto.addEventListener('change',()=>{if(!auto.checked&&min.value===''&&max.value===''){min.value=String(chart.scales.y.min);max.value=String(chart.scales.y.max);}apply();});min.addEventListener('input',apply);max.addEventListener('input',apply);
-    card.insertBefore(scale,wrapper);
-    if(!values.some(value=>value!==null))card.append(element('p','wh-status','No hay muestras con calidad válida para dibujar.'));
-    charts.push({chart,series,label,labels,values,auto,min,max,scaleError});
+  function render(allSeries){
+    const colors=['#1b687e','#bd6b19','#526cc6','#15956f','#a94c84','#558724','#b44739','#656178','#007e96','#896313','#8458ae','#387343'];
+    const card=element('article','wh-chart');
+    card.append(element('h3','','Tendencias del pozo'),element('p','wh-tag','Todas las variables en un gráfico · Escalas automáticas independientes por variable. La leyenda permite ocultar o mostrar cada tendencia.'));
+    chartBox.append(card);
+    const series=allSeries.filter(item=>!item.error&&item.samples.length);
+    allSeries.forEach(item=>{
+      const label=context.variables.find(variable=>variable.column===item.column)?.label||item.column;
+      if(item.error||!item.samples.length)card.append(element('p',item.error?'wh-status is-error':'wh-tag',label+': '+(item.error||'Sin muestras en el período seleccionado.')));
+    });
+    if(!series.length)return;
+    // Unir por instante real, no por índice: un punto ausente deja un hueco.
+    const timestamps=Array.from(new Set(series.flatMap(item=>item.samples.map(sample=>sample.timestamp)))).sort((a,b)=>new Date(a)-new Date(b));
+    const labels=timestamps.map(format),scales={x:{ticks:{color:'#47616c',maxTicksLimit:8,maxRotation:0},grid:{color:'#edf1f4'}}};
+    const datasets=series.map((item,index)=>{
+      const label=context.variables.find(variable=>variable.column===item.column)?.label||item.column;
+      const numeric=!/digital|string/i.test(item.type)&&item.samples.every(sample=>sample.value===null||typeof sample.value==='number');
+      const byTime=new Map(item.samples.map(sample=>[sample.timestamp,sample]));
+      const aligned=timestamps.map(time=>byTime.get(time));
+      const values=aligned.map(sample=>sample&&sample.good&&!sample.questionable?sample.value:null);
+      const states=Array.from(new Set(values.filter(value=>value!==null).map(String)));
+      const color=colors[index%colors.length],axis='y'+index;
+      const title=label+(item.unit?' · '+item.unit:'');
+      scales[axis]={type:numeric?'linear':'category',axis:'y',position:index%2?'right':'left',
+        // En pantallas angostas o selecciones grandes, el detalle queda en la leyenda y el tooltip.
+        display:window.innerWidth>=900&&series.length<=4,
+        title:{display:true,text:title,color},ticks:{color,maxTicksLimit:6},grid:{drawOnChartArea:index===0,color:'#e5ecf0'}};
+      if(!numeric)scales[axis].labels=states;
+      return {label:title,data:values.map(value=>numeric?value:(value===null?null:String(value))),
+        yAxisID:axis,borderColor:color,backgroundColor:color,borderWidth:2,pointRadius:2,
+        spanGaps:false,stepped:!numeric||item.step,historySamples:aligned,historySeries:item};
+    });
+    const wrapper=element('div','wh-canvas'),canvas=element('canvas');
+    canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Tendencias de '+context.well+' · '+series.length+' variables');wrapper.append(canvas);card.append(wrapper);
+    const chart=new Chart(canvas,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#24424f',
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true,position:'bottom',labels:{usePointStyle:true,boxWidth:10,padding:16}},
+        tooltip:{callbacks:{afterLabel:item=>item.dataset.historySamples[item.dataIndex]?.substituted?'Dato sustituido':''}}},scales},
+      plugins:[{id:'whWhite',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle='#fff';ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
+    if(!datasets.some(dataset=>dataset.data.some(value=>value!==null)))card.append(element('p','wh-status','No hay muestras con calidad válida para dibujar.'));
+    const variables=series.map(item=>{
+      const label=context.variables.find(variable=>variable.column===item.column)?.label||item.column;
+      return label+': '+item.tag+(item.derivation_label?' · '+item.derivation_label:'');
+    });
+    card.append(element('p','wh-tag',variables.join(' | ')));
+    charts.push({chart,series,labels});
   }
 
   // XLSX sin dependencias externas: ZIP sin compresión y celdas tipadas.
@@ -162,10 +175,17 @@
   });
   reportButton.addEventListener('click',async()=>{
     if(!result||!charts.length)return;
-    if(charts.some(item=>item.scaleError.textContent)){status.textContent='Corregí las escalas antes de agregar al reporte.';return;}
     reportButton.disabled=true;
     try{
-      const items=charts.map(item=>({key:item.series.reportKey,type:'chart',title:result.well+' · '+item.label,payload:{kind:'chart',chart_type:'line',axis_label:'Fecha (Argentina)',labels:item.labels,datasets:[{label:item.label,values:item.values}],unit:item.series.unit,group_title:'Históricos · '+result.well,context:format(result.start)+' a '+format(result.end)+' · Frecuencia 1 hora · '+item.series.tag,scale:item.auto.checked?{auto:true}:{auto:false,min:+item.min.value,max:+item.max.value},image_data:item.chart.toBase64Image()}}));
+      const item=charts[0];
+      const datasets=item.chart.data.datasets.filter((dataset,index)=>item.chart.isDatasetVisible(index));
+      if(!datasets.length){status.textContent='Mostrá al menos una tendencia antes de agregar al reporte.';return;}
+      const items=[{key:result.combinedReportKey,type:'chart',title:result.well+' · Tendencias',payload:{
+        kind:'chart',chart_type:'line',axis_label:'Fecha (Argentina)',labels:item.labels,
+        datasets:datasets.map(dataset=>({label:dataset.label,values:dataset.data,unit:dataset.historySeries.unit,color:dataset.borderColor})),
+        group_title:'Históricos · '+result.well,
+        context:format(result.start)+' a '+format(result.end)+' · Frecuencia 1 hora · Escalas automáticas independientes · '+datasets.map(dataset=>dataset.historySeries.tag).join(' | '),
+        scale:{auto:true,independent:true},image_data:item.chart.toBase64Image()}}];
       const response=await json('novedades_semanales_report_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'batch',active:true,items})});
       status.textContent=response.message||'Históricos agregados al reporte.';
       document.querySelectorAll('[data-ns-report-count]').forEach(node=>{node.textContent=String(response.count);node.hidden=!response.count;});
