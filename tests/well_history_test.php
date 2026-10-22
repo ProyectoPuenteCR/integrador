@@ -30,11 +30,12 @@ $result=wh_history($catalog,['QT:RPM','ECO'],'2026-10-21T00:00','2026-10-22T00:0
         ['WebId'=>$id2,'Items'=>[['Timestamp'=>'2026-10-21T03:00:00Z','Value'=>['Name'=>'NORMAL','Value'=>0],'Good'=>true]]]
     ]];
 });
-check(strpos($requestPath,'/streamsets/interpolated?')===0&&strpos($requestPath,'interval=1h')!==false,'Muestreo horario en PI.');
+check(strpos($requestPath,'/streamsets/interpolated?')===0&&strpos($requestPath,'interval=3600s')!==false,'Muestreo horario en PI.');
 check(substr_count($requestPath,'webId=')===2,'Consultar todas las variables en una sola petición.');
 check(strpos($requestPath,'startTime=2026-10-21T00%3A00%3A00-03%3A00')!==false&&$result['start']==='2026-10-21T00:00:00-03:00','Interpretar calendario en Argentina.');
 check($result['series'][0]['samples'][0]['value']===0,'Conservar cero real.');
 check(!$result['series'][0]['samples'][1]['good']&&$result['series'][0]['samples'][2]['questionable'],'Conservar calidad de PI.');
+check($result['series'][1]['samples'][0]['plot_value']===0.0,'Conservar código digital cero para escala común.');
 check($result['series'][1]['samples'][0]['value']==='NORMAL','Leer estados digitales como nombres.');
 $derived=wh_history($catalog,['ESTADO_RPM'],'2026-10-21T00:00','2026-10-22T00:00',function()use($id){return ['Items'=>[['WebId'=>$id,'Items'=>[['Timestamp'=>'2026-10-21T03:00:00Z','Value'=>0,'Good'=>true],['Timestamp'=>'2026-10-21T04:00:00Z','Value'=>750,'Good'=>true]]]]];});
 check($derived['series'][0]['samples'][0]['value']==='PARADO'&&$derived['series'][0]['samples'][1]['value']==='EN MARCHA','Aplicar la misma regla de estado que la grilla.');
@@ -47,4 +48,11 @@ rejects(function(){wh_well("pozo%' OR 1=1--");});
 rejects(function()use($catalog){wh_history($catalog,['FP'],'2026-10-21T00:00','2026-10-22T00:00',function(){throw new RuntimeException('No debe llamar PI.');});});
 rejects(function()use($catalog){wh_history($catalog,[['malformado']],'2026-10-21T00:00','2026-10-22T00:00',function(){});});
 rejects(function()use($catalog){wh_history($catalog,array_fill(0,13,'QT:RPM'),'2026-10-21T00:00','2026-10-22T00:00',function(){});});
+$path30='';
+$hourly=wh_history($catalog,['QT:RPM'],'2026-10-21T00:00','2026-10-22T00:00',function($path)use(&$path30,$id){$path30=$path;return ['Items'=>[['WebId'=>$id,'Items'=>[]]]];},30);
+check(strpos($path30,'interval=30s')!==false&&$hourly['intervalSeconds']===30,'Frecuencia real de 30 segundos en PI.');
+foreach([29,0,-30,86401,30.5,true,[],null,'1h','30 OR 1=1'] as $value)rejects(function()use($value){wh_interval($value);});
+check(wh_interval('60')===60,'Aceptar segundos enteros.');
+rejects(function()use($catalog){wh_history($catalog,['QT:RPM'],'2026-10-01T00:00','2026-10-22T00:00',function(){throw new RuntimeException('No debe consultar PI sobre el límite.');},30);});
+check($derived['series'][0]['samples'][0]['plot_value']===0&&$derived['series'][0]['samples'][1]['plot_value']===1,'Estado derivado con código 0/1.');
 echo "OK: catálogo, correspondencias, rango, muestreo horario, calidad, estados y errores parciales.\n";

@@ -39,10 +39,10 @@ try{
         if($status<200||$status>=300)throw new RuntimeException('No se pudo consultar PI Web API (HTTP '.$status.').');
         $data=json_decode($body,true);if(!is_array($data))throw new RuntimeException('La respuesta de PI no es válida.');return $data;
     };
-    $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request);
-    foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode([$well,$series['column'],$result['start'],$result['end']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
+    $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request,$input['intervalSeconds']??3600);
+    foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode([$well,$series['column'],$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
     $columns=array_column($result['series'],'column');sort($columns);
-    $result['combinedReportKey']='well_history_combined:'.sha1(json_encode([$well,$columns,$result['start'],$result['end']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
+    $result['combinedReportKey']='well_history_combined:'.sha1(json_encode([$well,$columns,$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
     wh_out(['ok'=>true,'well'=>$well]+$result);
 }catch(InvalidArgumentException $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],422);}
 catch(Throwable $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],502);}

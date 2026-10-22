@@ -10,6 +10,10 @@
     return parts.year+'-'+parts.month+'-'+parts.day+'T'+parts.hour+':'+parts.minute;
   };
   const format=value=>dateFormat.format(new Date(value));
+  const detailFormat=new Intl.DateTimeFormat('es-AR',{timeZone:timezone,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const detailed=value=>detailFormat.format(new Date(value));
+  const numberFormat=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
+  const frequencyLabel=seconds=>seconds%3600===0?(seconds/3600)+' h':seconds%60===0?(seconds/60)+' min':seconds+' s';
   const element=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
   async function json(url,options){
     const response=await fetch(url,{credentials:'same-origin',...options});
@@ -46,14 +50,14 @@
           if(check.checked)chosen.set(column,{column,label});else chosen.delete(column);update();
         });
       });
-      note.textContent=available?'Seleccioná las variables que querés consultar. Los históricos se toman cada una hora.':'No se encontraron tags verificados para este pozo.';update();
+      note.textContent=available?'Seleccioná las variables que querés consultar. Podés elegir la frecuencia desde 30 segundos.':'No se encontraron tags verificados para este pozo.';update();
     }catch(error){if(tokens.get(body)===token){note.textContent=error.message;note.classList.add('is-error');button.disabled=true;}}
   }
 
   const dialog=element('dialog','well-details wh-dialog');dialog.setAttribute('aria-labelledby','whTitle');
-  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Históricos PI · Monitoreo SCADA</div><h2 id="whTitle"></h2><p class="well-details__subtitle">Una muestra por hora · Fechas y horarios de Argentina</p></div><button type="button" class="tg-btn" data-wh-close aria-label="Cerrar históricos" autofocus>×</button></header><div class="well-details__body"><form class="wh-toolbar"><label>Desde<input type="datetime-local" name="from" required aria-label="Histórico desde"></label><label>Hasta<input type="datetime-local" name="to" required aria-label="Histórico hasta"></label><span class="wh-frequency">Frecuencia: 1 hora</span><button class="tg-btn" type="submit">Traer históricos</button><button class="tg-btn" type="button" data-wh-export disabled>Exportar Excel</button><button class="tg-btn" type="button" data-wh-report disabled>Agregar al reporte</button></form><p class="wh-status" role="status" aria-live="polite"></p><div class="wh-charts"></div></div><footer class="well-details__footer"><span>Valores interpolados cada hora · Máximo 31 días por consulta</span><button type="button" class="tg-btn" data-wh-close>Volver a la ficha</button></footer>';
+  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Históricos PI · Monitoreo SCADA</div><h2 id="whTitle"></h2><p class="well-details__subtitle">Frecuencia configurable · Fechas y horarios de Argentina</p></div><button type="button" class="tg-btn" data-wh-close aria-label="Cerrar históricos" autofocus>×</button></header><div class="well-details__body"><form class="wh-toolbar"><label>Desde<input type="datetime-local" name="from" required aria-label="Histórico desde"></label><label>Hasta<input type="datetime-local" name="to" required aria-label="Histórico hasta"></label><label>Frecuencia (segundos)<input type="number" name="intervalSeconds" value="3600" min="30" max="86400" step="1" required aria-label="Frecuencia en segundos" list="whIntervals"><datalist id="whIntervals"><option value="30">30 segundos</option><option value="60">1 minuto</option><option value="300">5 minutos</option><option value="900">15 minutos</option><option value="3600">1 hora</option></datalist></label><button class="tg-btn" type="submit">Traer históricos</button><button class="tg-btn" type="button" data-wh-export disabled>Exportar Excel</button><button class="tg-btn" type="button" data-wh-report disabled>Agregar al reporte</button></form><p class="wh-status" role="status" aria-live="polite"></p><div class="wh-charts"></div></div><footer class="well-details__footer"><span>Mínimo 30 segundos · Máximo 31 días · Hasta 60.000 muestras por consulta</span><button type="button" class="tg-btn" data-wh-close>Volver a la ficha</button></footer>';
   document.body.append(dialog);
-  const form=dialog.querySelector('form'),from=form.elements.from,to=form.elements.to;
+  const form=dialog.querySelector('form'),from=form.elements.from,to=form.elements.to,frequency=form.elements.intervalSeconds;
   const status=dialog.querySelector('.wh-status'),chartBox=dialog.querySelector('.wh-charts');
   const exportButton=dialog.querySelector('[data-wh-export]'),reportButton=dialog.querySelector('[data-wh-report]');
   reportButton.hidden=!cfg.wellHistoryReport;
@@ -65,7 +69,7 @@
   dialog.addEventListener('click',event=>{const rect=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom))close();});
   dialog.addEventListener('keydown',event=>{
     if(event.key!=='Tab')return;
-    const controls=Array.from(dialog.querySelectorAll('button,input,a[href]')).filter(node=>!node.disabled&&node.getClientRects().length);
+    const controls=Array.from(dialog.querySelectorAll('button,input,select,a[href]')).filter(node=>!node.disabled&&node.getClientRects().length);
     const first=controls[0],last=controls[controls.length-1];
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
@@ -84,7 +88,7 @@
     result=null;destroy();exportButton.disabled=reportButton.disabled=true;
     status.textContent='Consultando PI Web API…';status.classList.remove('is-error');
     try{
-      const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,columns:context.variables.map(item=>item.column),from:from.value,to:to.value})});
+      const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,columns:context.variables.map(item=>item.column),from:from.value,to:to.value,intervalSeconds:Number(frequency.value)})});
       if(number!==requestNumber||!dialog.open)return;
       result=data;
       if(typeof window.Chart!=='function')throw Error('No se pudo cargar el componente de gráficos. Recargá la página.');
@@ -92,14 +96,14 @@
       const usable=data.series.filter(series=>series.samples.length&&!series.error).length;
       const samples=data.series.reduce((count,series)=>count+series.samples.length,0);
       const bad=data.series.reduce((count,series)=>count+series.samples.filter(sample=>!sample.good||sample.questionable).length,0);
-      status.textContent=usable+' de '+data.series.length+' históricos consultados · '+samples+' muestras'+(bad?' · '+bad+' sin calidad válida (se muestran como huecos)':'')+'.';
+      status.textContent='Frecuencia: '+frequencyLabel(data.intervalSeconds||Number(frequency.value))+' · '+usable+' de '+data.series.length+' históricos consultados · '+samples+' muestras'+(bad?' · '+bad+' sin calidad válida (se muestran como huecos)':'')+'.';
       exportButton.disabled=!samples;reportButton.disabled=!usable;
     }catch(error){if(number!==requestNumber||error.name==='AbortError')return;status.textContent=error.message;status.classList.add('is-error');}
   }
   function render(allSeries){
-    const colors=['#1b687e','#bd6b19','#526cc6','#15956f','#a94c84','#558724','#b44739','#656178','#007e96','#896313','#8458ae','#387343'];
+    const colors=['#53d6a4','#ffc857','#b8a1ef','#f57ca7','#5fc9f8','#ff9473','#c5df72','#96a9ff','#eb9ae3','#5ce0dc','#e9b486','#d3dce5'];
     const card=element('article','wh-chart');
-    card.append(element('h3','','Tendencias del pozo'),element('p','wh-tag','Todas las variables en un gráfico · Escalas automáticas independientes por variable. La leyenda permite ocultar o mostrar cada tendencia.'));
+    card.append(element('h3','','Tendencias del pozo'),element('p','wh-tag','Una escala común de mínimo a máximo · Mové el cursor o la barra para consultar valores. Tocá una tendencia para ocultarla o mostrarla.'));
     chartBox.append(card);
     const series=allSeries.filter(item=>!item.error&&item.samples.length);
     allSeries.forEach(item=>{
@@ -107,40 +111,71 @@
       if(item.error||!item.samples.length)card.append(element('p',item.error?'wh-status is-error':'wh-tag',label+': '+(item.error||'Sin muestras en el período seleccionado.')));
     });
     if(!series.length)return;
-    // Unir por instante real, no por índice: un punto ausente deja un hueco.
     const timestamps=Array.from(new Set(series.flatMap(item=>item.samples.map(sample=>sample.timestamp)))).sort((a,b)=>new Date(a)-new Date(b));
-    const labels=timestamps.map(format),scales={x:{ticks:{color:'#47616c',maxTicksLimit:8,maxRotation:0},grid:{color:'#edf1f4'}}};
+    const labels=timestamps.map(detailed);
     const datasets=series.map((item,index)=>{
       const label=context.variables.find(variable=>variable.column===item.column)?.label||item.column;
-      const numeric=!/digital|string/i.test(item.type)&&item.samples.every(sample=>sample.value===null||typeof sample.value==='number');
-      const byTime=new Map(item.samples.map(sample=>[sample.timestamp,sample]));
-      const aligned=timestamps.map(time=>byTime.get(time));
-      const values=aligned.map(sample=>sample&&sample.good&&!sample.questionable?sample.value:null);
-      const states=Array.from(new Set(values.filter(value=>value!==null).map(String)));
-      const color=colors[index%colors.length],axis='y'+index;
-      const title=label+(item.unit?' · '+item.unit:'');
-      scales[axis]={type:numeric?'linear':'category',axis:'y',position:index%2?'right':'left',
-        // En pantallas angostas o selecciones grandes, el detalle queda en la leyenda y el tooltip.
-        display:window.innerWidth>=900&&series.length<=4,
-        title:{display:true,text:title,color},ticks:{color,maxTicksLimit:6},grid:{drawOnChartArea:index===0,color:'#e5ecf0'}};
-      if(!numeric)scales[axis].labels=states;
-      return {label:title,data:values.map(value=>numeric?value:(value===null?null:String(value))),
-        yAxisID:axis,borderColor:color,backgroundColor:color,borderWidth:2,pointRadius:2,
-        spanGaps:false,stepped:!numeric||item.step,historySamples:aligned,historySeries:item};
+      const alignedMap=new Map(item.samples.map(sample=>[sample.timestamp,sample]));
+      const aligned=timestamps.map(time=>alignedMap.get(time));
+      const values=aligned.map(sample=>{
+        if(!sample||!sample.good||sample.questionable)return null;
+        const value=sample.plot_value??(typeof sample.value==='number'?sample.value:null);
+        return typeof value==='number'&&Number.isFinite(value)?value:null;
+      });
+      return {label:label+(item.unit?' · '+item.unit:''),data:values,yAxisID:'y',borderColor:colors[index%colors.length],
+        backgroundColor:colors[index%colors.length],pointBackgroundColor:colors[index%colors.length],
+        borderWidth:2,pointRadius:values.length>300?0:2,pointHoverRadius:4,spanGaps:false,
+        stepped:/digital|string/i.test(item.type)||item.step,historySamples:aligned,historySeries:item};
     });
+    const legend=element('div','wh-legend');legend.setAttribute('aria-label','Tendencias visibles');card.append(legend);
     const wrapper=element('div','wh-canvas'),canvas=element('canvas');
-    canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Tendencias de '+context.well+' · '+series.length+' variables');wrapper.append(canvas);card.append(wrapper);
-    const chart=new Chart(canvas,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#24424f',
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:true,position:'bottom',labels:{usePointStyle:true,boxWidth:10,padding:16}},
-        tooltip:{callbacks:{afterLabel:item=>item.dataset.historySamples[item.dataIndex]?.substituted?'Dato sustituido':''}}},scales},
-      plugins:[{id:'whWhite',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle='#fff';ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
-    if(!datasets.some(dataset=>dataset.data.some(value=>value!==null)))card.append(element('p','wh-status','No hay muestras con calidad válida para dibujar.'));
-    const variables=series.map(item=>{
-      const label=context.variables.find(variable=>variable.column===item.column)?.label||item.column;
-      return label+': '+item.tag+(item.derivation_label?' · '+item.derivation_label:'');
+    canvas.dataset.clearChartLocal='true';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Tendencias de '+context.well+' · '+series.length+' variables');wrapper.append(canvas);card.append(wrapper);
+    const tip=element('div','wh-tooltip');tip.hidden=true;wrapper.append(tip);
+    const scrub=element('label','wh-scrub'),scrubTitle=element('span','','Recorrer el histórico'),slider=element('input');
+    slider.type='range';slider.min='0';slider.max=String(timestamps.length-1);slider.step='1';slider.value='0';slider.setAttribute('aria-label','Recorrer valores del histórico');
+    const time=element('output','wh-inspected-time');scrub.append(scrubTitle,slider,time);card.append(scrub);
+    const table=element('table','wh-values');table.innerHTML='<thead><tr><th>Variable</th><th>Valor en el instante</th><th>Unidad / calidad</th></tr></thead>';
+    const tbody=element('tbody');table.append(tbody);card.append(table);
+    const rows=datasets.map(dataset=>{
+      const row=element('tr'),name=element('th','',dataset.label),value=element('td'),quality=element('td');name.scope='row';name.style.color=dataset.borderColor;row.append(name,value,quality);tbody.append(row);return {row,value,quality};
     });
-    card.append(element('p','wh-tag',variables.join(' | ')));
+    const sampleText=sample=>!sample?'Sin muestra':sample.value===null?'Sin dato':typeof sample.value==='number'?numberFormat.format(sample.value):String(sample.value);
+    let chart;
+    function inspect(index,showTooltip=false){
+      index=Math.max(0,Math.min(timestamps.length-1,Math.round(index)));slider.value=String(index);slider.setAttribute('aria-valuetext',labels[index]);time.textContent=labels[index];
+      tip.replaceChildren(element('strong','',labels[index]));
+      datasets.forEach((dataset,di)=>{
+        const visible=chart.isDatasetVisible(di),sample=dataset.historySamples[index],text=sampleText(sample);
+        rows[di].row.hidden=!visible;rows[di].value.textContent=text;
+        rows[di].quality.textContent=[dataset.historySeries.unit,sample?(sample.good&&!sample.questionable?'Buena':'Sin calidad válida'):'Sin muestra',sample?.substituted?'Sustituido':''].filter(Boolean).join(' · ');
+        if(visible){const line=element('div','',dataset.label+': '+text+(sample&&(!sample.good||sample.questionable)?' · Sin calidad válida':''));line.style.color=dataset.borderColor;tip.append(line);}
+      });
+      chart.$whIndex=index;tip.hidden=!showTooltip;
+      if(showTooltip){const pixel=chart.scales.x.getPixelForValue(index);tip.style.left=Math.max(8,Math.min(wrapper.clientWidth-tip.offsetWidth-8,pixel+12))+'px';tip.style.top='18px';}
+      chart.draw();
+    }
+    function toggle(index){chart.setDatasetVisibility(index,!chart.isDatasetVisible(index));chart.update('none');syncLegend();inspect(Number(slider.value));}
+    const buttons=datasets.map((dataset,index)=>{
+      const button=element('button','wh-series');button.type='button';button.style.setProperty('--series-color',dataset.borderColor);
+      button.append(element('span','wh-dot'),document.createTextNode(dataset.label));button.addEventListener('click',()=>toggle(index));legend.append(button);return button;
+    });
+    const showAll=element('button','wh-show-all','Mostrar todas');showAll.type='button';legend.append(showAll);
+    const syncLegend=()=>buttons.forEach((button,index)=>{button.setAttribute('aria-pressed',String(chart.isDatasetVisible(index)));button.classList.toggle('is-hidden',!chart.isDatasetVisible(index));});
+    showAll.addEventListener('click',()=>{datasets.forEach((dataset,index)=>chart.setDatasetVisibility(index,true));chart.update('none');syncLegend();inspect(Number(slider.value));});
+    const crosshair={id:'whCrosshair',afterDraw(chart){if(chart.$whIndex===undefined)return;const {ctx,chartArea,scales}=chart,x=scales.x.getPixelForValue(chart.$whIndex);ctx.save();ctx.strokeStyle='#a9bbc8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();chart.data.datasets.forEach((dataset,index)=>{if(!chart.isDatasetVisible(index)||dataset.data[chart.$whIndex]===null)return;const y=scales.y.getPixelForValue(dataset.data[chart.$whIndex]);ctx.beginPath();ctx.arc(x,y,4,0,2*Math.PI);ctx.fillStyle=dataset.borderColor;ctx.fill();ctx.strokeStyle='#e3edf4';ctx.stroke();});ctx.restore();}};
+    chart=new Chart(canvas,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#c9d9e4',
+      interaction:{mode:'index',intersect:false,axis:'x'},
+      onHover(event){if(event.x>=chart.chartArea.left&&event.x<=chart.chartArea.right)inspect(chart.scales.x.getValueForPixel(event.x),true);},
+      onClick(event){const active=chart.getElementsAtEventForMode(event,'nearest',{intersect:true},false);if(active.length)toggle(active[0].datasetIndex);},
+      plugins:{legend:{display:false},tooltip:{enabled:false},clearGlobalValues:false,datalabels:{display:false}},
+      scales:{x:{ticks:{color:'#9bb1c0',maxTicksLimit:8,maxRotation:0,callback(value){return labels[value]?.replace(/,? \d{2}:\d{2}:\d{2}$/,match=>match.slice(0,-3));}},grid:{color:'#293e4b'}},
+        y:{type:'linear',position:'left',ticks:{color:'#9bb1c0',maxTicksLimit:7},grid:{color:'#293e4b'}}}},
+      plugins:[crosshair,{id:'whDark',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle='#15232d';ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
+    slider.addEventListener('input',()=>inspect(Number(slider.value),true));
+    canvas.addEventListener('mouseleave',()=>{tip.hidden=true;});
+    syncLegend();inspect(0);
+    if(!datasets.some(dataset=>dataset.data.some(value=>value!==null)))card.append(element('p','wh-status','No hay muestras numéricas con calidad válida para dibujar. Los estados se conservan en la tabla.'));
+    card.append(element('p','wh-tag','Los estados digitales usan su código PI en la escala; el cursor muestra su descripción. Las variables conservan sus unidades originales.'));
     charts.push({chart,series,labels});
   }
 
@@ -169,8 +204,8 @@
   }
   exportButton.addEventListener('click',()=>{
     if(!result)return;
-    const rows=[['Pozo','Variable','Tag PI','Fecha y hora (Argentina)','Fecha UTC','Valor','Unidad','Calidad buena','Cuestionable','Sustituido']];
-    result.series.forEach(series=>series.samples.forEach(sample=>rows.push([result.well,context.variables.find(item=>item.column===series.column)?.label||series.column,series.tag,format(sample.timestamp),sample.timestamp,sample.value??'',series.unit,sample.good?'Sí':'No',sample.questionable?'Sí':'No',sample.substituted?'Sí':'No'])));
+    const rows=[['Pozo','Variable','Tag PI','Fecha y hora (Argentina)','Fecha UTC','Frecuencia (segundos)','Valor','Unidad','Calidad buena','Cuestionable','Sustituido']];
+    result.series.forEach(series=>series.samples.forEach(sample=>rows.push([result.well,context.variables.find(item=>item.column===series.column)?.label||series.column,series.tag,detailed(sample.timestamp),sample.timestamp,result.intervalSeconds||3600,sample.value??'',series.unit,sample.good?'Sí':'No',sample.questionable?'Sí':'No',sample.substituted?'Sí':'No'])));
     const url=URL.createObjectURL(workbook(rows)),link=element('a');link.href=url;link.download='Historicos_'+result.well.replace(/[^\w.-]/g,'_')+'.xlsx';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   reportButton.addEventListener('click',async()=>{
@@ -182,10 +217,10 @@
       if(!datasets.length){status.textContent='Mostrá al menos una tendencia antes de agregar al reporte.';return;}
       const items=[{key:result.combinedReportKey,type:'chart',title:result.well+' · Tendencias',payload:{
         kind:'chart',chart_type:'line',axis_label:'Fecha (Argentina)',labels:item.labels,
-        datasets:datasets.map(dataset=>({label:dataset.label,values:dataset.data,unit:dataset.historySeries.unit,color:dataset.borderColor})),
+        datasets:datasets.map(dataset=>({label:dataset.label,values:dataset.historySamples.map(sample=>sample&&sample.good&&!sample.questionable?sample.value:null),unit:dataset.historySeries.unit,color:dataset.borderColor})),
         group_title:'Históricos · '+result.well,
-        context:format(result.start)+' a '+format(result.end)+' · Frecuencia 1 hora · Escalas automáticas independientes · '+datasets.map(dataset=>dataset.historySeries.tag).join(' | '),
-        scale:{auto:true,independent:true},image_data:item.chart.toBase64Image()}}];
+        context:detailed(result.start)+' a '+detailed(result.end)+' · Frecuencia '+frequencyLabel(result.intervalSeconds||3600)+' · Escala común automática · '+datasets.map(dataset=>dataset.historySeries.tag).join(' | '),
+        scale:{auto:true,independent:false},image_data:item.chart.toBase64Image()}}];
       const response=await json('novedades_semanales_report_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'batch',active:true,items})});
       status.textContent=response.message||'Históricos agregados al reporte.';
       document.querySelectorAll('[data-ns-report-count]').forEach(node=>{node.textContent=String(response.count);node.hidden=!response.count;});

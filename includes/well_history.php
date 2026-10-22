@@ -43,7 +43,7 @@ function wh_catalog($db,$well) {
     // Misma regla de ESTADO_RPM que usa telemetry_grid.php, sobre el RPM horario.
     if(!empty($output['QT:RPM']['available']))$output['ESTADO_RPM']=array_merge($output['QT:RPM'],[
         'type'=>'Digital','unit'=>'','step'=>true,'derived'=>'rpm_state',
-        'derivation_label'=>'Estado calculado a partir de RPM en cada muestra horaria.'
+        'derivation_label'=>'Estado calculado a partir de RPM en cada muestra.'
     ]);
     return $output;
 }
@@ -59,13 +59,23 @@ function wh_range($from,$to) {
     if($seconds<=0||$seconds>31*86400)throw new InvalidArgumentException('El rango debe ser mayor a cero y de hasta 31 días.');
     return [$dates[0]->format(DateTimeInterface::ATOM),$dates[1]->format(DateTimeInterface::ATOM)];
 }
-function wh_history($catalog,$columns,$from,$to,$request) {
+function wh_interval($value) {
+    if(!(is_int($value)||(is_string($value)&&ctype_digit($value)))||(int)$value<30||(int)$value>86400)
+        throw new InvalidArgumentException('La frecuencia debe ser un número entero entre 30 y 86400 segundos.');
+    return (int)$value;
+}
+function wh_history($catalog,$columns,$from,$to,$request,$intervalSeconds=3600) {
     if(!is_array($columns)||!$columns||count($columns)>12)throw new InvalidArgumentException('Seleccioná entre 1 y 12 variables.');
     foreach($columns as $column)if(!is_string($column)||empty($catalog[$column]['available']))throw new InvalidArgumentException('Una variable seleccionada no tiene un tag verificado.');
     $columns=array_values(array_unique($columns));
     [$start,$end]=wh_range($from,$to);
+    $intervalSeconds=wh_interval($intervalSeconds);
+    $seconds=strtotime($end)-strtotime($start);
+    $points=(int)floor($seconds/$intervalSeconds)+1;
+    if($points>10000||$points*count($columns)>60000)
+        throw new InvalidArgumentException('La consulta supera el límite de muestras. Aumentá la frecuencia en segundos o reducí el período o la cantidad de variables.');
     $ids=[];foreach($columns as $column)$ids[$catalog[$column]['webid']]=true;
-    $query='startTime='.rawurlencode($start).'&endTime='.rawurlencode($end).'&interval=1h';
+    $query='startTime='.rawurlencode($start).'&endTime='.rawurlencode($end).'&interval='.$intervalSeconds.'s';
     foreach(array_keys($ids) as $id)$query.='&webId='.rawurlencode($id);
     $response=$request('/streamsets/interpolated?'.$query);
     if(!isset($response['Items'])||!is_array($response['Items']))throw new RuntimeException('PI Web API no devolvió las series solicitadas.');
@@ -77,18 +87,22 @@ function wh_history($catalog,$columns,$from,$to,$request) {
             'type'=>$point['type'],'step'=>$point['step'],'samples'=>[]];
         if(!empty($point['derivation_label']))$entry['derivation_label']=$point['derivation_label'];
         if(!isset($stream['Items'])||!is_array($stream['Items'])||!empty($stream['Errors'])){$entry['error']='PI no devolvió datos para esta variable.';$series[]=$entry;continue;}
-        if(count($stream['Items'])>746)throw new RuntimeException('PI devolvió más muestras que el rango permitido.');
+        if(count($stream['Items'])>min(10000,$points+2))throw new RuntimeException('PI devolvió más muestras que el rango permitido.');
         foreach($stream['Items'] as $sample){
             $timestamp=(string)($sample['Timestamp']??'');$epoch=strtotime($timestamp);
             if($epoch===false||$epoch<strtotime($start)||$epoch>strtotime($end))continue;
             $raw=$sample['Value']??null;$value=is_array($raw)?($raw['Name']??null):$raw;
             if(($point['derived']??'')==='rpm_state')$value=is_numeric($raw)?((float)$raw===0.0?'PARADO':((float)$raw>0?'EN MARCHA':'SIN DATO')):'SIN DATO';
             if(!is_scalar($value)&&$value!==null)$value=null;
-            $entry['samples'][]=['timestamp'=>$timestamp,'value'=>$value,'good'=>($sample['Good']??false)===true,
+            // Conservar el estado textual y el código numérico PI por separado.
+            $plot=is_numeric($value)?(float)$value:null;
+            if(is_array($raw)&&isset($raw['Value'])&&is_numeric($raw['Value']))$plot=(float)$raw['Value'];
+            if(($point['derived']??'')==='rpm_state')$plot=is_numeric($raw)&&$raw>=0?((float)$raw===0.0?0:1):null;
+            $entry['samples'][]=['timestamp'=>$timestamp,'value'=>$value,'plot_value'=>$plot,'good'=>($sample['Good']??false)===true,
                 'questionable'=>!empty($sample['Questionable']),'substituted'=>!empty($sample['Substituted'])];
         }
         if(!$entry['samples'])$entry['error']='Sin muestras en el rango seleccionado.';
         $series[]=$entry;
     }
-    return ['start'=>$start,'end'=>$end,'interval'=>'1h','timezone'=>'America/Argentina/Buenos_Aires','series'=>$series];
+    return ['start'=>$start,'end'=>$end,'interval'=>$intervalSeconds.'s','intervalSeconds'=>$intervalSeconds,'timezone'=>'America/Argentina/Buenos_Aires','series'=>$series];
 }
