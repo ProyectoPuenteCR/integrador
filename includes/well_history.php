@@ -2,7 +2,7 @@
 /* Lectura del catálogo existente. No crea ni modifica objetos SQL. */
 function wh_clean($value) { return trim(trim((string)$value), "\" \t\r\n"); }
 function wh_columns() {
-    return ['ESTADO','Fecha','ECO','ESTADO-GRAL','PT:LINEA','YAT:COM','__COMUNICACION',
+    return ['ZT:SUP','WT:SUP','ZT:FONDO','WT:FONDO','ESTADO','Fecha','ECO','ESTADO-GRAL','PT:LINEA','YAT:COM','__COMUNICACION',
         'ET:VARIADOR','FP','FT:AGUA_ACU','FT:AGUA_CIERRE','FT:FONDO-LLENADO.PV',
         'FT:LLENADO.SP','FT:LLENADO-ACTUAL','FT:OIL_ACU','FT:OIL_CIERRE','FT:PROD_ACU',
         'FT:PROD-PROY','FT:PROY-AGUA','FT:PROY-OIL','WT:SUP_MAX','WT:SPMIN','YT:CONTROL',

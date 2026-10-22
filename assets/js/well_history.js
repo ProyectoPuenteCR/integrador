@@ -24,14 +24,17 @@
     if(!cache.has(well))cache.set(well,json('well_history_api.php?well='+encodeURIComponent(well)).catch(error=>{cache.delete(well);throw error;}));
     return cache.get(well);
   }
-  async function decorate({well,body,actions}){
+  async function decorate({well,body,actions,historyHost,cardsHost}){
+    detach();
     const token={};tokens.set(body,token);
+    if(historyHost)mount(well,historyHost,cardsHost);
     const chosen=selections.get(well)||new Map();selections.set(well,chosen);
     const button=element('button','tg-btn wh-open','Histórico');button.type='button';button.disabled=true;actions.prepend(button);
     const note=element('p','wh-catalog-status','Buscando variables con histórico en PI…');note.setAttribute('role','status');body.prepend(note);
     const fields=Array.from(body.querySelectorAll('[data-history-column]'));
     const update=()=>{button.textContent='Histórico ('+chosen.size+')';button.disabled=!chosen.size;};update();button.disabled=true;
     button.addEventListener('click',()=>open(well,Array.from(chosen.values()),button));
+    if(inlineHost)context={well,variables:Array.from(chosen.values())};
     try{
       const data=await catalog(well);if(tokens.get(body)!==token)return;
       for(const column of chosen.keys())if(!data.columns[column]?.available)chosen.delete(column);
@@ -48,9 +51,11 @@
         check.addEventListener('change',()=>{
           if(check.checked&&chosen.size>=12){check.checked=false;note.textContent='Podés comparar hasta 12 variables por consulta.';return;}
           if(check.checked)chosen.set(column,{column,label});else chosen.delete(column);update();
+          if(inlineHost){context.variables=Array.from(chosen.values());invalidateSelection();}
         });
       });
       note.textContent=available?'Seleccioná las variables que querés consultar. Podés elegir la frecuencia desde 30 segundos.':'No se encontraron tags verificados para este pozo.';update();
+      if(inlineHost&&context?.well===well){context.variables=Array.from(chosen.values());invalidateSelection();}
     }catch(error){if(tokens.get(body)===token){note.textContent=error.message;note.classList.add('is-error');button.disabled=true;}}
   }
 
@@ -61,7 +66,7 @@
   const status=dialog.querySelector('.wh-status'),chartBox=dialog.querySelector('.wh-charts');
   const exportButton=dialog.querySelector('[data-wh-export]'),reportButton=dialog.querySelector('[data-wh-report]');
   reportButton.hidden=!cfg.wellHistoryReport;
-  let context=null,result=null,charts=[],requestNumber=0,returnTo=null,controller=null;
+  let context=null,result=null,charts=[],requestNumber=0,returnTo=null,controller=null,inlineHost=null,cardsController=null,cardCharts=[];
   const destroy=()=>{charts.forEach(item=>item.chart?.destroy());charts=[];chartBox.replaceChildren();};
   const maximizeButton=dialog.querySelector('[data-wh-maximize]');
   function maximize(enabled){
@@ -84,8 +89,23 @@
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
   });
+  const home=dialog.querySelector('.well-details__body');
+  function active(){return inlineHost?!!inlineHost.closest('dialog')?.open:dialog.open;}
+  function detach(){
+    controller?.abort();cardsController?.abort();requestNumber++;destroy();cardCharts.forEach(chart=>chart.destroy());cardCharts=[];
+    if(inlineHost){home.append(form,status,chartBox);inlineHost=null;}context=null;result=null;
+  }
+  function invalidateSelection(){controller?.abort();requestNumber++;result=null;destroy();exportButton.disabled=reportButton.disabled=true;status.textContent=context.variables.length?'Selección: '+context.variables.length+' variables. Presioná Histórico o Traer históricos.':'Seleccioná variables con los checkbox de abajo y presioná Histórico.';}
+  function mount(well,host,cardsHost){
+    inlineHost=host;host.classList.add('wh-inline');host.append(form,status,chartBox);
+    const end=new Date();end.setMinutes(0,0,0);from.value=localDate(new Date(end.getTime()-86400000));to.value=localDate(end);
+    context={well,variables:[]};exportButton.disabled=reportButton.disabled=true;
+    status.textContent='Seleccioná variables con los checkbox de abajo y presioná Histórico.';
+    if(cardsHost)mountCards(well,cardsHost);
+  }
   function open(well,variables,opener){
-    if(!variables.length||dialog.open)return;
+    if(!variables.length||(!inlineHost&&dialog.open))return;
+    if(inlineHost){context={well,variables};load();inlineHost.scrollIntoView({block:'start',behavior:'smooth'});return;}
     context={well,variables};returnTo=opener;result=null;destroy();
     const end=new Date();end.setMinutes(0,0,0);from.value=localDate(new Date(end.getTime()-86400000));to.value=localDate(end);
     dialog.querySelector('h2').textContent=well+' · '+variables.length+' variable'+(variables.length===1?'':'s');
@@ -93,13 +113,14 @@
   }
   form.addEventListener('submit',event=>{event.preventDefault();load();});
   async function load(){
+    if(!context?.variables.length){status.textContent='Seleccioná al menos una variable con los checkbox.';return;}
     if(!form.reportValidity())return;
     controller?.abort();controller=new AbortController();const number=++requestNumber;
     result=null;destroy();exportButton.disabled=reportButton.disabled=true;
     status.textContent='Consultando PI Web API…';status.classList.remove('is-error');
     try{
       const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,columns:context.variables.map(item=>item.column),from:from.value,to:to.value,intervalSeconds:Math.round(Number(frequency.value)*60)})});
-      if(number!==requestNumber||!dialog.open)return;
+      if(number!==requestNumber||!active())return;
       result=data;
       if(typeof window.Chart!=='function')throw Error('No se pudo cargar el componente de gráficos. Recargá la página.');
       render(data.series);
@@ -189,6 +210,35 @@
     charts.push({chart,series,labels});
   }
 
+  function mountCards(well,host){
+    const heading=element('h3','','Cartas dinamométricas'),controls=element('form','wd-card-controls');
+    const atLabel=element('label','','Hasta'),at=element('input');at.type='datetime-local';at.required=true;at.value=localDate(new Date());at.setAttribute('aria-label','Cartas hasta');atLabel.append(at);
+    const windowLabel=element('label','','Ventana (segundos)'),windowInput=element('input');windowInput.type='number';windowInput.min='5';windowInput.max='300';windowInput.value='60';windowInput.required=true;windowInput.setAttribute('aria-label','Ventana de las cartas');windowLabel.append(windowInput);
+    const get=element('button','tg-btn','Consultar cartas');get.type='submit';controls.append(atLabel,windowLabel,get);host.append(heading,controls);
+    const cards=['superficie','fondo'].map(kind=>{
+      const card=element('section','wd-card'),title=element('h3','','Carta de '+kind),note=element('p','wh-tag',kind==='superficie'?'X: ZT:SUP · Y: WT:SUP':'X: ZT:FONDO · Y: WT:FONDO');
+      const message=element('p','wh-status','Presioná Consultar cartas para buscar datos reales de PI.'),plot=element('div','wd-card-plot');card.append(title,note,message,plot);host.append(card);return {kind,message,plot};
+    });
+    controls.addEventListener('submit',async event=>{
+      event.preventDefault();if(!controls.reportValidity())return;
+      cardsController?.abort();const pending=new AbortController();cardsController=pending;get.disabled=true;
+      cardCharts.forEach(chart=>chart.destroy());cardCharts=[];cards.forEach(card=>{card.plot.replaceChildren();card.message.textContent='Consultando PI…';});
+      try{
+        const data=await json('well_history_api.php',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cards',well,at:at.value,windowSeconds:Number(windowInput.value)})});
+        if(pending!==cardsController||!active())return;
+        cards.forEach((card,index)=>{
+          const series=data.cards.find(item=>item.kind===card.kind);
+          if(!series||series.error){card.message.textContent=series?.error||'Sin datos de PI.';return;}
+          card.message.textContent=series.points.filter(point=>point.y!==null).length+' pares válidos · '+detailed(data.start)+' a '+detailed(data.end)+' · Ventana temporal, sin identificación automática de ciclo.';
+          const canvas=element('canvas');canvas.dataset.clearChartLocal='true';canvas.setAttribute('aria-label','Carta de '+card.kind+' de '+well);canvas.setAttribute('role','img');card.plot.append(canvas);
+          const color=index?'#b2e879':'#5fc9f8';
+          const chart=new Chart(canvas,{type:'scatter',data:{datasets:[{label:'Carta de '+card.kind,data:series.points,borderColor:color,backgroundColor:color,showLine:true,spanGaps:false,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#b7cbd8',plugins:{legend:{display:false},clearGlobalValues:false,tooltip:{callbacks:{label:item=>detailed(series.points[item.dataIndex].timestamp)+' · X: '+item.parsed.x+' · Y: '+item.parsed.y}}},scales:{x:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Posición'+(series.xUnit?' ('+series.xUnit+')':'')},grid:{color:'#293e4b'}},y:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Carga'+(series.yUnit?' ('+series.yUnit+')':'')},grid:{color:'#293e4b'}}}}});cardCharts.push(chart);
+        });
+      }catch(error){if(error.name!=='AbortError'&&pending===cardsController)cards.forEach(card=>card.message.textContent=error.message);}
+      finally{if(pending===cardsController)get.disabled=false;}
+    });
+  }
+
   // XLSX sin dependencias externas: ZIP sin compresión y celdas tipadas.
   const xml=value=>String(value??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   function workbook(rows){
@@ -236,5 +286,5 @@
       document.querySelectorAll('[data-ns-report-count]').forEach(node=>{node.textContent=String(response.count);node.hidden=!response.count;});
     }catch(error){status.textContent=error.message;status.classList.add('is-error');}finally{reportButton.disabled=false;}
   });
-  window.CLEAR_WELL_HISTORY={decorate};
+  window.CLEAR_WELL_HISTORY={decorate,detach};
 })();

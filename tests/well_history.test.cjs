@@ -20,12 +20,14 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
   try{
     const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},acceptDownloads:true});
     const errors=[],requests=[],reports=[];page.on('pageerror',error=>errors.push(error.message));
-    let fail=false,delay=false;
+    let fail=false,delay=false;const cardRequests=[];
     await page.route('http://clear.test/**',async route=>{
       const url=new URL(route.request().url());
       if(url.pathname.endsWith('/well_history_api.php')){
         if(route.request().method()==='GET')return route.fulfill({json:{ok:true,columns:catalog}});
-        const request=route.request().postDataJSON();requests.push(request);
+        const request=route.request().postDataJSON();
+        if(request.action==='cards'){cardRequests.push(request);return route.fulfill({json:{ok:true,start:'2026-10-22T14:59:00-03:00',end:'2026-10-22T15:00:00-03:00',cards:[{kind:'superficie',xUnit:'in',yUnit:'lb',points:[{x:0,y:32000,timestamp:'2026-10-22T17:59:10Z'},{x:100,y:60000,timestamp:'2026-10-22T17:59:20Z'},{x:0,y:34000,timestamp:'2026-10-22T17:59:30Z'}]},{kind:'fondo',points:[],error:'Falta verificar ZT:FONDO en PI_Points_Stage.'}]}});}
+        requests.push(request);
         if(delay)await new Promise(resolve=>setTimeout(resolve,150));
         return route.fulfill({status:fail?422:200,json:fail?{ok:false,error:'El rango debe ser de hasta 31 días.'}:response(request.columns,request.intervalSeconds)});
       }
@@ -36,7 +38,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await page.goto('http://clear.test/monitoreo_pozos.php');
     for(const file of ['chart.umd.js','chart_preferences.js','well_history.js','well_details.js'])await page.addScriptTag({path:path.join(root,'assets/js',file)});
     await page.locator('td[data-column=POZO]').dblclick();
-    const detail=page.locator('dialog.well-details:not(.wh-dialog)'),history=page.locator('dialog.wh-dialog');
+    const detail=page.locator('dialog.well-details:not(.wh-dialog)'),history=detail;
     await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===3);
     assert.equal(await detail.getByRole('button',{name:'Histórico (0)',exact:true}).isDisabled(),true);
     assert.equal(await detail.getByRole('checkbox',{name:'Seleccionar Fecha para histórico',exact:true}).isDisabled(),true);
@@ -48,29 +50,37 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(await history.getByLabel('Frecuencia en minutos',{exact:true}).getAttribute('min'),'0.5');
     assert.equal(await history.locator('.wh-scale').count(),0);
     assert.equal(requests[0].intervalSeconds,3600);
+    assert.equal(await page.locator('dialog.wh-dialog').isVisible(),false);
+    assert.equal(await history.locator('.wd-kpi').count(),6);
+    await history.getByRole('button',{name:'Consultar cartas',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.wd-card-plot canvas').length===1);
+    assert.equal(cardRequests[0].windowSeconds,60);assert.equal(cardRequests[0].well,fields.POZO);
+    assert.ok((await history.locator('.wd-cards-host').textContent()).includes('Falta verificar ZT:FONDO'));
+    const xy=await history.locator('.wd-card-plot canvas').evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
+    assert.deepEqual(xy.map(point=>point.x),[0,100,0]);
     const originalBox=await history.boundingBox();
-    await history.getByRole('button',{name:'Maximizar históricos',exact:true}).click();
+    await history.getByRole('button',{name:'Maximizar ficha del pozo',exact:true}).click();
     const maximized=await history.boundingBox(),viewport=page.viewportSize();
     assert.ok(Math.abs(maximized.width-viewport.width)<=2);assert.ok(Math.abs(maximized.height-viewport.height)<=2);
-    assert.equal(await history.getByRole('button',{name:'Restaurar tamaño',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.equal(await history.getByRole('button',{name:'Restaurar ficha del pozo',exact:true}).getAttribute('aria-pressed'),'true');
     assert.equal(requests.length,1);
-    await history.getByRole('button',{name:'Restaurar tamaño',exact:true}).click();
+    await history.getByRole('button',{name:'Restaurar ficha del pozo',exact:true}).click();
     assert.ok(Math.abs((await history.boundingBox()).width-originalBox.width)<=2);
     assert.equal(await history.getByLabel('Frecuencia en minutos',{exact:true}).inputValue(),'60');
     await page.waitForFunction(()=>{const canvas=document.querySelector('.wh-chart canvas');return Math.abs(Chart.getChart(canvas).width-canvas.parentElement.clientWidth)<2;});
-    const chartState=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return chart.data.datasets.map(dataset=>({label:dataset.label,color:dataset.borderColor,axis:dataset.yAxisID,data:dataset.data}));});
+    const chartState=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return chart.data.datasets.map(dataset=>({label:dataset.label,color:dataset.borderColor,axis:dataset.yAxisID,data:dataset.data}));});
     assert.equal(chartState.length,3);assert.equal(new Set(chartState.map(item=>item.color)).size,3);assert.equal(new Set(chartState.map(item=>item.axis)).size,1);
-    const options=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return {type:chart.config.type,scales:Object.keys(chart.scales),local:canvas.dataset.clearChartLocal,labels:chart.options.plugins.clearGlobalValues,background:getComputedStyle(canvas.parentElement).backgroundColor};});
+    const options=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return {type:chart.config.type,scales:Object.keys(chart.scales),local:canvas.dataset.clearChartLocal,labels:chart.options.plugins.clearGlobalValues,background:getComputedStyle(canvas.parentElement).backgroundColor};});
     assert.deepEqual(options.scales,['x','y']);assert.equal(options.type,'line');assert.equal(options.local,'true');assert.equal(options.labels,false);assert.equal(options.background,'rgb(21, 35, 45)');
     assert.equal(await history.locator('.clearChartInlineBtn').count(),0);
     assert.deepEqual(chartState[1].data,[0.85,null,0.85]);
     assert.deepEqual(chartState[2].data,[0,null,1]);
-    await history.locator('canvas').scrollIntoViewIfNeeded();
-    const location=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas),box=canvas.getBoundingClientRect();return {x:box.x+chart.scales.x.getPixelForValue(1),y:box.y+chart.chartArea.top+20};});
+    await history.locator('.wh-chart canvas').scrollIntoViewIfNeeded();
+    const location=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas),box=canvas.getBoundingClientRect();return {x:box.x+chart.scales.x.getPixelForValue(1),y:box.y+chart.chartArea.top+20};});
     await page.mouse.move(location.x,location.y);
     await page.waitForFunction(()=>document.querySelector('.wh-inspected-time').textContent.includes('01:00:00'));
     assert.ok((await history.locator('.wh-values').textContent()).includes('Sin calidad válida'));
-    const dot=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas),box=canvas.getBoundingClientRect();return {x:box.x+chart.scales.x.getPixelForValue(0),y:box.y+chart.scales.y.getPixelForValue(750)};});
+    const dot=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas),box=canvas.getBoundingClientRect();return {x:box.x+chart.scales.x.getPixelForValue(0),y:box.y+chart.scales.y.getPixelForValue(750)};});
     await page.mouse.click(dot.x+2,dot.y);
     await page.waitForFunction(()=>document.querySelector('.wh-series').getAttribute('aria-pressed')==='false');
     assert.equal(await history.getByRole('button',{name:'QT:RPM · rpm',exact:true}).getAttribute('aria-pressed'),'false');
@@ -80,14 +90,14 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.ok((await history.locator('.wh-inspected-time').textContent()).includes('02:00:00'));
     assert.ok((await history.locator('.wh-values').textContent()).includes('752'));
     assert.ok((await history.locator('.wh-tooltip').textContent()).includes('ALARMA'));
-    assert.equal(await history.locator('canvas').evaluate(canvas=>Chart.getChart(canvas).$whIndex),2);
+    assert.equal(await history.locator('.wh-chart canvas').evaluate(canvas=>Chart.getChart(canvas).$whIndex),2);
     await history.getByRole('button',{name:'FP',exact:true}).click();assert.equal(await history.getByRole('button',{name:'FP',exact:true}).getAttribute('aria-pressed'),'false');
     await history.getByRole('button',{name:'Mostrar todas',exact:true}).click();
     await history.getByLabel('Frecuencia en minutos',{exact:true}).fill('0.4');
     assert.equal(await history.getByLabel('Frecuencia en minutos',{exact:true}).evaluate(input=>input.validity.rangeUnderflow),true);
     await history.getByRole('button',{name:'Traer históricos',exact:true}).click();assert.equal(requests.length,1);
     await history.getByLabel('Frecuencia en minutos',{exact:true}).fill('60');
-    const data=await history.locator('canvas').first().evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
+    const data=await history.locator('.wh-chart canvas').first().evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
     assert.deepEqual(data,[750,null,752]);
     const download=page.waitForEvent('download');await history.getByRole('button',{name:'Exportar Excel',exact:true}).click();
     const file=await download,downloadPath=await file.path();assert.ok(file.suggestedFilename().endsWith('.xlsx'));
@@ -110,9 +120,9 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('[data-wh-report]').disabled===false);
     assert.equal(reports[1].items[0].payload.datasets.length,2);
-    await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);chart.data.datasets.forEach((item,index)=>chart.hide(index));});
+    await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);chart.data.datasets.forEach((item,index)=>chart.hide(index));});
     await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
-    assert.equal(reports.length,2);assert.ok((await history.locator('.wh-status').textContent()).includes('Mostrá al menos'));
+    assert.equal(reports.length,2);assert.ok((await history.locator('.wd-history-host>.wh-status').textContent()).includes('Mostrá al menos'));
     await history.getByLabel('Frecuencia en minutos',{exact:true}).fill('0.5');
     await history.getByLabel('Histórico desde',{exact:true}).fill('2026-10-01T00:00');
     await history.getByLabel('Histórico hasta',{exact:true}).fill('2026-10-02T00:00');
@@ -121,9 +131,17 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(requests[1].intervalSeconds,30);assert.equal(requests[1].from,'2026-10-01T00:00');assert.equal(requests[1].to,'2026-10-02T00:00');
     fail=true;await history.getByRole('button',{name:'Traer históricos',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('.wh-status').textContent.includes('31 días'));
-    assert.equal(await history.locator('canvas').count(),0);assert.equal(await history.getByRole('button',{name:'Exportar Excel',exact:true}).isDisabled(),true);
-    fail=false;delay=true;await history.getByRole('button',{name:'Traer históricos',exact:true}).click();await history.getByRole('button',{name:'Cerrar históricos',exact:true}).click();
-    assert.equal(await history.isVisible(),false);assert.equal(await detail.isVisible(),true);
+    assert.equal(await history.locator('.wh-chart canvas').count(),0);assert.equal(await history.getByRole('button',{name:'Exportar Excel',exact:true}).isDisabled(),true);
+    fail=false;const beforeSelection=requests.length;
+    await detail.getByRole('checkbox',{name:'Seleccionar FP para histórico',exact:true}).uncheck();
+    assert.equal(requests.length,beforeSelection);assert.equal(await history.locator('.wh-chart canvas').count(),0);
+    await detail.getByRole('button',{name:'Histórico (2)',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===1);
+    assert.deepEqual(requests.at(-1).columns,['QT:RPM','ECO']);
+    fail=false;delay=true;await history.getByRole('button',{name:'Traer históricos',exact:true}).click();await history.getByRole('button',{name:'Cerrar ficha del pozo',exact:true}).click();
+    assert.equal(await history.isVisible(),false);assert.equal(await detail.isVisible(),false);
+    await page.locator('td[data-column=POZO]').dblclick();
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===3);
     assert.equal(await detail.getByRole('checkbox',{name:'Seleccionar QT:RPM para histórico',exact:true}).isChecked(),true);
     assert.deepEqual(errors,[]);
   }finally{await browser.close();}

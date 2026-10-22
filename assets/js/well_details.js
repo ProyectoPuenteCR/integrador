@@ -6,12 +6,13 @@
   if(!table||!table.tBodies[0])return;
 
   const dialog=document.createElement('dialog');
-  dialog.className='well-details';
+  dialog.className='well-details wd-dashboard';
   dialog.setAttribute('aria-labelledby','wellDetailsTitle');
-  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Ficha del pozo</div><h2 id="wellDetailsTitle"></h2><p class="well-details__subtitle"></p></div><button type="button" class="tg-btn" data-well-close aria-label="Cerrar ficha del pozo" autofocus>×</button></header><div class="well-details__body"></div><footer class="well-details__footer"><span>Datos de la grilla · incluye columnas ocultas</span><div class="well-details__actions"></div><button type="button" class="tg-btn" data-well-close>Cerrar</button></footer>';
+  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Centro de operación · Ficha del pozo</div><h2 id="wellDetailsTitle"></h2><p class="well-details__subtitle"></p></div><div class="wd-head-actions"><button type="button" class="tg-btn wd-choose" data-well-choose>Elegir variables</button><button type="button" class="tg-btn" data-well-maximize aria-label="Maximizar ficha del pozo" aria-pressed="false">⛶</button><button type="button" class="tg-btn" data-well-close aria-label="Cerrar ficha del pozo" autofocus>×</button></div></header><div class="well-details__body"></div><footer class="well-details__footer"><span>Datos de la grilla · incluye columnas ocultas</span><div class="well-details__actions"></div><button type="button" class="tg-btn" data-well-close>Cerrar</button></footer>';
   document.body.append(dialog);
   const title=dialog.querySelector('h2');
   const subtitle=dialog.querySelector('.well-details__subtitle');
+  const liveStatus=document.createElement('div');liveStatus.className='wd-live-status';subtitle.after(liveStatus);
   const body=dialog.querySelector('.well-details__body');
   const actions=dialog.querySelector('.well-details__actions');
   const titleLine=document.createElement('div');titleLine.className='well-details__title-line';
@@ -41,7 +42,10 @@
     if(previous?.isConnected)previous.focus({preventScroll:true});
   }
 
-  function close(){dialog.close();restoreFocus();}
+  const maximize=dialog.querySelector('[data-well-maximize]');
+  function resize(maximized){dialog.classList.toggle('is-maximized',maximized);maximize.setAttribute('aria-pressed',String(maximized));maximize.setAttribute('aria-label',maximized?'Restaurar ficha del pozo':'Maximizar ficha del pozo');maximize.textContent=maximized?'❐':'⛶';}
+  maximize.addEventListener('click',()=>resize(!dialog.classList.contains('is-maximized')));
+  function close(){window.CLEAR_WELL_HISTORY?.detach?.();dialog.close();resize(false);restoreFocus();}
 
   function addAction(source,label,{target=actions,screen=false,iconOnly=false}={}){
     if(!source)return;
@@ -71,6 +75,8 @@
     }
     addAction(cells.get('PANTALLA')?.querySelector('a'),'Abrir pantalla de PI Vision',{target:titleIcons,screen:true,iconOnly:true});
     subtitle.textContent=[cfg.title||'Monitoreo de Pozos',value(cfg.batteryColumn||'BATERIA')].filter(Boolean).join(' · ');
+    liveStatus.replaceChildren();
+    ['__COMUNICACION','ESTADO_RPM'].forEach(column=>{if(!value(column))return;const badge=document.createElement('span');badge.textContent=value(column);if(column==='__COMUNICACION'&&communication==='sin comunicacion')badge.className='is-error';liveStatus.append(badge);});
     body.replaceChildren();actions.replaceChildren();
     const groups=new Map(['Identificación','Operación','Producción','Variables de telemetría'].map(name=>[name,[]]));
     originalColumns.forEach(({column,label})=>{
@@ -86,16 +92,29 @@
       else description.textContent=(column==='COMENTARIO'?cell.textContent.trim():cell.dataset.raw?.trim())||'Sin dato';
       field.append(term,description);groups.get(groupFor(column)).push(field);
     });
+    const kpis=document.createElement('div');kpis.className='wd-kpis';
+    [['Petróleo','PRODUCCION_PETROLEO'],['Líquido','PRODUCCION_LIQUIDO'],['Llenado','FT:FONDO-LLENADO.PV'],['Motor','QT:RPM'],['Presión de línea','PT:LINEA'],['Alarmas 24 h','ALM']].forEach(([label,column])=>{
+      const card=document.createElement('article');card.className='wd-kpi';const heading=document.createElement('span');heading.textContent=label;
+      const reading=document.createElement('strong');reading.textContent=value(column)||'Sin dato';
+      card.append(heading,reading);kpis.append(card);
+    });body.append(kpis);
+    const workspace=document.createElement('div');workspace.className='wd-workspace';
+    const historyHost=document.createElement('section');historyHost.className='wd-history-host';historyHost.setAttribute('aria-label','Tendencias seleccionadas');
+    const cardsHost=document.createElement('aside');cardsHost.className='wd-cards-host';cardsHost.setAttribute('aria-label','Cartas dinamométricas');
+    workspace.append(historyHost,cardsHost);body.append(workspace);
+    const details=document.createElement('div');details.className='wd-data-groups';details.tabIndex=-1;body.append(details);
+    dialog.querySelector('[data-well-choose]').onclick=()=>{details.scrollIntoView({block:'start',behavior:'smooth'});details.focus({preventScroll:true});};
     groups.forEach((fields,name)=>{
       if(!fields.length)return;
       const section=document.createElement('section');section.className='well-details__section';
       const heading=document.createElement('h3');heading.textContent=name;
-      const list=document.createElement('dl');list.append(...fields);section.append(heading,list);body.append(section);
+      const list=document.createElement('dl');list.append(...fields);section.append(heading,list);details.append(section);
     });
     addAction(row.querySelector('.tg-alarm-link'),'Ver alarmas ('+(value('ALM')||'0')+')');
     addAction(cells.get('PANTALLA')?.querySelector('a'),'Abrir pantalla',{screen:true});
     addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
-    if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions});
+    if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions,historyHost,cardsHost});
+    if(!window.CLEAR_WELL_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
     dialog.showModal();document.body.classList.add('well-details-open');
   }
 
@@ -121,7 +140,7 @@
   });
   dialog.addEventListener('keydown',event=>{
     if(event.key!=='Tab')return;
-    const buttons=Array.from(dialog.querySelectorAll('button,a[href]')).filter(item=>item.getClientRects().length);
+    const buttons=Array.from(dialog.querySelectorAll('button,a[href],input,select')).filter(item=>!item.disabled&&item.getClientRects().length);
     const first=buttons[0],last=buttons[buttons.length-1];
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}

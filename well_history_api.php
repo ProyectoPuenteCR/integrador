@@ -5,6 +5,7 @@ require_once __DIR__.'/includes/permissions.php';
 require_once __DIR__.'/includes/appconfig.php';
 require_once __DIR__.'/includes/well_history.php';
 require_once __DIR__.'/includes/pi_transport.php';
+require_once __DIR__.'/includes/well_cards.php';
 auth_require();
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -39,6 +40,7 @@ try{
         if($status<200||$status>=300)throw new RuntimeException('No se pudo consultar PI Web API (HTTP '.$status.').');
         $data=json_decode($body,true);if(!is_array($data))throw new RuntimeException('La respuesta de PI no es válida.');return $data;
     };
+    if(($input['action']??'')==='cards')wh_out(['ok'=>true,'well'=>$well]+wh_cards($catalog,$input['at']??'',$input['windowSeconds']??60,$request));
     $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request,$input['intervalSeconds']??3600);
     foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode([$well,$series['column'],$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
     $columns=array_column($result['series'],'column');sort($columns);
