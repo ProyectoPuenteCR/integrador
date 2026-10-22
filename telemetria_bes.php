@@ -1,6 +1,7 @@
 <?php
 $TELEMETRY = [
     'key' => 'telemetria_bes',
+    'collapsible_toolbar' => true,
     'title' => 'Telemetría BES',
     'subtitle' => 'Monitoreo de bombeo electrosumergible',
     'table' => 'BES_RTQP',

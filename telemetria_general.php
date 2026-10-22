@@ -1,6 +1,7 @@
 <?php
 $TELEMETRY = [
     'key' => 'telemetria_general',
+    'collapsible_toolbar' => true,
     'title' => 'Grilla general de pozos',
     'subtitle' => 'Vista unificada de pozos con recepción SCADA y/o TECSS · actualización SQL cada 10 minutos',
     'table' => 'TELEMETRIA_POZOS_GENERAL_CACHE',

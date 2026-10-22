@@ -1,6 +1,7 @@
 <?php
 $TELEMETRY = [
     'key' => 'telemetria_pcp',
+    'collapsible_toolbar' => true,
     'title' => 'Telemetría PCP',
     'subtitle' => 'Monitoreo de pozos con bombeo PCP',
 
