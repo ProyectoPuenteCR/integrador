@@ -12,7 +12,8 @@
   const format=value=>dateFormat.format(new Date(value));
   const detailFormat=new Intl.DateTimeFormat('es-AR',{timeZone:timezone,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
   const detailed=value=>detailFormat.format(new Date(value));
-  const numberFormat=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
+  const numberFormat=new Intl.NumberFormat('es-AR',{maximumFractionDigits:2});
+  const readingFormat=new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const frequencyLabel=seconds=>numberFormat.format(seconds/60)+' min';
   const element=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
   async function json(url,options){
@@ -170,7 +171,7 @@
     const rows=datasets.map(dataset=>{
       const row=element('tr'),name=element('th','',dataset.label),value=element('td'),quality=element('td');name.scope='row';name.style.color=dataset.borderColor;row.append(name,value,quality);tbody.append(row);return {row,value,quality};
     });
-    const sampleText=sample=>!sample?'Sin muestra':sample.value===null?'Sin dato':typeof sample.value==='number'?numberFormat.format(sample.value):String(sample.value);
+    const sampleText=sample=>!sample?'Sin muestra':sample.value===null?'Sin dato':typeof sample.value==='number'?readingFormat.format(sample.value):String(sample.value);
     let chart;
     function inspect(index,showTooltip=false){
       index=Math.max(0,Math.min(timestamps.length-1,Math.round(index)));slider.value=String(index);slider.setAttribute('aria-valuetext',labels[index]);time.textContent=labels[index];
@@ -233,7 +234,7 @@
           card.message.textContent=series.points.filter(point=>point.y!==null).length+' pares válidos · '+detailed(series.start||data.start)+' a '+detailed(series.end||data.end)+(series.reference?' · Referencia PI: '+detailed(series.reference):'')+' · Ventana temporal, sin identificación automática de ciclo.';
           const canvas=element('canvas');canvas.dataset.clearChartLocal='true';canvas.setAttribute('aria-label','Carta de '+card.kind+' de '+well);canvas.setAttribute('role','img');card.plot.append(canvas);
           const color=index?'#b2e879':'#5fc9f8';
-          const chart=new Chart(canvas,{type:'scatter',data:{datasets:[{label:'Carta de '+card.kind,data:series.points,borderColor:color,backgroundColor:color,showLine:true,spanGaps:false,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#b7cbd8',plugins:{legend:{display:false},clearGlobalValues:false,tooltip:{callbacks:{label:item=>detailed(series.points[item.dataIndex].timestamp)+' · X: '+item.parsed.x+' · Y: '+item.parsed.y}}},scales:{x:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Posición'+(series.xUnit?' ('+series.xUnit+')':'')},grid:{color:'#293e4b'}},y:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Carga'+(series.yUnit?' ('+series.yUnit+')':'')},grid:{color:'#293e4b'}}}}});cardCharts.push(chart);
+          const chart=new Chart(canvas,{type:'scatter',data:{datasets:[{label:'Carta de '+card.kind,data:series.points,borderColor:color,backgroundColor:color,showLine:true,spanGaps:false,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#b7cbd8',plugins:{legend:{display:false},clearGlobalValues:false,tooltip:{callbacks:{label:item=>detailed(series.points[item.dataIndex].timestamp)+' · X: '+readingFormat.format(item.parsed.x)+' · Y: '+readingFormat.format(item.parsed.y)}}},scales:{x:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Posición'+(series.xUnit?' ('+series.xUnit+')':'')},grid:{color:'#293e4b'}},y:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Carga'+(series.yUnit?' ('+series.yUnit+')':'')},grid:{color:'#293e4b'}}}}});cardCharts.push(chart);
         });
       }catch(error){if(error.name!=='AbortError'&&pending===cardsController)cards.forEach(card=>card.message.textContent=error.message);}
       finally{if(pending===cardsController)get.disabled=false;}

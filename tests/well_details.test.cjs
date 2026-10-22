@@ -7,7 +7,7 @@ const {chromium}=require('playwright');
 const root=path.join(__dirname,'..');
 const gridStyle=fs.readFileSync(path.join(root,'includes/telemetry_grid.php'),'utf8').match(/<style>([\s\S]*?)<\/style>/)[1].split('<?php')[0];
 const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
-const fields={POZO:'YPF.SC.BB-113',BATERIA:'CE 22',ALM:'0',__COMUNICACION:'Comunicando',ESTADO:'Bombeo normal',PRODUCCION_PETROLEO:'0,20','PT:LINEA':'12,4',FP:'0',Fecha:'',COMENTARIO:'Información restringida',PANTALLA:'https://screen.example/',CARTAS:'https://cartas.example/'};
+const fields={POZO:'YPF.SC.BB-113',BATERIA:'CE 22',ALM:'0',__COMUNICACION:'Comunicando',ESTADO:'Bombeo normal',PRODUCCION_PETROLEO:'0,20','PT:LINEA':'12,4',FP:'0','FT:AGUA_ACU':'0.79493647813797','ZT:CARRERA-ACTUAL':'149.41000366211',Fecha:'',COMENTARIO:'Información restringida',PANTALLA:'https://screen.example/',CARTAS:'https://cartas.example/'};
 function html(key='monitoreo_pozos'){
   const columns=Object.keys(fields);
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>${gridStyle}${fs.readFileSync(path.join(root,'assets/css/app.css'),'utf8')}${fs.readFileSync(path.join(root,'assets/css/well_details.css'),'utf8')}</style></head><body><table class="tg-table" id="tgTable"><thead><tr>${columns.map(c=>`<th data-column="${c}" data-report-label="${c==='__COMUNICACION'?'COM':c}">${c}</th>`).join('')}</tr></thead><tbody>${['YPF.SC.BB-113','Otro <pozo>'].map(well=>`<tr>${columns.map(c=>`<td data-column="${c}" data-raw="${escape(c==='POZO'?well:fields[c])}" ${c==='PT:LINEA'?'style="display:none"':''}>${c==='PANTALLA'||c==='CARTAS'?`<a href="${fields[c]}" data-telemetry-popup-url="${fields[c]}">Abrir</a>`:c==='COMENTARIO'?'<span>Sin permiso</span>':c==='ALM'?'<a class="tg-alarm-link" href="/alarmas" data-telemetry-modal-url="/alarmas?embed=1">0</a><button class="comment">Comentario</button><input type="checkbox">':c==='__COMUNICACION'?'<span class="tg-badge info" style="color:rgb(20, 90, 120)">Comunicando</span>':escape(c==='POZO'?well:fields[c])}</td>`).join('')}</tr>`).join('')}</tbody></table><script>window.CLEAR_TELEMETRY_GRID={key:'${key}',title:'Monitoreo Pozos',batteryColumn:'BATERIA'};</script></body></html>`;
@@ -27,6 +27,13 @@ for(const mobile of [false,true])test(`ficha de pozo: ${mobile?'móvil':'escrito
     const text=await dialog.textContent();
     for(const expected of ['Identificación','Operación','Producción','Variables de telemetría','PT:LINEA','12,4','Sin dato','Sin permiso','0,20'])assert.ok(text.includes(expected),expected);
     assert.ok(!text.includes('Información restringida'));
+    assert.equal(await dialog.locator('[data-history-column="FT:AGUA_ACU"] dd').textContent(),'0,79');
+    assert.equal(await dialog.locator('[data-history-column="ZT:CARRERA-ACTUAL"] dd').textContent(),'149,41');
+    assert.equal(await dialog.locator('[data-history-column="FP"] dd').textContent(),'0,00');
+    assert.equal(await row.locator('[data-column="FT:AGUA_ACU"]').getAttribute('data-raw'),'0.79493647813797');
+    const groups=await dialog.locator('.wd-data-groups .well-details__section').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,width:r.width};}));
+    assert.ok(groups.every((group,index)=>!index||group.top>=groups[index-1].bottom));
+    assert.ok(groups.every(group=>Math.abs(group.width-groups[0].width)<2));
     assert.equal(await dialog.locator('.well-details__field').count(),Object.keys(fields).length-2);
     assert.equal(await dialog.locator('.tg-badge').textContent(),'Comunicando');
     assert.equal(await dialog.locator('a[data-telemetry-popup-url]').count(),3);

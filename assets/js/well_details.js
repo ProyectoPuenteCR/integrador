@@ -33,6 +33,13 @@
     if(['ALM','__COMUNICACION','ESTADO','ESTADO-GRAL','ESTADO_RPM','AF-ESTADO-PARO-REMOTO','Fecha','COMENTARIO'].includes(column))return 'Operación';
     return 'Variables de telemetría';
   };
+  const readingFormat=new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false});
+  function displayValue(column,raw){
+    if(!raw)return 'Sin dato';
+    if(!/^(PRODUCCION_|(?:PT|QT|FT|WT|ZT|ET):|FP$)/.test(column))return raw;
+    if(!/^[+-]?\d+(?:[.,]\d+)?(?:e[+-]?\d+)?$/i.test(raw))return raw;
+    const value=Number(raw.replace(',','.'));return Number.isFinite(value)?readingFormat.format(value):raw;
+  }
   const originalColumns=Array.from(table.tHead.rows[0].cells).map(header=>({column:header.dataset.column,label:header.dataset.reportLabel||header.dataset.column}));
 
   function restoreFocus(){
@@ -84,18 +91,18 @@
       const cell=cells.get(column);
       if(!cell)return;
       const field=document.createElement('div');field.className='well-details__field';
-      field.dataset.historyColumn=column;
+      field.dataset.historyColumn=column;if(column==='COMENTARIO')field.classList.add('wd-field-comment');
       const term=document.createElement('dt');term.textContent=column==='ALM'?'Alarmas en las últimas 24 h':(label==='COM'?'Comunicación':label);
       const description=document.createElement('dd');
       const badge=cell.querySelector('.tg-badge');
       if(badge)description.append(badge.cloneNode(true));
-      else description.textContent=(column==='COMENTARIO'?cell.textContent.trim():cell.dataset.raw?.trim())||'Sin dato';
+      else description.textContent=displayValue(column,(column==='COMENTARIO'?cell.textContent.trim():cell.dataset.raw?.trim())||'');
       field.append(term,description);groups.get(groupFor(column)).push(field);
     });
     const kpis=document.createElement('div');kpis.className='wd-kpis';
     [['Petróleo','PRODUCCION_PETROLEO'],['Líquido','PRODUCCION_LIQUIDO'],['Llenado','FT:FONDO-LLENADO.PV'],['Motor','QT:RPM'],['Presión de línea','PT:LINEA'],['Alarmas 24 h','ALM']].forEach(([label,column])=>{
       const card=document.createElement('article');card.className='wd-kpi';const heading=document.createElement('span');heading.textContent=label;
-      const reading=document.createElement('strong');reading.textContent=value(column)||'Sin dato';
+      const reading=document.createElement('strong');reading.textContent=displayValue(column,value(column));
       card.append(heading,reading);kpis.append(card);
     });body.append(kpis);
     const workspace=document.createElement('div');workspace.className='wd-workspace';

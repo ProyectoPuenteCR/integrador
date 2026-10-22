@@ -48,3 +48,17 @@ body.well-details-open{overflow:hidden}
 .wd-head-actions .wd-choose{font-size:12px;white-space:nowrap;padding:8px 10px}.wd-data-groups:focus{outline:1px solid #5fc9f8;outline-offset:4px}.wd-dashboard .well-details__section dd{color:#e0edf5}@media(max-width:600px){.wd-head-actions{flex-wrap:wrap;justify-content:flex-end;max-width:145px}.wd-head-actions .wd-choose{font-size:10px;order:3;flex-basis:100%;padding:6px}}
 .wd-live-status{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}.wd-live-status span{font-size:11px;padding:4px 8px;border:1px solid #397660;border-radius:12px;background:#163b32;color:#6be2b4}.wd-live-status .is-error{border-color:#9b4747;background:#482727;color:#ffaaa0}
 .wd-card-controls select{padding:6px;max-width:210px;border:1px solid #3d5666;border-radius:6px;background:#101c24;color:#e0edf5;color-scheme:dark}
+
+/* Filas completas: los paneles cortos ya no toman la altura del más largo. */
+.wd-data-groups{grid-template-columns:minmax(0,1fr);align-items:start;gap:12px}
+.wd-data-groups .well-details__section{padding:14px;min-width:0}
+.wd-data-groups .well-details__section h3{margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #293e4b}
+.wd-data-groups .well-details__section dl{grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;align-items:stretch}
+.wd-data-groups .well-details__field{display:flex;flex-direction:column;min-width:0;padding:9px 10px;border:1px solid #293e4b;border-radius:7px;background:#12212a}
+.wd-data-groups .well-details__field dt{min-height:25px;line-height:1.35;font-size:10px;overflow-wrap:anywhere}
+.wd-data-groups .well-details__field dd{margin:3px 0 7px;font-size:14px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.wd-data-groups .well-details__field .wh-pick{margin-top:auto;min-height:20px;align-items:center}
+.wd-data-groups .wd-field-comment{grid-column:span 2}
+.wd-kpi strong{font-variant-numeric:tabular-nums}
+@media(max-width:600px){.wd-data-groups .well-details__section dl{grid-template-columns:repeat(2,minmax(0,1fr))}.wd-data-groups .well-details__field{padding:8px}.wd-data-groups .well-details__field dd{font-size:13px}.wd-data-groups .well-details__field dt{min-height:26px}}
+@media(max-width:360px){.wd-data-groups .well-details__section dl{grid-template-columns:minmax(0,1fr)}.wd-data-groups .wd-field-comment{grid-column:auto}}

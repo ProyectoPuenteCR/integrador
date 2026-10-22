@@ -778,7 +778,7 @@ if($batteryCounts)$filterGroups[]=['column'=>$batteryCol,'label'=>'Baterías','v
 ?>
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?php echo h($TELEMETRY['title']); ?> · CLEAR</title><link rel="stylesheet" href="assets/css/app.css?v=20260902-column-menu-1"><link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9"><link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1"><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260904-dashboard-full-1">
-<?php if(($TELEMETRY['key']??'')==='monitoreo_pozos'): ?><link rel="stylesheet" href="assets/css/well_details.css?v=20261022-5"><link rel="stylesheet" href="assets/css/well_history.css?v=20261022-5"><?php endif; ?>
+<?php if(($TELEMETRY['key']??'')==='monitoreo_pozos'): ?><link rel="stylesheet" href="assets/css/well_details.css?v=20261022-6"><link rel="stylesheet" href="assets/css/well_history.css?v=20261022-5"><?php endif; ?>
 <style>
 .tg{padding:0 20px 24px}
 .tg-hero{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:8px 0 10px}
@@ -960,7 +960,7 @@ document.querySelectorAll('[data-server-filter]').forEach(function(select){
 <script>window.CLEAR_TELEMETRY_GRID=<?php echo json_encode(['key'=>$TELEMETRY['key'],'title'=>$TELEMETRY['title'],'batteryColumn'=>$batteryCol,'remoteStopColumn'=>$remoteStopEnabled?$remoteStopColumn:'','persistFilters'=>$persistFiltersEnabled,'wellHistory'=>($TELEMETRY['key']==='monitoreo_pozos'&&permissions_can_menu('pi_historico')),'wellHistoryReport'=>$reportEnabled,'columnStateVersion'=>(string)($TELEMETRY['column_state_version'] ?? '317').'-zafiro-activo-1'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script>
 <script src="assets/js/telemetry_grid.js?v=20261022-history-1"></script>
 <script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
-<?php if(($TELEMETRY['key']??'')==='monitoreo_pozos'): ?><script src="assets/js/chart.umd.js"></script><script src="assets/js/well_history.js?v=20261022-6"></script><script src="assets/js/well_details.js?v=20261022-4"></script><?php endif; ?>
+<?php if(($TELEMETRY['key']??'')==='monitoreo_pozos'): ?><script src="assets/js/chart.umd.js"></script><script src="assets/js/well_history.js?v=20261022-7"></script><script src="assets/js/well_details.js?v=20261022-5"></script><?php endif; ?>
 <script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
 <?php if($reportEnabled): ?><script>window.CLEAR_WEEKLY_NEWS={};</script><script src="assets/js/novedades_semanales.js?v=20260904-dashboard-full-1"></script><?php endif; ?>
 </body></html>
