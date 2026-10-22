@@ -33,6 +33,7 @@
     if(['ALM','__COMUNICACION','ESTADO','ESTADO-GRAL','ESTADO_RPM','AF-ESTADO-PARO-REMOTO','Fecha','COMENTARIO'].includes(column))return 'Operación';
     return 'Variables de telemetría';
   };
+  const isNoData=text=>/^(?:sin\s+datos?|[—–-])?$/i.test(String(text).trim());
   const readingFormat=new Intl.NumberFormat('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false});
   function displayValue(column,raw){
     if(!raw)return 'Sin dato';
@@ -108,12 +109,14 @@
       const badge=cell.querySelector('.tg-badge');
       if(badge)description.append(badge.cloneNode(true));
       else description.textContent=displayValue(column,(column==='COMENTARIO'?cell.textContent.trim():cell.dataset.raw?.trim())||'');
+      field.classList.toggle('is-no-data',isNoData(description.textContent));
       field.append(term,description);groups.get(groupFor(column)).push(field);
     });
     const kpis=document.createElement('div');kpis.className='wd-kpis';
     [['Petróleo','PRODUCCION_PETROLEO'],['Líquido','PRODUCCION_LIQUIDO'],['Llenado','FT:FONDO-LLENADO.PV'],['Motor','QT:RPM'],['Presión de línea','PT:LINEA'],['Alarmas 24 h','ALM']].forEach(([label,column])=>{
       const card=document.createElement('article');card.className='wd-kpi';const heading=document.createElement('span');heading.textContent=label;
       const reading=document.createElement('strong');reading.textContent=displayValue(column,value(column));
+      card.classList.toggle('is-no-data',isNoData(reading.textContent));
       card.append(heading,reading);kpis.append(card);
     });body.append(kpis);
     const workspace=document.createElement('div');workspace.className='wd-workspace';
