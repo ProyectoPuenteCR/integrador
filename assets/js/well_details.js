@@ -78,6 +78,7 @@
       const cell=cells.get(column);
       if(!cell)return;
       const field=document.createElement('div');field.className='well-details__field';
+      field.dataset.historyColumn=column;
       const term=document.createElement('dt');term.textContent=column==='ALM'?'Alarmas en las últimas 24 h':(label==='COM'?'Comunicación':label);
       const description=document.createElement('dd');
       const badge=cell.querySelector('.tg-badge');
@@ -94,6 +95,7 @@
     addAction(row.querySelector('.tg-alarm-link'),'Ver alarmas ('+(value('ALM')||'0')+')');
     addAction(cells.get('PANTALLA')?.querySelector('a'),'Abrir pantalla',{screen:true});
     addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
+    if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions});
     dialog.showModal();document.body.classList.add('well-details-open');
   }
 

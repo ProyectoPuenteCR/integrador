@@ -254,7 +254,7 @@
     if(timer)clearInterval(timer);
     const interval=parseInt(document.getElementById('tgInterval').value||'0',10);
     localStorage.setItem(refreshKey,String(interval));
-    if(interval>0)timer=setInterval(()=>{if(!document.hidden)location.reload();},interval*1000);
+    if(interval>0)timer=setInterval(()=>{if(!document.hidden&&!document.querySelector('.well-details[open]'))location.reload();},interval*1000);
   }
 
   function setQuickFilter(type){
