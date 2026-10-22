@@ -1,0 +1,40 @@
+body.well-details-open{overflow:hidden}
+.well-details-row{cursor:pointer}
+.well-details-row:focus-visible{outline:2px solid var(--petrol);outline-offset:-2px}
+.well-details{position:fixed;inset:0;margin:auto;width:min(1100px,94vw);max-height:90vh;max-height:90dvh;padding:0;border:1px solid var(--line-mid);border-radius:16px;background:var(--surface,#fff);color:var(--text);box-shadow:0 26px 80px rgba(8,25,34,.34)}
+.well-details[open]{display:flex;flex-direction:column}
+.well-details::backdrop{background:rgba(8,25,34,.5);backdrop-filter:blur(2px)}
+.well-details__head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line-mid)}
+.well-details__head .tg-btn{font-size:24px;line-height:1}
+.well-details__eyebrow{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--petrol)}
+.well-details h2{margin:5px 0;font:800 24px/1.2 var(--font-head,system-ui);overflow-wrap:anywhere}
+.well-details__subtitle{margin:0;color:var(--text-mut);font-size:12px}
+.well-details__body{overflow:auto;min-height:0;padding:16px 22px;display:grid;gap:12px;overscroll-behavior:contain}
+.well-details__section{border:1px solid var(--line-mid);border-radius:10px;padding:14px}
+.well-details h3{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--petrol)}
+.well-details dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;margin:0}
+.well-details__field{min-width:0}
+.well-details dt{font-size:10px;line-height:1.4;color:var(--text-mut);overflow-wrap:anywhere}
+.well-details dd{margin:4px 0 0;font-size:13px;line-height:1.5;font-weight:650;white-space:pre-wrap;overflow-wrap:anywhere}
+.well-details .tg-badge{white-space:normal}
+.well-details__footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 22px;border-top:1px solid var(--line-mid)}
+.well-details__footer>span{margin-right:auto;color:var(--text-mut);font-size:11px}
+.well-details__actions{display:flex;gap:8px;flex-wrap:wrap}
+.well-details .tg-btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+@media(max-width:720px){.well-details dl{grid-template-columns:repeat(2,minmax(0,1fr))}.well-details__head,.well-details__body,.well-details__footer{padding:12px}.well-details h2{font-size:20px}}
+@media(max-width:420px){.well-details dl{grid-template-columns:1fr}.well-details__footer>span{flex-basis:100%}}
+
+.well-details__head,.well-details__footer{flex-shrink:0}
+.well-details-hint{margin:8px 0;color:var(--text-mut);font-size:11px}
+.well-details__identity{min-width:0;flex:1}
+.well-details__pump{float:left;width:72px;height:72px;object-fit:contain;margin-right:16px;filter:drop-shadow(0 2px 3px rgba(15,23,42,.12))}
+.well-details__pump[hidden]{display:none}
+.well-details__title-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.well-details__title-icons{display:inline-flex;align-items:center;gap:8px}
+.well-details__screen{width:32px;height:32px;flex-shrink:0}
+.well-details__screen svg{width:18px;height:18px}
+.well-details__comm-fail{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;color:#c52d26;background:#fde8e7;border:1px solid #f4b9b4}
+.well-details__comm-fail svg{width:21px;height:21px}
+.well-details__actions .tg-btn{gap:6px}
+.well-details__actions .tg-btn svg{width:16px;height:16px}
+@media(max-width:420px){.well-details__pump{width:48px;height:48px;margin-right:10px}.well-details__title-line{gap:6px}.well-details__comm-fail,.well-details__screen{width:28px;height:28px}}
