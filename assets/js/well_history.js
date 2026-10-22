@@ -212,11 +212,12 @@
 
   function mountCards(well,host){
     const heading=element('h3','','Cartas dinamométricas'),controls=element('form','wd-card-controls');
+    const modeLabel=element('label','','Consulta'),mode=element('select');mode.setAttribute('aria-label','Modo de consulta de cartas');mode.innerHTML='<option value="latest">Última carta disponible</option><option value="manual">Fecha manual</option>';modeLabel.append(mode);
     const atLabel=element('label','','Hasta'),at=element('input');at.type='datetime-local';at.required=true;at.value=localDate(new Date());at.setAttribute('aria-label','Cartas hasta');atLabel.append(at);
     const windowLabel=element('label','','Ventana (segundos)'),windowInput=element('input');windowInput.type='number';windowInput.min='5';windowInput.max='300';windowInput.value='60';windowInput.required=true;windowInput.setAttribute('aria-label','Ventana de las cartas');windowLabel.append(windowInput);
-    const get=element('button','tg-btn','Consultar cartas');get.type='submit';controls.append(atLabel,windowLabel,get);host.append(heading,controls);
+    const get=element('button','tg-btn','Consultar cartas');get.type='submit';at.disabled=true;mode.addEventListener('change',()=>{at.disabled=mode.value==='latest';});controls.append(modeLabel,atLabel,windowLabel,get);host.append(heading,controls);
     const cards=['superficie','fondo'].map(kind=>{
-      const card=element('section','wd-card'),title=element('h3','','Carta de '+kind),note=element('p','wh-tag',kind==='superficie'?'X: ZT:SUP · Y: WT:SUP':'X: ZT:FONDO · Y: WT:FONDO');
+      const card=element('section','wd-card'),title=element('h3','','Carta de '+kind),note=element('p','wh-tag',kind==='superficie'?'X: ZT:SUP-POS · Y: WT:SUP-LOAD':'X: ZT:FONDO-POS · Y: WT:FONDO-LOAD');
       const message=element('p','wh-status','Presioná Consultar cartas para buscar datos reales de PI.'),plot=element('div','wd-card-plot');card.append(title,note,message,plot);host.append(card);return {kind,message,plot};
     });
     controls.addEventListener('submit',async event=>{
@@ -224,12 +225,12 @@
       cardsController?.abort();const pending=new AbortController();cardsController=pending;get.disabled=true;
       cardCharts.forEach(chart=>chart.destroy());cardCharts=[];cards.forEach(card=>{card.plot.replaceChildren();card.message.textContent='Consultando PI…';});
       try{
-        const data=await json('well_history_api.php',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cards',well,at:at.value,windowSeconds:Number(windowInput.value)})});
+        const data=await json('well_history_api.php',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cards',well,mode:mode.value,at:at.value,windowSeconds:Number(windowInput.value)})});
         if(pending!==cardsController||!active())return;
         cards.forEach((card,index)=>{
           const series=data.cards.find(item=>item.kind===card.kind);
           if(!series||series.error){card.message.textContent=series?.error||'Sin datos de PI.';return;}
-          card.message.textContent=series.points.filter(point=>point.y!==null).length+' pares válidos · '+detailed(data.start)+' a '+detailed(data.end)+' · Ventana temporal, sin identificación automática de ciclo.';
+          card.message.textContent=series.points.filter(point=>point.y!==null).length+' pares válidos · '+detailed(series.start||data.start)+' a '+detailed(series.end||data.end)+(series.reference?' · Referencia PI: '+detailed(series.reference):'')+' · Ventana temporal, sin identificación automática de ciclo.';
           const canvas=element('canvas');canvas.dataset.clearChartLocal='true';canvas.setAttribute('aria-label','Carta de '+card.kind+' de '+well);canvas.setAttribute('role','img');card.plot.append(canvas);
           const color=index?'#b2e879':'#5fc9f8';
           const chart=new Chart(canvas,{type:'scatter',data:{datasets:[{label:'Carta de '+card.kind,data:series.points,borderColor:color,backgroundColor:color,showLine:true,spanGaps:false,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#b7cbd8',plugins:{legend:{display:false},clearGlobalValues:false,tooltip:{callbacks:{label:item=>detailed(series.points[item.dataIndex].timestamp)+' · X: '+item.parsed.x+' · Y: '+item.parsed.y}}},scales:{x:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Posición'+(series.xUnit?' ('+series.xUnit+')':'')},grid:{color:'#293e4b'}},y:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Carga'+(series.yUnit?' ('+series.yUnit+')':'')},grid:{color:'#293e4b'}}}}});cardCharts.push(chart);

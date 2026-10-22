@@ -26,7 +26,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
       if(url.pathname.endsWith('/well_history_api.php')){
         if(route.request().method()==='GET')return route.fulfill({json:{ok:true,columns:catalog}});
         const request=route.request().postDataJSON();
-        if(request.action==='cards'){cardRequests.push(request);return route.fulfill({json:{ok:true,start:'2026-10-22T14:59:00-03:00',end:'2026-10-22T15:00:00-03:00',cards:[{kind:'superficie',xUnit:'in',yUnit:'lb',points:[{x:0,y:32000,timestamp:'2026-10-22T17:59:10Z'},{x:100,y:60000,timestamp:'2026-10-22T17:59:20Z'},{x:0,y:34000,timestamp:'2026-10-22T17:59:30Z'}]},{kind:'fondo',points:[],error:'Falta verificar ZT:FONDO en PI_Points_Stage.'}]}});}
+        if(request.action==='cards'){cardRequests.push(request);return route.fulfill({json:{ok:true,start:'2026-10-22T14:59:00-03:00',end:'2026-10-22T15:00:00-03:00',cards:[{kind:'superficie',xUnit:'in',yUnit:'lb',points:[{x:0,y:32000,timestamp:'2026-10-22T17:59:10Z'},{x:100,y:60000,timestamp:'2026-10-22T17:59:20Z'},{x:0,y:34000,timestamp:'2026-10-22T17:59:30Z'}]},{kind:'fondo',points:[],error:'Falta verificar ZT:FONDO-POS en PI_Points_Stage.'}]}});}
         requests.push(request);
         if(delay)await new Promise(resolve=>setTimeout(resolve,150));
         return route.fulfill({status:fail?422:200,json:fail?{ok:false,error:'El rango debe ser de hasta 31 días.'}:response(request.columns,request.intervalSeconds)});
@@ -54,10 +54,15 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(await history.locator('.wd-kpi').count(),6);
     await history.getByRole('button',{name:'Consultar cartas',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.wd-card-plot canvas').length===1);
-    assert.equal(cardRequests[0].windowSeconds,60);assert.equal(cardRequests[0].well,fields.POZO);
-    assert.ok((await history.locator('.wd-cards-host').textContent()).includes('Falta verificar ZT:FONDO'));
+    assert.equal(cardRequests[0].mode,'latest');assert.equal(cardRequests[0].windowSeconds,60);assert.equal(cardRequests[0].well,fields.POZO);
+    assert.ok((await history.locator('.wd-cards-host').textContent()).includes('Falta verificar ZT:FONDO-POS'));
     const xy=await history.locator('.wd-card-plot canvas').evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
     assert.deepEqual(xy.map(point=>point.x),[0,100,0]);
+    await history.getByLabel('Modo de consulta de cartas',{exact:true}).selectOption('manual');
+    assert.equal(await history.getByLabel('Cartas hasta',{exact:true}).isEnabled(),true);
+    await history.getByRole('button',{name:'Consultar cartas',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.wd-card-plot canvas').length===1);
+    assert.equal(cardRequests[1].mode,'manual');
     const originalBox=await history.boundingBox();
     await history.getByRole('button',{name:'Maximizar ficha del pozo',exact:true}).click();
     const maximized=await history.boundingBox(),viewport=page.viewportSize();

@@ -2,12 +2,12 @@
 /* Lectura del catálogo existente. No crea ni modifica objetos SQL. */
 function wh_clean($value) { return trim(trim((string)$value), "\" \t\r\n"); }
 function wh_columns() {
-    return ['ZT:SUP','WT:SUP','ZT:FONDO','WT:FONDO','ESTADO','Fecha','ECO','ESTADO-GRAL','PT:LINEA','YAT:COM','__COMUNICACION',
+    return ['TIME:SUP','TIME:FONDO','ZT:SUP-POS','WT:SUP-LOAD','ZT:FONDO-POS','WT:FONDO-LOAD','ESTADO','Fecha','ECO','ESTADO-GRAL','PT:LINEA','YAT:COM','__COMUNICACION',
         'ET:VARIADOR','FP','FT:AGUA_ACU','FT:AGUA_CIERRE','FT:FONDO-LLENADO.PV',
         'FT:LLENADO.SP','FT:LLENADO-ACTUAL','FT:OIL_ACU','FT:OIL_CIERRE','FT:PROD_ACU',
         'FT:PROD-PROY','FT:PROY-AGUA','FT:PROY-OIL','WT:SUP_MAX','WT:SPMIN','YT:CONTROL',
         'YT:DEVICE','YT:LLAVE','YT:LLAVE-AUTO','ZT:CARRERA-MIN','ZT:CARRERA-ACTUAL',
-        'ZT:FONDO-POS','ZT:PUMPOFF','ZT:SUP-CARRERA','PT:CABEZA','QT:RPM','ESTADO_RPM',
+        'ZT:PUMPOFF','ZT:SUP-CARRERA','PT:CABEZA','QT:RPM','ESTADO_RPM',
         'AF-ESTADO-PARO-REMOTO','PRODUCCION_PETROLEO','PRODUCCION_LIQUIDO','PRODUCCION_GAS'];
 }
 function wh_well($value) {
