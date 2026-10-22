@@ -45,8 +45,19 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===1&&document.querySelector('[data-wh-export]').disabled===false);
     assert.equal(requests.length,1);assert.deepEqual(requests[0].columns,['QT:RPM','FP','ECO']);
     assert.equal(await history.locator('.wh-chart').count(),1);
-    assert.equal(await history.getByLabel('Frecuencia en segundos',{exact:true}).getAttribute('min'),'30');
+    assert.equal(await history.getByLabel('Frecuencia en minutos',{exact:true}).getAttribute('min'),'0.5');
     assert.equal(await history.locator('.wh-scale').count(),0);
+    assert.equal(requests[0].intervalSeconds,3600);
+    const originalBox=await history.boundingBox();
+    await history.getByRole('button',{name:'Maximizar históricos',exact:true}).click();
+    const maximized=await history.boundingBox(),viewport=page.viewportSize();
+    assert.ok(Math.abs(maximized.width-viewport.width)<=2);assert.ok(Math.abs(maximized.height-viewport.height)<=2);
+    assert.equal(await history.getByRole('button',{name:'Restaurar tamaño',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.equal(requests.length,1);
+    await history.getByRole('button',{name:'Restaurar tamaño',exact:true}).click();
+    assert.ok(Math.abs((await history.boundingBox()).width-originalBox.width)<=2);
+    assert.equal(await history.getByLabel('Frecuencia en minutos',{exact:true}).inputValue(),'60');
+    await page.waitForFunction(()=>{const canvas=document.querySelector('.wh-chart canvas');return Math.abs(Chart.getChart(canvas).width-canvas.parentElement.clientWidth)<2;});
     const chartState=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return chart.data.datasets.map(dataset=>({label:dataset.label,color:dataset.borderColor,axis:dataset.yAxisID,data:dataset.data}));});
     assert.equal(chartState.length,3);assert.equal(new Set(chartState.map(item=>item.color)).size,3);assert.equal(new Set(chartState.map(item=>item.axis)).size,1);
     const options=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return {type:chart.config.type,scales:Object.keys(chart.scales),local:canvas.dataset.clearChartLocal,labels:chart.options.plugins.clearGlobalValues,background:getComputedStyle(canvas.parentElement).backgroundColor};});
@@ -54,6 +65,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(await history.locator('.clearChartInlineBtn').count(),0);
     assert.deepEqual(chartState[1].data,[0.85,null,0.85]);
     assert.deepEqual(chartState[2].data,[0,null,1]);
+    await history.locator('canvas').scrollIntoViewIfNeeded();
     const location=await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas),box=canvas.getBoundingClientRect();return {x:box.x+chart.scales.x.getPixelForValue(1),y:box.y+chart.chartArea.top+20};});
     await page.mouse.move(location.x,location.y);
     await page.waitForFunction(()=>document.querySelector('.wh-inspected-time').textContent.includes('01:00:00'));
@@ -71,16 +83,16 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(await history.locator('canvas').evaluate(canvas=>Chart.getChart(canvas).$whIndex),2);
     await history.getByRole('button',{name:'FP',exact:true}).click();assert.equal(await history.getByRole('button',{name:'FP',exact:true}).getAttribute('aria-pressed'),'false');
     await history.getByRole('button',{name:'Mostrar todas',exact:true}).click();
-    await history.getByLabel('Frecuencia en segundos',{exact:true}).fill('29');
-    assert.equal(await history.getByLabel('Frecuencia en segundos',{exact:true}).evaluate(input=>input.validity.rangeUnderflow),true);
+    await history.getByLabel('Frecuencia en minutos',{exact:true}).fill('0.4');
+    assert.equal(await history.getByLabel('Frecuencia en minutos',{exact:true}).evaluate(input=>input.validity.rangeUnderflow),true);
     await history.getByRole('button',{name:'Traer históricos',exact:true}).click();assert.equal(requests.length,1);
-    await history.getByLabel('Frecuencia en segundos',{exact:true}).fill('3600');
+    await history.getByLabel('Frecuencia en minutos',{exact:true}).fill('60');
     const data=await history.locator('canvas').first().evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
     assert.deepEqual(data,[750,null,752]);
     const download=page.waitForEvent('download');await history.getByRole('button',{name:'Exportar Excel',exact:true}).click();
     const file=await download,downloadPath=await file.path();assert.ok(file.suggestedFilename().endsWith('.xlsx'));
     const entries=zipEntries(fs.readFileSync(downloadPath));assert.equal(Object.keys(entries).length,5);
-    const sheet=entries['xl/worksheets/sheet1.xml'];assert.ok(sheet.includes('21/10/2026, 00:00'));assert.ok(sheet.includes('<v>750</v>'));assert.ok(sheet.includes('Calidad buena'));assert.ok(sheet.includes('NORMAL'));
+    const sheet=entries['xl/worksheets/sheet1.xml'];assert.ok(sheet.includes('21/10/2026, 00:00'));assert.ok(sheet.includes('<v>750</v>'));assert.ok(sheet.includes('Frecuencia (minutos)'));assert.ok(sheet.includes('Calidad buena'));assert.ok(sheet.includes('NORMAL'));
     if(process.env.WELL_HISTORY_QA_DIR){
       fs.mkdirSync(process.env.WELL_HISTORY_QA_DIR,{recursive:true});
       fs.copyFileSync(downloadPath,path.join(process.env.WELL_HISTORY_QA_DIR,'historicos-'+(mobile?'movil':'escritorio')+'.xlsx'));
@@ -101,7 +113,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await history.locator('canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);chart.data.datasets.forEach((item,index)=>chart.hide(index));});
     await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
     assert.equal(reports.length,2);assert.ok((await history.locator('.wh-status').textContent()).includes('Mostrá al menos'));
-    await history.getByLabel('Frecuencia en segundos',{exact:true}).fill('30');
+    await history.getByLabel('Frecuencia en minutos',{exact:true}).fill('0.5');
     await history.getByLabel('Histórico desde',{exact:true}).fill('2026-10-01T00:00');
     await history.getByLabel('Histórico hasta',{exact:true}).fill('2026-10-02T00:00');
     await history.getByRole('button',{name:'Traer históricos',exact:true}).click();

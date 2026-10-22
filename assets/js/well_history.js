@@ -13,7 +13,7 @@
   const detailFormat=new Intl.DateTimeFormat('es-AR',{timeZone:timezone,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
   const detailed=value=>detailFormat.format(new Date(value));
   const numberFormat=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
-  const frequencyLabel=seconds=>seconds%3600===0?(seconds/3600)+' h':seconds%60===0?(seconds/60)+' min':seconds+' s';
+  const frequencyLabel=seconds=>numberFormat.format(seconds/60)+' min';
   const element=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
   async function json(url,options){
     const response=await fetch(url,{credentials:'same-origin',...options});
@@ -55,15 +55,25 @@
   }
 
   const dialog=element('dialog','well-details wh-dialog');dialog.setAttribute('aria-labelledby','whTitle');
-  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Históricos PI · Monitoreo SCADA</div><h2 id="whTitle"></h2><p class="well-details__subtitle">Frecuencia configurable · Fechas y horarios de Argentina</p></div><button type="button" class="tg-btn" data-wh-close aria-label="Cerrar históricos" autofocus>×</button></header><div class="well-details__body"><form class="wh-toolbar"><label>Desde<input type="datetime-local" name="from" required aria-label="Histórico desde"></label><label>Hasta<input type="datetime-local" name="to" required aria-label="Histórico hasta"></label><label>Frecuencia (segundos)<input type="number" name="intervalSeconds" value="3600" min="30" max="86400" step="1" required aria-label="Frecuencia en segundos" list="whIntervals"><datalist id="whIntervals"><option value="30">30 segundos</option><option value="60">1 minuto</option><option value="300">5 minutos</option><option value="900">15 minutos</option><option value="3600">1 hora</option></datalist></label><button class="tg-btn" type="submit">Traer históricos</button><button class="tg-btn" type="button" data-wh-export disabled>Exportar Excel</button><button class="tg-btn" type="button" data-wh-report disabled>Agregar al reporte</button></form><p class="wh-status" role="status" aria-live="polite"></p><div class="wh-charts"></div></div><footer class="well-details__footer"><span>Mínimo 30 segundos · Máximo 31 días · Hasta 60.000 muestras por consulta</span><button type="button" class="tg-btn" data-wh-close>Volver a la ficha</button></footer>';
+  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Históricos PI · Monitoreo SCADA</div><h2 id="whTitle"></h2><p class="well-details__subtitle">Frecuencia configurable · Fechas y horarios de Argentina</p></div><div class="wh-head-actions"><button type="button" class="tg-btn" data-wh-maximize aria-label="Maximizar históricos" aria-pressed="false" title="Maximizar">⛶</button><button type="button" class="tg-btn" data-wh-close aria-label="Cerrar históricos" autofocus>×</button></div></header><div class="well-details__body"><form class="wh-toolbar"><label>Desde<input type="datetime-local" name="from" required aria-label="Histórico desde"></label><label>Hasta<input type="datetime-local" name="to" required aria-label="Histórico hasta"></label><label>Frecuencia (minutos)<input type="number" name="intervalMinutes" value="60" min="0.5" max="1440" step="0.5" required aria-label="Frecuencia en minutos" list="whIntervals"><datalist id="whIntervals"><option value="0.5">0,5 minutos</option><option value="1">1 minuto</option><option value="5">5 minutos</option><option value="15">15 minutos</option><option value="60">60 minutos</option></datalist></label><button class="tg-btn" type="submit">Traer históricos</button><button class="tg-btn" type="button" data-wh-export disabled>Exportar Excel</button><button class="tg-btn" type="button" data-wh-report disabled>Agregar al reporte</button></form><p class="wh-status" role="status" aria-live="polite"></p><div class="wh-charts"></div></div><footer class="well-details__footer"><span>Mínimo 0,5 minutos · Máximo 31 días · Hasta 60.000 muestras por consulta</span><button type="button" class="tg-btn" data-wh-close>Volver a la ficha</button></footer>';
   document.body.append(dialog);
-  const form=dialog.querySelector('form'),from=form.elements.from,to=form.elements.to,frequency=form.elements.intervalSeconds;
+  const form=dialog.querySelector('form'),from=form.elements.from,to=form.elements.to,frequency=form.elements.intervalMinutes;
   const status=dialog.querySelector('.wh-status'),chartBox=dialog.querySelector('.wh-charts');
   const exportButton=dialog.querySelector('[data-wh-export]'),reportButton=dialog.querySelector('[data-wh-report]');
   reportButton.hidden=!cfg.wellHistoryReport;
   let context=null,result=null,charts=[],requestNumber=0,returnTo=null,controller=null;
   const destroy=()=>{charts.forEach(item=>item.chart?.destroy());charts=[];chartBox.replaceChildren();};
-  function close(){controller?.abort();requestNumber++;dialog.close();if(returnTo?.isConnected)returnTo.focus({preventScroll:true});}
+  const maximizeButton=dialog.querySelector('[data-wh-maximize]');
+  function maximize(enabled){
+    dialog.classList.toggle('is-maximized',enabled);
+    maximizeButton.setAttribute('aria-pressed',String(enabled));
+    maximizeButton.setAttribute('aria-label',enabled?'Restaurar tamaño':'Maximizar históricos');
+    maximizeButton.title=enabled?'Restaurar tamaño':'Maximizar';
+    maximizeButton.textContent=enabled?'❐':'⛶';
+    requestAnimationFrame(()=>charts.forEach(item=>item.chart.resize()));
+  }
+  maximizeButton.addEventListener('click',()=>maximize(!dialog.classList.contains('is-maximized')));
+  function close(){controller?.abort();requestNumber++;dialog.close();maximize(false);if(returnTo?.isConnected)returnTo.focus({preventScroll:true});}
   dialog.querySelectorAll('[data-wh-close]').forEach(button=>button.addEventListener('click',close));
   dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
   dialog.addEventListener('click',event=>{const rect=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom))close();});
@@ -88,7 +98,7 @@
     result=null;destroy();exportButton.disabled=reportButton.disabled=true;
     status.textContent='Consultando PI Web API…';status.classList.remove('is-error');
     try{
-      const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,columns:context.variables.map(item=>item.column),from:from.value,to:to.value,intervalSeconds:Number(frequency.value)})});
+      const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,columns:context.variables.map(item=>item.column),from:from.value,to:to.value,intervalSeconds:Math.round(Number(frequency.value)*60)})});
       if(number!==requestNumber||!dialog.open)return;
       result=data;
       if(typeof window.Chart!=='function')throw Error('No se pudo cargar el componente de gráficos. Recargá la página.');
@@ -96,7 +106,7 @@
       const usable=data.series.filter(series=>series.samples.length&&!series.error).length;
       const samples=data.series.reduce((count,series)=>count+series.samples.length,0);
       const bad=data.series.reduce((count,series)=>count+series.samples.filter(sample=>!sample.good||sample.questionable).length,0);
-      status.textContent='Frecuencia: '+frequencyLabel(data.intervalSeconds||Number(frequency.value))+' · '+usable+' de '+data.series.length+' históricos consultados · '+samples+' muestras'+(bad?' · '+bad+' sin calidad válida (se muestran como huecos)':'')+'.';
+      status.textContent='Frecuencia: '+frequencyLabel(data.intervalSeconds||Math.round(Number(frequency.value)*60))+' · '+usable+' de '+data.series.length+' históricos consultados · '+samples+' muestras'+(bad?' · '+bad+' sin calidad válida (se muestran como huecos)':'')+'.';
       exportButton.disabled=!samples;reportButton.disabled=!usable;
     }catch(error){if(number!==requestNumber||error.name==='AbortError')return;status.textContent=error.message;status.classList.add('is-error');}
   }
@@ -204,8 +214,8 @@
   }
   exportButton.addEventListener('click',()=>{
     if(!result)return;
-    const rows=[['Pozo','Variable','Tag PI','Fecha y hora (Argentina)','Fecha UTC','Frecuencia (segundos)','Valor','Unidad','Calidad buena','Cuestionable','Sustituido']];
-    result.series.forEach(series=>series.samples.forEach(sample=>rows.push([result.well,context.variables.find(item=>item.column===series.column)?.label||series.column,series.tag,detailed(sample.timestamp),sample.timestamp,result.intervalSeconds||3600,sample.value??'',series.unit,sample.good?'Sí':'No',sample.questionable?'Sí':'No',sample.substituted?'Sí':'No'])));
+    const rows=[['Pozo','Variable','Tag PI','Fecha y hora (Argentina)','Fecha UTC','Frecuencia (minutos)','Valor','Unidad','Calidad buena','Cuestionable','Sustituido']];
+    result.series.forEach(series=>series.samples.forEach(sample=>rows.push([result.well,context.variables.find(item=>item.column===series.column)?.label||series.column,series.tag,detailed(sample.timestamp),sample.timestamp,(result.intervalSeconds||3600)/60,sample.value??'',series.unit,sample.good?'Sí':'No',sample.questionable?'Sí':'No',sample.substituted?'Sí':'No'])));
     const url=URL.createObjectURL(workbook(rows)),link=element('a');link.href=url;link.download='Historicos_'+result.well.replace(/[^\w.-]/g,'_')+'.xlsx';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   });
   reportButton.addEventListener('click',async()=>{
