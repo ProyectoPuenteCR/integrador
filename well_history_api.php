@@ -4,6 +4,7 @@ require_once __DIR__.'/includes/auth.php';
 require_once __DIR__.'/includes/permissions.php';
 require_once __DIR__.'/includes/appconfig.php';
 require_once __DIR__.'/includes/well_history.php';
+require_once __DIR__.'/includes/pi_transport.php';
 auth_require();
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -33,18 +34,9 @@ try{
     $user=config_get('pi_user','');$pass=config_get('pi_pass','');
     $auth=($user!==''||$pass!=='')?'Basic '.base64_encode($user.':'.$pass):($fallback['auth']??'');
     $request=function($path)use($pi,$auth){
-        if(!function_exists('curl_init'))throw new RuntimeException('El servidor necesita la extensión cURL para consultar PI.');
-        $ch=curl_init(rtrim($pi['base'],'/').$path);
-        $headers=['Accept: application/json'];if($auth!=='')$headers[]='Authorization: '.$auth;
-        curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>$headers,CURLOPT_TIMEOUT=>45,
-            CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2]);
-        if($pi['ca_bundle']!==''){
-            if(!is_file($pi['ca_bundle']))throw new RuntimeException('No se encontró el archivo de certificados configurado para PI.');
-            curl_setopt($ch,CURLOPT_CAINFO,$pi['ca_bundle']);
-        }
-        $body=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);$curlError=curl_errno($ch);curl_close($ch);
-        if(in_array($curlError,[51,60,77],true))throw new RuntimeException('No se pudo validar el certificado de PI. Configurá una CA confiable mediante pi_ca_bundle o pi.ca_bundle en config.php.');
-        if($body===false||$status<200||$status>=300)throw new RuntimeException('No se pudo consultar PI Web API'.($status?' (HTTP '.$status.')':'').'.');
+        $response=clear_pi_transport($path,$pi,$auth,45);
+        $status=$response['status'];$body=$response['body'];
+        if($status<200||$status>=300)throw new RuntimeException('No se pudo consultar PI Web API (HTTP '.$status.').');
         $data=json_decode($body,true);if(!is_array($data))throw new RuntimeException('La respuesta de PI no es válida.');return $data;
     };
     $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request);
