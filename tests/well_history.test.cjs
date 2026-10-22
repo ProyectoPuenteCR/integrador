@@ -85,8 +85,24 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     const chartState=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return chart.data.datasets.map(dataset=>({label:dataset.label,color:dataset.borderColor,axis:dataset.yAxisID,data:dataset.data}));});
     assert.equal(chartState.length,3);assert.equal(new Set(chartState.map(item=>item.color)).size,3);assert.equal(new Set(chartState.map(item=>item.axis)).size,1);
     const options=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return {type:chart.config.type,scales:Object.keys(chart.scales),local:canvas.dataset.clearChartLocal,labels:chart.options.plugins.clearGlobalValues,background:getComputedStyle(canvas.parentElement).backgroundColor};});
-    assert.deepEqual(options.scales,['x','y']);assert.equal(options.type,'line');assert.equal(options.local,'true');assert.equal(options.labels,false);assert.equal(options.background,'rgb(21, 35, 45)');
+    assert.deepEqual(options.scales,['x','y']);assert.equal(options.type,'line');assert.equal(options.local,'true');assert.equal(options.labels,false);assert.equal(options.background,'rgb(255, 255, 255)');
     assert.equal(await history.locator('.clearChartInlineBtn').count(),0);
+    const type=history.getByLabel('Tipo de gráfico de tendencias',{exact:true});
+    const queryCount=requests.length;
+    await history.getByRole('button',{name:'FP',exact:true}).click();
+    await type.selectOption('bar');
+    assert.equal(await history.locator('.wh-chart canvas').evaluate(canvas=>Chart.getChart(canvas).config.type),'bar');
+    assert.equal(await history.getByRole('button',{name:'FP',exact:true}).getAttribute('aria-pressed'),'false');
+    await history.getByRole('button',{name:'Cambiar a tema oscuro',exact:true}).click();
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('.wh-canvas')).backgroundColor==='rgb(21, 35, 45)');
+    assert.equal(await history.locator('.wh-chart canvas').evaluate(canvas=>Chart.getChart(canvas).options.scales.y.grid.color),'#293e4b');
+    assert.equal(await history.getByRole('button',{name:'FP',exact:true}).getAttribute('aria-pressed'),'false');
+    await history.getByRole('button',{name:'Cambiar a tema claro',exact:true}).click();
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('.wh-canvas')).backgroundColor==='rgb(255, 255, 255)');
+    await type.selectOption('area');assert.equal(await history.locator('.wh-chart canvas').evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].fill),true);
+    await type.selectOption('step');assert.equal(await history.locator('.wh-chart canvas').evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].stepped),true);
+    await type.selectOption('line');await history.getByRole('button',{name:'Mostrar todas',exact:true}).click();
+    assert.equal(requests.length,queryCount);
     assert.deepEqual(chartState[1].data,[0.85,null,0.85]);
     assert.deepEqual(chartState[2].data,[0,null,1]);
     await history.locator('.wh-chart canvas').scrollIntoViewIfNeeded();
@@ -123,9 +139,11 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
       if(mobile)await page.evaluate(()=>document.documentElement.dataset.theme='dark');
       await page.screenshot({path:path.join(process.env.WELL_HISTORY_QA_DIR,'historicos-'+(mobile?'movil':'escritorio')+'.png')});
     }
+    await type.selectOption('bar');
     await history.getByRole('button',{name:'Agregar al reporte',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('.wh-status').textContent.includes('agregadas al reporte'));
     assert.equal(reports.length,1);assert.equal(reports[0].items.length,1);
+    assert.equal(reports[0].items[0].payload.chart_type,'bar');await type.selectOption('line');
     assert.ok(reports[0].items[0].payload.image_data.startsWith('data:image/png;base64,'));
     assert.deepEqual(reports[0].items[0].payload.scale,{auto:true,independent:false});
     assert.match(reports[0].items[0].key,/^[a-z0-9_-]+:[a-f0-9]{40}$/);assert.equal(reports[0].items[0].payload.datasets.length,3);assert.deepEqual(reports[0].items[0].payload.datasets[0].values,[750,null,752]);

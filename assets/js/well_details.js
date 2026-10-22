@@ -8,7 +8,7 @@
   const dialog=document.createElement('dialog');
   dialog.className='well-details wd-dashboard';
   dialog.setAttribute('aria-labelledby','wellDetailsTitle');
-  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Centro de operación · Ficha del pozo</div><h2 id="wellDetailsTitle"></h2><p class="well-details__subtitle"></p></div><div class="wd-head-actions"><button type="button" class="tg-btn wd-choose" data-well-choose>Elegir variables</button><button type="button" class="tg-btn" data-well-maximize aria-label="Maximizar ficha del pozo" aria-pressed="false">⛶</button><button type="button" class="tg-btn" data-well-close aria-label="Cerrar ficha del pozo" autofocus>×</button></div></header><div class="well-details__body"></div><footer class="well-details__footer"><span>Datos de la grilla · incluye columnas ocultas</span><div class="well-details__actions"></div><button type="button" class="tg-btn" data-well-close>Cerrar</button></footer>';
+  dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Centro de operación · Ficha del pozo</div><h2 id="wellDetailsTitle"></h2><p class="well-details__subtitle"></p></div><div class="wd-head-actions"><button type="button" class="tg-btn" data-well-theme aria-label="Cambiar a tema oscuro" title="Tema oscuro" aria-pressed="false">☾</button><button type="button" class="tg-btn wd-choose" data-well-choose>Elegir variables</button><button type="button" class="tg-btn" data-well-maximize aria-label="Maximizar ficha del pozo" aria-pressed="false">⛶</button><button type="button" class="tg-btn" data-well-close aria-label="Cerrar ficha del pozo" autofocus>×</button></div></header><div class="well-details__body"></div><footer class="well-details__footer"><span>Datos de la grilla · incluye columnas ocultas</span><div class="well-details__actions"></div><button type="button" class="tg-btn" data-well-close>Cerrar</button></footer>';
   document.body.append(dialog);
   const title=dialog.querySelector('h2');
   const subtitle=dialog.querySelector('.well-details__subtitle');
@@ -49,6 +49,17 @@
     if(previous?.isConnected)previous.focus({preventScroll:true});
   }
 
+  const themeButton=dialog.querySelector('[data-well-theme]');
+  function syncTheme(){const dark=document.documentElement.dataset.theme==='dark';themeButton.textContent=dark?'☀':'☾';themeButton.setAttribute('aria-label',dark?'Cambiar a tema claro':'Cambiar a tema oscuro');themeButton.title=dark?'Tema claro':'Tema oscuro';themeButton.setAttribute('aria-pressed',String(dark));}
+  themeButton.addEventListener('click',()=>{
+    const platformButton=document.getElementById('themeToggleBtn');
+    if(platformButton){platformButton.click();return;}
+    const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+    document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;
+    try{localStorage.setItem(window.CLEAR_THEME_USER_KEY||'clear_theme',theme);}catch(error){}
+    window.dispatchEvent(new CustomEvent('clear-theme-change',{detail:{theme}}));
+  });
+  new MutationObserver(syncTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});syncTheme();
   const maximize=dialog.querySelector('[data-well-maximize]');
   function resize(maximized){dialog.classList.toggle('is-maximized',maximized);maximize.setAttribute('aria-pressed',String(maximized));maximize.setAttribute('aria-label',maximized?'Restaurar ficha del pozo':'Maximizar ficha del pozo');maximize.textContent=maximized?'❐':'⛶';}
   maximize.addEventListener('click',()=>resize(!dialog.classList.contains('is-maximized')));

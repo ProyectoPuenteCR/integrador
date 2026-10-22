@@ -3,6 +3,10 @@
   const cfg=window.CLEAR_TELEMETRY_GRID||{};
   if(cfg.key!=='monitoreo_pozos'||!cfg.wellHistory)return;
   const cache=new Map(),selections=new Map(),defaultsApplied=new Set(),tokens=new WeakMap();
+  const lightColors=['#16855f','#ad6800','#7452af','#bc3868','#087fa9','#bf4c24','#66821a','#425ec3','#a43c98','#087e79','#935b2d','#526777'];
+  const darkColors=['#53d6a4','#ffc857','#b8a1ef','#f57ca7','#5fc9f8','#ff9473','#c5df72','#96a9ff','#eb9ae3','#5ce0dc','#e9b486','#d3dce5'];
+  const chartTheme=()=>document.documentElement.dataset.theme==='dark'?{background:'#15232d',text:'#e0edf5',muted:'#9bb1c0',grid:'#293e4b',colors:darkColors}:{background:'#fff',text:'#183846',muted:'#607b88',grid:'#e3ebf0',colors:lightColors};
+  let chartMode='line';
   const timezone='America/Argentina/Buenos_Aires';
   const dateFormat=new Intl.DateTimeFormat('es-AR',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
   const localDate=date=>{
@@ -144,7 +148,7 @@
     }catch(error){if(number!==requestNumber||error.name==='AbortError')return;status.textContent=error.message;status.classList.add('is-error');}
   }
   function render(allSeries){
-    const colors=['#53d6a4','#ffc857','#b8a1ef','#f57ca7','#5fc9f8','#ff9473','#c5df72','#96a9ff','#eb9ae3','#5ce0dc','#e9b486','#d3dce5'];
+    const colors=chartTheme().colors;
     const card=element('article','wh-chart');
     card.append(element('h3','','Tendencias del pozo'),element('p','wh-tag','Una escala común de mínimo a máximo · Mové el cursor o la barra para consultar valores. Tocá una tendencia para ocultarla o mostrarla.'));
     chartBox.append(card);
@@ -170,6 +174,8 @@
         borderWidth:2,pointRadius:values.length>300?0:2,pointHoverRadius:4,spanGaps:false,
         stepped:/digital|string/i.test(item.type)||item.step,historySamples:aligned,historySeries:item};
     });
+    const viewLabel=element('label','wh-chart-type','Tipo de gráfico '),view=element('select');
+    view.setAttribute('aria-label','Tipo de gráfico de tendencias');view.innerHTML='<option value="line">Líneas</option><option value="bar">Barras</option><option value="area">Área</option><option value="step">Escalonado</option>';view.value=chartMode;viewLabel.append(view);card.append(viewLabel);
     const legend=element('div','wh-legend');legend.setAttribute('aria-label','Tendencias visibles');card.append(legend);
     const wrapper=element('div','wh-canvas'),canvas=element('canvas');
     canvas.dataset.clearChartLocal='true';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Tendencias de '+context.well+' · '+series.length+' variables');wrapper.append(canvas);card.append(wrapper);
@@ -205,21 +211,32 @@
     const showAll=element('button','wh-show-all','Mostrar todas');showAll.type='button';legend.append(showAll);
     const syncLegend=()=>buttons.forEach((button,index)=>{button.setAttribute('aria-pressed',String(chart.isDatasetVisible(index)));button.classList.toggle('is-hidden',!chart.isDatasetVisible(index));});
     showAll.addEventListener('click',()=>{datasets.forEach((dataset,index)=>chart.setDatasetVisibility(index,true));chart.update('none');syncLegend();inspect(Number(slider.value));});
-    const crosshair={id:'whCrosshair',afterDraw(chart){if(chart.$whIndex===undefined)return;const {ctx,chartArea,scales}=chart,x=scales.x.getPixelForValue(chart.$whIndex);ctx.save();ctx.strokeStyle='#a9bbc8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();chart.data.datasets.forEach((dataset,index)=>{if(!chart.isDatasetVisible(index)||dataset.data[chart.$whIndex]===null)return;const y=scales.y.getPixelForValue(dataset.data[chart.$whIndex]);ctx.beginPath();ctx.arc(x,y,4,0,2*Math.PI);ctx.fillStyle=dataset.borderColor;ctx.fill();ctx.strokeStyle='#e3edf4';ctx.stroke();});ctx.restore();}};
-    chart=new Chart(canvas,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#c9d9e4',
+    const crosshair={id:'whCrosshair',afterDraw(chart){if(chart.$whIndex===undefined)return;const {ctx,chartArea,scales}=chart,x=scales.x.getPixelForValue(chart.$whIndex);ctx.save();ctx.strokeStyle=chartTheme().muted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();chart.data.datasets.forEach((dataset,index)=>{if(!chart.isDatasetVisible(index)||dataset.data[chart.$whIndex]===null)return;const y=scales.y.getPixelForValue(dataset.data[chart.$whIndex]);ctx.beginPath();ctx.arc(x,y,4,0,2*Math.PI);ctx.fillStyle=dataset.borderColor;ctx.fill();ctx.strokeStyle=chartTheme().background;ctx.stroke();});ctx.restore();}};
+    chart=new Chart(canvas,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,color:chartTheme().text,
       interaction:{mode:'index',intersect:false,axis:'x'},
       onHover(event){if(event.x>=chart.chartArea.left&&event.x<=chart.chartArea.right)inspect(chart.scales.x.getValueForPixel(event.x),true);},
       onClick(event){const active=chart.getElementsAtEventForMode(event,'nearest',{intersect:true},false);if(active.length)toggle(active[0].datasetIndex);},
       plugins:{legend:{display:false},tooltip:{enabled:false},clearGlobalValues:false,datalabels:{display:false}},
-      scales:{x:{ticks:{color:'#9bb1c0',maxTicksLimit:8,maxRotation:0,callback(value){return labels[value]?.replace(/,? \d{2}:\d{2}:\d{2}$/,match=>match.slice(0,-3));}},grid:{color:'#293e4b'}},
-        y:{type:'linear',position:'left',ticks:{color:'#9bb1c0',maxTicksLimit:7},grid:{color:'#293e4b'}}}},
-      plugins:[crosshair,{id:'whDark',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle='#15232d';ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
+      scales:{x:{ticks:{color:chartTheme().muted,maxTicksLimit:8,maxRotation:0,callback(value){return labels[value]?.replace(/,? \d{2}:\d{2}:\d{2}$/,match=>match.slice(0,-3));}},grid:{color:chartTheme().grid}},
+        y:{type:'linear',position:'left',ticks:{color:chartTheme().muted,maxTicksLimit:7},grid:{color:chartTheme().grid}}}},
+      plugins:[crosshair,{id:'whDark',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle=chartTheme().background;ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
+    function applyView(){
+      chartMode=view.value;const hidden=datasets.map((dataset,index)=>!chart.isDatasetVisible(index));
+      chart.config.type=chartMode==='bar'?'bar':'line';
+      datasets.forEach((dataset,index)=>{
+        dataset.hidden=hidden[index];dataset.fill=chartMode==='area';
+        dataset.backgroundColor=dataset.fill?dataset.borderColor+'30':dataset.borderColor;
+        dataset.stepped=chartMode==='step'||/digital|string/i.test(dataset.historySeries.type)||dataset.historySeries.step;
+        dataset.pointRadius=chartMode==='bar'||dataset.data.length>300?0:2;
+      });chart.update('none');syncLegend();
+    }
+    view.addEventListener('change',applyView);applyView();
     slider.addEventListener('input',()=>inspect(Number(slider.value),true));
     canvas.addEventListener('mouseleave',()=>{tip.hidden=true;});
     syncLegend();inspect(0);
     if(!datasets.some(dataset=>dataset.data.some(value=>value!==null)))card.append(element('p','wh-status','No hay muestras numéricas con calidad válida para dibujar. Los estados se conservan en la tabla.'));
     card.append(element('p','wh-tag','Los estados digitales usan su código PI en la escala; el cursor muestra su descripción. Las variables conservan sus unidades originales.'));
-    charts.push({chart,series,labels});
+    charts.push({chart,series,labels,buttons,rows});
   }
 
   function mountCards(well,host){
@@ -244,14 +261,27 @@
           if(!series||series.error){card.message.textContent=series?.error||'Sin datos de PI.';return;}
           card.message.textContent=series.points.filter(point=>point.y!==null).length+' pares válidos · '+detailed(series.start||data.start)+' a '+detailed(series.end||data.end)+(series.reference?' · Referencia PI: '+detailed(series.reference):'')+' · Ventana temporal, sin identificación automática de ciclo.';
           const canvas=element('canvas');canvas.dataset.clearChartLocal='true';canvas.setAttribute('aria-label','Carta de '+card.kind+' de '+well);canvas.setAttribute('role','img');card.plot.append(canvas);
-          const color=index?'#b2e879':'#5fc9f8';
-          const chart=new Chart(canvas,{type:'scatter',data:{datasets:[{label:'Carta de '+card.kind,data:series.points,borderColor:color,backgroundColor:color,showLine:true,spanGaps:false,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:'#b7cbd8',plugins:{legend:{display:false},clearGlobalValues:false,tooltip:{callbacks:{label:item=>detailed(series.points[item.dataIndex].timestamp)+' · X: '+readingFormat.format(item.parsed.x)+' · Y: '+readingFormat.format(item.parsed.y)}}},scales:{x:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Posición'+(series.xUnit?' ('+series.xUnit+')':'')},grid:{color:'#293e4b'}},y:{type:'linear',ticks:{color:'#b7cbd8'},title:{color:'#b7cbd8',display:true,text:'Carga'+(series.yUnit?' ('+series.yUnit+')':'')},grid:{color:'#293e4b'}}}}});cardCharts.push(chart);
+          const color=chartTheme().colors[index?0:4];
+          const chart=new Chart(canvas,{type:'scatter',data:{datasets:[{label:'Carta de '+card.kind,data:series.points,borderColor:color,backgroundColor:color,showLine:true,spanGaps:false,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,color:chartTheme().muted,plugins:{legend:{display:false},clearGlobalValues:false,tooltip:{callbacks:{label:item=>detailed(series.points[item.dataIndex].timestamp)+' · X: '+readingFormat.format(item.parsed.x)+' · Y: '+readingFormat.format(item.parsed.y)}}},scales:{x:{type:'linear',ticks:{color:chartTheme().muted},title:{color:chartTheme().muted,display:true,text:'Posición'+(series.xUnit?' ('+series.xUnit+')':'')},grid:{color:chartTheme().grid}},y:{type:'linear',ticks:{color:chartTheme().muted},title:{color:chartTheme().muted,display:true,text:'Carga'+(series.yUnit?' ('+series.yUnit+')':'')},grid:{color:chartTheme().grid}}}}});chart.$wellCardKind=card.kind;cardCharts.push(chart);
         });
       }catch(error){if(error.name!=='AbortError'&&pending===cardsController)cards.forEach(card=>card.message.textContent=error.message);}
       finally{if(pending===cardsController)get.disabled=false;}
     });
     requestAnimationFrame(()=>{if(active()&&host.isConnected)controls.requestSubmit();});
   }
+
+  function updateChartThemes(){
+    const theme=chartTheme();
+    function axes(chart){chart.options.color=theme.text;Object.values(chart.options.scales).forEach(axis=>{if(axis.ticks)axis.ticks.color=theme.muted;if(axis.grid)axis.grid.color=theme.grid;if(axis.title)axis.title.color=theme.muted;});}
+    charts.forEach(item=>{
+      axes(item.chart);item.chart.data.datasets.forEach((dataset,index)=>{
+        const color=theme.colors[index%theme.colors.length];dataset.borderColor=dataset.pointBackgroundColor=color;dataset.backgroundColor=dataset.fill?color+'30':color;
+        item.buttons[index].style.setProperty('--series-color',color);item.rows[index].row.querySelector('th').style.color=color;
+      });item.chart.canvas.parentElement.querySelector('.wh-tooltip').hidden=true;item.chart.update('none');
+    });
+    cardCharts.forEach((chart,index)=>{axes(chart);chart.data.datasets[0].borderColor=chart.data.datasets[0].backgroundColor=theme.colors[chart.$wellCardKind==='fondo'?0:4];chart.update('none');});
+  }
+  new MutationObserver(updateChartThemes).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
   // XLSX sin dependencias externas: ZIP sin compresión y celdas tipadas.
   const xml=value=>String(value??'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -290,7 +320,7 @@
       const datasets=item.chart.data.datasets.filter((dataset,index)=>item.chart.isDatasetVisible(index));
       if(!datasets.length){status.textContent='Mostrá al menos una tendencia antes de agregar al reporte.';return;}
       const items=[{key:result.combinedReportKey,type:'chart',title:result.well+' · Tendencias',payload:{
-        kind:'chart',chart_type:'line',axis_label:'Fecha (Argentina)',labels:item.labels,
+        kind:'chart',chart_type:item.chart.config.type,chart_mode:chartMode,axis_label:'Fecha (Argentina)',labels:item.labels,
         datasets:datasets.map(dataset=>({label:dataset.label,values:dataset.historySamples.map(sample=>sample&&sample.good&&!sample.questionable?sample.value:null),unit:dataset.historySeries.unit,color:dataset.borderColor})),
         group_title:'Históricos · '+result.well,
         context:detailed(result.start)+' a '+detailed(result.end)+' · Frecuencia '+frequencyLabel(result.intervalSeconds||3600)+' · Escala común automática · '+datasets.map(dataset=>dataset.historySeries.tag).join(' | '),
