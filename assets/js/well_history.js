@@ -176,6 +176,9 @@
     });
     const viewLabel=element('label','wh-chart-type','Tipo de gráfico '),view=element('select');
     view.setAttribute('aria-label','Tipo de gráfico de tendencias');view.innerHTML='<option value="line">Líneas</option><option value="bar">Barras</option><option value="area">Área</option><option value="step">Escalonado</option>';view.value=chartMode;viewLabel.append(view);card.append(viewLabel);
+    const zoomControls=element('div','wh-zoom-controls'),resetZoom=element('button','tg-btn','Restablecer zoom');
+    resetZoom.type='button';resetZoom.disabled=true;
+    zoomControls.append(element('span','','Zoom: arrastrá con el botón izquierdo sobre el gráfico.'),resetZoom);card.append(zoomControls);
     const legend=element('div','wh-legend');legend.setAttribute('aria-label','Tendencias visibles');card.append(legend);
     const wrapper=element('div','wh-canvas'),canvas=element('canvas');
     canvas.dataset.clearChartLocal='true';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Tendencias de '+context.well+' · '+series.length+' variables');wrapper.append(canvas);card.append(wrapper);
@@ -191,7 +194,7 @@
     const sampleText=sample=>!sample?'Sin muestra':sample.value===null?'Sin dato':typeof sample.value==='number'?readingFormat.format(sample.value):String(sample.value);
     let chart;
     function inspect(index,showTooltip=false){
-      index=Math.max(0,Math.min(timestamps.length-1,Math.round(index)));slider.value=String(index);slider.setAttribute('aria-valuetext',labels[index]);time.textContent=labels[index];
+      index=Math.max(Number(slider.min),Math.min(Number(slider.max),Math.round(index)));slider.value=String(index);slider.setAttribute('aria-valuetext',labels[index]);time.textContent=labels[index];
       tip.replaceChildren(element('strong','',labels[index]));
       datasets.forEach((dataset,di)=>{
         const visible=chart.isDatasetVisible(di),sample=dataset.historySamples[index],text=sampleText(sample);
@@ -211,15 +214,24 @@
     const showAll=element('button','wh-show-all','Mostrar todas');showAll.type='button';legend.append(showAll);
     const syncLegend=()=>buttons.forEach((button,index)=>{button.setAttribute('aria-pressed',String(chart.isDatasetVisible(index)));button.classList.toggle('is-hidden',!chart.isDatasetVisible(index));});
     showAll.addEventListener('click',()=>{datasets.forEach((dataset,index)=>chart.setDatasetVisibility(index,true));chart.update('none');syncLegend();inspect(Number(slider.value));});
-    const crosshair={id:'whCrosshair',afterDraw(chart){if(chart.$whIndex===undefined)return;const {ctx,chartArea,scales}=chart,x=scales.x.getPixelForValue(chart.$whIndex);ctx.save();ctx.strokeStyle=chartTheme().muted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();chart.data.datasets.forEach((dataset,index)=>{if(!chart.isDatasetVisible(index)||dataset.data[chart.$whIndex]===null)return;const y=scales.y.getPixelForValue(dataset.data[chart.$whIndex]);ctx.beginPath();ctx.arc(x,y,4,0,2*Math.PI);ctx.fillStyle=dataset.borderColor;ctx.fill();ctx.strokeStyle=chartTheme().background;ctx.stroke();});ctx.restore();}};
+    const crosshair={id:'whCrosshair',afterDraw(chart){if(chart.$whIndex===undefined)return;const {ctx,chartArea,scales}=chart,x=scales.x.getPixelForValue(chart.$whIndex);ctx.save();ctx.beginPath();ctx.rect(chartArea.left,chartArea.top,chartArea.width,chartArea.height);ctx.clip();ctx.strokeStyle=chartTheme().muted;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();chart.data.datasets.forEach((dataset,index)=>{if(!chart.isDatasetVisible(index)||dataset.data[chart.$whIndex]===null)return;const y=scales.y.getPixelForValue(dataset.data[chart.$whIndex]);ctx.beginPath();ctx.arc(x,y,4,0,2*Math.PI);ctx.fillStyle=dataset.borderColor;ctx.fill();ctx.strokeStyle=chartTheme().background;ctx.stroke();});ctx.restore();}};
     chart=new Chart(canvas,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,color:chartTheme().text,
       interaction:{mode:'index',intersect:false,axis:'x'},
       onHover(event){if(event.x>=chart.chartArea.left&&event.x<=chart.chartArea.right)inspect(chart.scales.x.getValueForPixel(event.x),true);},
       onClick(event){const active=chart.getElementsAtEventForMode(event,'nearest',{intersect:true},false);if(active.length)toggle(active[0].datasetIndex);},
-      plugins:{legend:{display:false},tooltip:{enabled:false},clearGlobalValues:false,datalabels:{display:false}},
+      plugins:{legend:{display:false},tooltip:{enabled:false},clearGlobalValues:false,datalabels:{display:false},
+        zoom:{limits:{x:{min:'original',max:'original',minRange:1},y:{min:'original',max:'original'}},
+          zoom:{mode:'xy',wheel:{enabled:false},pinch:{enabled:false},
+            drag:{enabled:true,threshold:8,backgroundColor:'rgba(35,142,179,0.16)',borderColor:'#238eb3',borderWidth:1},
+            onZoomStart(){tip.hidden=true;return true;},onZoomComplete(){syncZoom();}}}},
       scales:{x:{ticks:{color:chartTheme().muted,maxTicksLimit:8,maxRotation:0,callback(value){return labels[value]?.replace(/,? \d{2}:\d{2}:\d{2}$/,match=>match.slice(0,-3));}},grid:{color:chartTheme().grid}},
         y:{type:'linear',position:'left',ticks:{color:chartTheme().muted,maxTicksLimit:7},grid:{color:chartTheme().grid}}}},
       plugins:[crosshair,{id:'whDark',beforeDraw(chart){const ctx=chart.ctx;ctx.save();ctx.globalCompositeOperation='destination-over';ctx.fillStyle=chartTheme().background;ctx.fillRect(0,0,chart.width,chart.height);ctx.restore();}}]});
+    function syncZoom(){
+      slider.min=String(Math.max(0,Math.ceil(chart.scales.x.min)));slider.max=String(Math.min(timestamps.length-1,Math.floor(chart.scales.x.max)));
+      resetZoom.disabled=!chart.isZoomedOrPanned();inspect(Number(slider.value));
+    }
+    resetZoom.addEventListener('click',()=>{chart.resetZoom('none');syncZoom();});
     function applyView(){
       chartMode=view.value;const hidden=datasets.map((dataset,index)=>!chart.isDatasetVisible(index));
       chart.config.type=chartMode==='bar'?'bar':'line';

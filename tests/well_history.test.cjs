@@ -36,7 +36,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     });
     await page.addInitScript(()=>localStorage.setItem('clear_global_chart_preferences_v1',JSON.stringify({type:'bar',primary:'#ff0000',secondary:'#ff0000',values:true})));
     await page.goto('http://clear.test/monitoreo_pozos.php');
-    for(const file of ['chart.umd.js','chart_preferences.js','well_history.js','well_details.js'])await page.addScriptTag({path:path.join(root,'assets/js',file)});
+    for(const file of ['chart.umd.js','chartjs-plugin-zoom.min.js','chart_preferences.js','well_history.js','well_details.js'])await page.addScriptTag({path:path.join(root,'assets/js',file)});
     await page.locator('td[data-column=POZO]').click();
     const detail=page.locator('dialog.well-details:not(.wh-dialog)'),history=detail;
     await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===5);
@@ -87,6 +87,21 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     const options=await history.locator('.wh-chart canvas').evaluate(canvas=>{const chart=Chart.getChart(canvas);return {type:chart.config.type,scales:Object.keys(chart.scales),local:canvas.dataset.clearChartLocal,labels:chart.options.plugins.clearGlobalValues,background:getComputedStyle(canvas.parentElement).backgroundColor};});
     assert.deepEqual(options.scales,['x','y']);assert.equal(options.type,'line');assert.equal(options.local,'true');assert.equal(options.labels,false);assert.equal(options.background,'rgb(255, 255, 255)');
     assert.equal(await history.locator('.clearChartInlineBtn').count(),0);
+    // Arrastre real con botón izquierdo: zoom sin ocultar series ni volver a consultar PI.
+    await history.locator('.wh-chart canvas').scrollIntoViewIfNeeded();
+    const zoomBefore=requests.length;
+    const rectangle=await history.locator('.wh-chart canvas').evaluate(canvas=>{const c=Chart.getChart(canvas),b=canvas.getBoundingClientRect(),a=c.chartArea;return {x:b.x+a.left,y:b.y+a.top,w:a.width,h:a.height};});
+    await page.mouse.move(rectangle.x+rectangle.w*.15,rectangle.y+rectangle.h*.15);await page.mouse.down({button:'left'});
+    await page.mouse.move(rectangle.x+rectangle.w*.65,rectangle.y+rectangle.h*.8,{steps:8});await page.mouse.up({button:'left'});
+    await page.waitForFunction(()=>!document.querySelector('.wh-zoom-controls button').disabled);
+    const zoomed=await history.locator('.wh-chart canvas').evaluate(canvas=>{const c=Chart.getChart(canvas);return {xMin:c.scales.x.min,xMax:c.scales.x.max,yMin:c.scales.y.min,yMax:c.scales.y.max,visible:c.data.datasets.map((_,i)=>c.isDatasetVisible(i))};});
+    assert.ok(zoomed.xMax-zoomed.xMin<2||zoomed.yMax-zoomed.yMin<800);
+    assert.deepEqual(zoomed.visible,[true,true,true]);assert.equal(requests.length,zoomBefore);
+    await history.getByRole('button',{name:'Restablecer zoom',exact:true}).click();
+    assert.equal(await history.getByRole('button',{name:'Restablecer zoom',exact:true}).isDisabled(),true);
+    assert.deepEqual(await history.locator('.wh-chart canvas').evaluate(canvas=>{const c=Chart.getChart(canvas);return [c.scales.x.min,c.scales.x.max];}),[0,2]);
+    // El plugin ignora eventos durante 500 ms al finalizar el arrastre para evitar un clic accidental.
+    await page.waitForTimeout(550);
     const type=history.getByLabel('Tipo de gráfico de tendencias',{exact:true});
     const queryCount=requests.length;
     await history.getByRole('button',{name:'FP',exact:true}).click();
