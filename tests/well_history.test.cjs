@@ -4,13 +4,13 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {chromium}=require('playwright');
 const root=path.join(__dirname,'..');
-const fields={POZO:'YPF.SC.BB-130',BATERIA:'BB 03','QT:RPM':'750',FP:'0,85',ECO:'NORMAL',Fecha:'2026-10-22 12:00','PT:LINEA':'0'};
+const fields={POZO:'YPF.SC.BB-130',BATERIA:'BB 03','QT:RPM':'750',FP:'0,85',ECO:'NORMAL',Fecha:'2026-10-22 12:00','PT:LINEA':'0',ESTADO_RPM:'EN MARCHA','PT:CABEZA':'10.45'};
 const config={key:'monitoreo_pozos',title:'Monitoreo Pozos',batteryColumn:'BATERIA',wellHistory:true,wellHistoryReport:true};
 function fixture(){
   const styles=fs.readFileSync(path.join(root,'includes/telemetry_grid.php'),'utf8').match(/<style>([\s\S]*?)<\/style>/)[1].split('<?php')[0];
   return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+['app','well_details','well_history'].map(name=>fs.readFileSync(path.join(root,'assets/css/'+name+'.css'),'utf8')).join('\n')+styles+'</style><table id="tgTable"><thead><tr>'+Object.keys(fields).map(column=>'<th data-column="'+column+'" data-report-label="'+column+'">'+column+'</th>').join('')+'</tr></thead><tbody><tr>'+Object.entries(fields).map(([column,value])=>'<td data-column="'+column+'" data-raw="'+value+'">'+value+'</td>').join('')+'</tr></tbody></table><script>window.CLEAR_TELEMETRY_GRID='+JSON.stringify(config)+'</script></html>';
 }
-const catalog={};for(const column of ['QT:RPM','FP','ECO'])catalog[column]={available:true,tag:fields.POZO+'(RPC)_'+column+'.PV',unit:column==='QT:RPM'?'rpm':'',type:column==='ECO'?'Digital':'Float32'};
+const catalog={};for(const column of ['QT:RPM','FP','ECO','ESTADO_RPM','PT:CABEZA'])catalog[column]={available:true,tag:fields.POZO+'(RPC)_'+column+'.PV',unit:column==='QT:RPM'?'rpm':'',type:column==='ECO'?'Digital':'Float32'};
 catalog.Fecha={available:false,reason:'Sin tag verificado'};catalog['PT:LINEA']={available:false,reason:'Sin tag verificado'};
 function response(columns,intervalSeconds=3600){return {ok:true,well:fields.POZO,intervalSeconds,combinedReportKey:'well_history_combined:'+ 'a'.repeat(40),start:'2026-10-21T00:00:00-03:00',end:'2026-10-22T00:00:00-03:00',series:columns.map((column,index)=>({column,tag:catalog[column].tag,unit:catalog[column].unit,type:catalog[column].type,step:column==='ECO',reportKey:'well_history:'+String(index+1).repeat(40),samples:[0,1,2].map(hour=>({timestamp:'2026-10-21T0'+(hour+3)+':00:00Z',plot_value:column==='ECO'?(hour?1:0):column==='FP'?0.85:750+hour,value:column==='ECO'?(hour?'ALARMA':'NORMAL'):column==='FP'?0.85:750+hour,good:hour!==1,questionable:false,substituted:false})).filter((sample,index)=>column!=='FP'||index!==1)}))};}
 // Leer los miembros ZIP almacenados para verificar que la descarga sea XLSX real.
@@ -37,9 +37,19 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await page.addInitScript(()=>localStorage.setItem('clear_global_chart_preferences_v1',JSON.stringify({type:'bar',primary:'#ff0000',secondary:'#ff0000',values:true})));
     await page.goto('http://clear.test/monitoreo_pozos.php');
     for(const file of ['chart.umd.js','chart_preferences.js','well_history.js','well_details.js'])await page.addScriptTag({path:path.join(root,'assets/js',file)});
-    await page.locator('td[data-column=POZO]').dblclick();
+    await page.locator('td[data-column=POZO]').click();
     const detail=page.locator('dialog.well-details:not(.wh-dialog)'),history=detail;
-    await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===3);
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===5);
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-chart canvas').length===1&&document.querySelector('[data-wh-export]').disabled===false);
+    assert.deepEqual(requests[0].columns,['ESTADO_RPM','QT:RPM','PT:CABEZA']);
+    assert.equal(await detail.getByRole('button',{name:'Restaurar ficha del pozo',exact:true}).getAttribute('aria-pressed'),'true');
+    await page.waitForFunction(()=>document.querySelectorAll('.wd-card-plot canvas').length===1);
+    assert.equal(cardRequests.length,1);assert.equal(cardRequests[0].mode,'latest');
+    for(const column of ['ESTADO_RPM','QT:RPM','PT:CABEZA']){
+      const checkbox=detail.getByRole('checkbox',{name:'Seleccionar '+column+' para histórico',exact:true});
+      assert.equal(await checkbox.isChecked(),true);await checkbox.uncheck();
+    }
+    requests.length=0;
     assert.equal(await detail.getByRole('button',{name:'Histórico (0)',exact:true}).isDisabled(),true);
     assert.equal(await detail.getByRole('checkbox',{name:'Seleccionar Fecha para histórico',exact:true}).isDisabled(),true);
     for(const column of ['QT:RPM','FP','ECO'])await detail.getByRole('checkbox',{name:'Seleccionar '+column+' para histórico',exact:true}).check();
@@ -52,8 +62,6 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.equal(requests[0].intervalSeconds,3600);
     assert.equal(await page.locator('dialog.wh-dialog').isVisible(),false);
     assert.equal(await history.locator('.wd-kpi').count(),6);
-    await history.getByRole('button',{name:'Consultar cartas',exact:true}).click();
-    await page.waitForFunction(()=>document.querySelectorAll('.wd-card-plot canvas').length===1);
     assert.equal(cardRequests[0].mode,'latest');assert.equal(cardRequests[0].windowSeconds,60);assert.equal(cardRequests[0].well,fields.POZO);
     assert.ok((await history.locator('.wd-cards-host').textContent()).includes('Falta verificar ZT:FONDO-POS'));
     const xy=await history.locator('.wd-card-plot canvas').evaluate(canvas=>Chart.getChart(canvas).data.datasets[0].data);
@@ -63,6 +71,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await history.getByRole('button',{name:'Consultar cartas',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.wd-card-plot canvas').length===1);
     assert.equal(cardRequests[1].mode,'manual');
+    await history.getByRole('button',{name:'Restaurar ficha del pozo',exact:true}).click();
     const originalBox=await history.boundingBox();
     await history.getByRole('button',{name:'Maximizar ficha del pozo',exact:true}).click();
     const maximized=await history.boundingBox(),viewport=page.viewportSize();
@@ -145,8 +154,8 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     assert.deepEqual(requests.at(-1).columns,['QT:RPM','ECO']);
     fail=false;delay=true;await history.getByRole('button',{name:'Traer históricos',exact:true}).click();await history.getByRole('button',{name:'Cerrar ficha del pozo',exact:true}).click();
     assert.equal(await history.isVisible(),false);assert.equal(await detail.isVisible(),false);
-    await page.locator('td[data-column=POZO]').dblclick();
-    await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===3);
+    await page.locator('td[data-column=POZO]').click();
+    await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===5);
     assert.equal(await detail.getByRole('checkbox',{name:'Seleccionar QT:RPM para histórico',exact:true}).isChecked(),true);
     assert.deepEqual(errors,[]);
   }finally{await browser.close();}

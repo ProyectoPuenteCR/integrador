@@ -62,3 +62,9 @@ body.well-details-open{overflow:hidden}
 .wd-kpi strong{font-variant-numeric:tabular-nums}
 @media(max-width:600px){.wd-data-groups .well-details__section dl{grid-template-columns:repeat(2,minmax(0,1fr))}.wd-data-groups .well-details__field{padding:8px}.wd-data-groups .well-details__field dd{font-size:13px}.wd-data-groups .well-details__field dt{min-height:26px}}
 @media(max-width:360px){.wd-data-groups .well-details__section dl{grid-template-columns:minmax(0,1fr)}.wd-data-groups .wd-field-comment{grid-column:auto}}
+
+.wd-dashboard .well-details__comm-fail{width:64px;height:64px;border-radius:14px;border:2px solid #ff8b80;background:#671e24;color:#ffd6d0;animation:wd-comm-pulse 1.4s ease-in-out infinite}
+.wd-dashboard .well-details__comm-fail svg{width:44px;height:44px}
+@keyframes wd-comm-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 #ef444400}50%{opacity:.4;box-shadow:0 0 0 8px #ef444433}}
+@media(prefers-reduced-motion:reduce){.wd-dashboard .well-details__comm-fail{animation:none}}
+@media(max-width:600px){.wd-dashboard .well-details__comm-fail{width:48px;height:48px}.wd-dashboard .well-details__comm-fail svg{width:32px;height:32px}}

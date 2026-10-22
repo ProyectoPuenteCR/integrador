@@ -122,16 +122,16 @@
     addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
     if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions,historyHost,cardsHost});
     if(!window.CLEAR_WELL_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
-    dialog.showModal();document.body.classList.add('well-details-open');
+    resize(true);dialog.showModal();body.scrollTop=0;document.body.classList.add('well-details-open');
   }
 
   table.tBodies[0].querySelectorAll('tr').forEach(row=>{
     if(!row.querySelector('td[data-column="POZO"]'))return;
     row.tabIndex=0;row.classList.add('well-details-row');
     row.setAttribute('aria-haspopup','dialog');
-    row.setAttribute('aria-label','Ver ficha del pozo '+(row.querySelector('td[data-column="POZO"]').dataset.raw||'')+'. Doble clic o Enter.');
+    row.setAttribute('aria-label','Ver ficha del pozo '+(row.querySelector('td[data-column="POZO"]').dataset.raw||'')+'. Clic o Enter.');
   });
-  table.tBodies[0].addEventListener('dblclick',event=>{
+  table.tBodies[0].addEventListener('click',event=>{
     if(event.target.closest(interactive))return;
     const row=event.target.closest('.well-details-row');if(row)open(row);
   });

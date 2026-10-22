@@ -21,8 +21,7 @@ for(const mobile of [false,true])test(`ficha de pozo: ${mobile?'móvil':'escrito
     const row=page.locator('#tgTable tbody tr').first(),dialog=page.locator('dialog.well-details');
     assert.equal(await dialog.isVisible(),false);
     await row.locator('.comment').dblclick();assert.equal(await dialog.isVisible(),false);
-    await row.locator('td[data-column=POZO]').click();assert.equal(await dialog.isVisible(),false);
-    await row.locator('td[data-column=POZO]').dblclick();assert.equal(await dialog.isVisible(),true);
+    await row.locator('td[data-column=POZO]').click();assert.equal(await dialog.isVisible(),true);
     assert.equal(await dialog.locator('h2').textContent(),'YPF.SC.BB-113');
     const text=await dialog.textContent();
     for(const expected of ['Identificación','Operación','Producción','Variables de telemetría','PT:LINEA','12,4','Sin dato','Sin permiso','0,20'])assert.ok(text.includes(expected),expected);
@@ -40,7 +39,7 @@ for(const mobile of [false,true])test(`ficha de pozo: ${mobile?'móvil':'escrito
     assert.equal(await dialog.locator('.well-details__screen svg').count(),1);
     assert.equal(await dialog.locator('.well-details__comm-fail').count(),0);
     assert.equal(await dialog.locator('.well-details__pump').getAttribute('src'),'assets/img/telemetry/monitoreo_pozos.png');
-    const bounds=await dialog.boundingBox();assert.ok(bounds.width<=(mobile?390:1440));
+    const bounds=await dialog.boundingBox();assert.ok(Math.abs(bounds.width-(mobile?390:1440))<2);assert.ok(Math.abs(bounds.height-(mobile?844:1000))<2);
     await page.keyboard.press('Escape');assert.equal(await dialog.isVisible(),false);
     assert.equal(await row.evaluate(node=>node===document.activeElement),true);
     await page.keyboard.press('Enter');assert.equal(await dialog.isVisible(),true);
@@ -50,12 +49,14 @@ for(const mobile of [false,true])test(`ficha de pozo: ${mobile?'móvil':'escrito
     assert.equal(await dialog.locator('h2').textContent(),'Otro <pozo>');
     assert.equal(await dialog.locator('pozo').count(),0);
     assert.equal(await dialog.locator('[aria-label="Falla de comunicación"]').count(),1);
-    assert.equal(await dialog.locator('.well-details__comm-fail').evaluate(node=>getComputedStyle(node).color),'rgb(197, 45, 38)');
+    assert.equal(await dialog.locator('.well-details__comm-fail').evaluate(node=>getComputedStyle(node).animationName),'wd-comm-pulse');
+    assert.ok((await dialog.locator('.well-details__comm-fail').boundingBox()).width>=(mobile?48:64));
+    await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await dialog.locator('.well-details__comm-fail').evaluate(node=>getComputedStyle(node).animationName),'none');
     await page.evaluate(()=>document.addEventListener('click',event=>{if(event.target.closest('[data-telemetry-modal-url]')){event.preventDefault();window.alarmOpened=true;}}));
     await dialog.locator('a[data-telemetry-modal-url]').click();
     assert.equal(await dialog.isVisible(),false);assert.equal(await page.evaluate(()=>window.alarmOpened),true);
     await row.focus();await page.keyboard.press('Enter');
-    await page.mouse.click(1,1);assert.equal(await dialog.isVisible(),false);
+    await page.keyboard.press('Escape');assert.equal(await dialog.isVisible(),false);
     await page.waitForFunction(()=>!document.body.classList.contains('well-details-open'));
     assert.equal(await page.locator('body').evaluate(node=>node.classList.contains('well-details-open')),false);
     await page.evaluate(()=>document.documentElement.dataset.theme='dark');

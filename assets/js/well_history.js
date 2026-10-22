@@ -2,7 +2,7 @@
   'use strict';
   const cfg=window.CLEAR_TELEMETRY_GRID||{};
   if(cfg.key!=='monitoreo_pozos'||!cfg.wellHistory)return;
-  const cache=new Map(),selections=new Map(),tokens=new WeakMap();
+  const cache=new Map(),selections=new Map(),defaultsApplied=new Set(),tokens=new WeakMap();
   const timezone='America/Argentina/Buenos_Aires';
   const dateFormat=new Intl.DateTimeFormat('es-AR',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
   const localDate=date=>{
@@ -37,7 +37,17 @@
     button.addEventListener('click',()=>open(well,Array.from(chosen.values()),button));
     if(inlineHost)context={well,variables:Array.from(chosen.values())};
     try{
-      const data=await catalog(well);if(tokens.get(body)!==token)return;
+      const data=await catalog(well);if(tokens.get(body)!==token||(historyHost&&(!active()||context?.well!==well)))return;
+      const defaultColumns=['ESTADO_RPM','QT:RPM','PT:CABEZA'];
+      const missingDefaults=[];
+      if(!defaultsApplied.has(well)){
+        defaultColumns.forEach(column=>{
+          const field=fields.find(item=>item.dataset.historyColumn===column);
+          if(field&&data.columns[column]?.available)chosen.set(column,{column,label:field.querySelector('dt').textContent});
+          else missingDefaults.push(column);
+        });
+        defaultsApplied.add(well);
+      }
       for(const column of chosen.keys())if(!data.columns[column]?.available)chosen.delete(column);
       let available=0;
       fields.forEach(field=>{
@@ -56,7 +66,8 @@
         });
       });
       note.textContent=available?'Seleccioná las variables que querés consultar. Podés elegir la frecuencia desde 30 segundos.':'No se encontraron tags verificados para este pozo.';update();
-      if(inlineHost&&context?.well===well){context.variables=Array.from(chosen.values());invalidateSelection();}
+      if(missingDefaults.length)note.textContent+=' Sin histórico verificado para: '+missingDefaults.join(', ')+'.';
+      if(inlineHost&&context?.well===well){context.variables=Array.from(chosen.values());invalidateSelection();if(context.variables.length)load();}
     }catch(error){if(tokens.get(body)===token){note.textContent=error.message;note.classList.add('is-error');button.disabled=true;}}
   }
 
@@ -239,6 +250,7 @@
       }catch(error){if(error.name!=='AbortError'&&pending===cardsController)cards.forEach(card=>card.message.textContent=error.message);}
       finally{if(pending===cardsController)get.disabled=false;}
     });
+    requestAnimationFrame(()=>{if(active()&&host.isConnected)controls.requestSubmit();});
   }
 
   // XLSX sin dependencias externas: ZIP sin compresión y celdas tipadas.
