@@ -64,7 +64,7 @@
   const maximize=dialog.querySelector('[data-well-maximize]');
   function resize(maximized){dialog.classList.toggle('is-maximized',maximized);maximize.setAttribute('aria-pressed',String(maximized));maximize.setAttribute('aria-label',maximized?'Restaurar ficha del pozo':'Maximizar ficha del pozo');maximize.textContent=maximized?'❐':'⛶';}
   maximize.addEventListener('click',()=>resize(!dialog.classList.contains('is-maximized')));
-  function close(){window.CLEAR_WELL_HISTORY?.detach?.();dialog.close();resize(false);restoreFocus();}
+  function close(){window.CLEAR_WELL_ACTIVITY?.detach?.();window.CLEAR_WELL_HISTORY?.detach?.();dialog.close();resize(false);restoreFocus();}
 
   function addAction(source,label,{target=actions,screen=false,iconOnly=false}={}){
     if(!source)return;
@@ -136,6 +136,7 @@
     addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
     if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions,historyHost,cardsHost});
     if(!window.CLEAR_WELL_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
+    window.CLEAR_WELL_ACTIVITY?.decorate({row,body,well:value('POZO'),close});
     resize(true);dialog.showModal();body.scrollTop=0;document.body.classList.add('well-details-open');
   }
 
@@ -161,7 +162,7 @@
   });
   dialog.addEventListener('keydown',event=>{
     if(event.key!=='Tab')return;
-    const buttons=Array.from(dialog.querySelectorAll('button,a[href],input,select')).filter(item=>!item.disabled&&item.getClientRects().length);
+    const buttons=Array.from(dialog.querySelectorAll('button,a[href],input,select,textarea')).filter(item=>!item.disabled&&item.getClientRects().length);
     const first=buttons[0],last=buttons[buttons.length-1];
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
