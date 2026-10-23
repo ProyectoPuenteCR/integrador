@@ -9,11 +9,11 @@
     const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'No se pudo completar la consulta.');return data;
   }
   function detach(){if(active){active.controller.abort();active=null;}}
-  function decorate({row,body,well,close}){
+  function decorate({row,body,activityHost,well,close}){
     detach();
     const state={controller:new AbortController()};active=state;
     const current=()=>active===state;
-    const panel=node('section','wd-activity');panel.setAttribute('aria-label','Comentario y alarmas del pozo');body.prepend(panel);
+    const panel=node('section','wd-activity');panel.setAttribute('aria-label','Comentario y alarmas del pozo');if(activityHost)activityHost.replaceChildren(panel);else body.prepend(panel);
     const comment=node('article','wd-activity-card');
     const heading=node('div','wd-activity-heading');heading.append(node('h3','','Comentario del pozo'));comment.append(heading);
     const preview=node('p','wd-comment-preview');

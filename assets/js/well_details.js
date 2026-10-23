@@ -15,6 +15,7 @@
   const liveStatus=document.createElement('div');liveStatus.className='wd-live-status';subtitle.after(liveStatus);
   const body=dialog.querySelector('.well-details__body');
   const actions=dialog.querySelector('.well-details__actions');
+  const activityHost=document.createElement('div');activityHost.className='wd-header-activity';dialog.querySelector('.wd-head-actions').before(activityHost);
   const titleLine=document.createElement('div');titleLine.className='well-details__title-line';
   title.before(titleLine);titleLine.append(title);
   const titleIcons=document.createElement('div');titleIcons.className='well-details__title-icons';titleLine.append(titleIcons);
@@ -136,7 +137,7 @@
     addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
     if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions,historyHost,cardsHost});
     if(!window.CLEAR_WELL_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
-    window.CLEAR_WELL_ACTIVITY?.decorate({row,body,well:value('POZO'),close});
+    window.CLEAR_WELL_ACTIVITY?.decorate({row,body,activityHost,well:value('POZO'),close});
     resize(true);dialog.showModal();body.scrollTop=0;document.body.classList.add('well-details-open');
   }
 

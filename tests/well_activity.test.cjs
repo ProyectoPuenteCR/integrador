@@ -4,10 +4,10 @@ const {chromium}=require('playwright');
 const path=require('node:path');
 const fs=require('node:fs');
 const root=path.join(__dirname,'..');
-test('comentario editable, alarma y campana del pozo',async()=>{
+for(const width of [1520,390])test('comentario y alarma en cabecera '+width,async()=>{
  const browser=await chromium.launch({headless:true,channel:'msedge'});
  try{
-  const page=await browser.newPage();let saved='Pendiente: falla sensor RPM',posted='';
+  const page=await browser.newPage({viewport:{width,height:900}});let saved='Pendiente: falla sensor RPM',posted='';
   await page.route('http://clear.test/**',async route=>{
    const url=new URL(route.request().url());
    if(url.pathname.endsWith('alarm_events_api.php')){if(route.request().method()==='POST'){posted=route.request().postData();saved='Sensor revisado';await route.fulfill({json:{ok:true}});}else await route.fulfill({json:{ok:true,comment:saved,author:'Operador CLEAR'}});}
@@ -18,12 +18,16 @@ test('comentario editable, alarma y campana del pozo',async()=>{
   await page.addScriptTag({path:path.join(root,'assets/js/well_activity.js')});await page.addScriptTag({path:path.join(root,'assets/js/well_details.js')});
   await page.locator('[data-column="POZO"]').last().click();const dialog=page.locator('dialog');
   await page.waitForFunction(()=>document.querySelector('.wd-comment-preview')?.textContent.includes('falla sensor'));
+  assert.equal(await dialog.locator('.well-details__head .wd-activity').count(),1);
+  assert.equal(await dialog.locator('.well-details__body .wd-activity').count(),0);
+  assert.ok(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+2));
   assert.equal(await dialog.locator('.wd-alarm-bell strong').textContent(),'3');assert.ok((await dialog.locator('.wd-last-alarm').textContent()).includes('FALLA'));
   await dialog.getByRole('button',{name:'Editar comentario',exact:true}).click();
   assert.equal(await dialog.locator('textarea').inputValue(),saved);
   await dialog.locator('textarea').fill('Sensor revisado');await dialog.locator('.wd-comment-form input').fill('Operador CLEAR');await dialog.getByRole('button',{name:'Guardar comentario'}).click();
   await page.waitForFunction(()=>document.querySelector('.wd-activity-status')?.textContent==='Comentario guardado.');
   assert.ok(posted.includes('POZO:YPF.SC.BB-106'));assert.ok(posted.includes('existing-key'));assert.equal(await page.locator('#tgTable [data-comment-preview]').textContent(),'Sensor revisado');
+  if(process.env.CLEAR_REVIEW_DIR)await page.screenshot({path:path.join(process.env.CLEAR_REVIEW_DIR,'cabecera-'+width+'.png')});
   await dialog.locator('.wd-alarm-bell').click();assert.equal(await dialog.isVisible(),false);
   const url=await page.evaluate(()=>window.historyUrl);assert.ok(url.startsWith('pozos_todas_alarmas.php?'));assert.ok(url.includes('pozo_exacto=1'));assert.ok(url.includes('pozo=YPF.SC.BB-106'));
   await page.evaluate(()=>{window.CLEAR_TELEMETRY_GRID.wellCommentView=false;window.CLEAR_TELEMETRY_GRID.wellAlarms=false;document.querySelector('[data-alarm-comment]').dataset.canCreate='0';});
