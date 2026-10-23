@@ -51,7 +51,8 @@ if($action==='batch'){
         $key=ns_clean($item['key']??'',120);$type=strtolower(ns_clean($item['type']??'',30));$title=ns_clean($item['title']??'',255);$payload=$item['payload']??[];
         if(!preg_match('/^[a-z0-9_-]+:[a-f0-9]{40}$/',$key)||!in_array($type,['row','chart','kpi','table'],true)||$title===''||!is_array($payload))ns_rep_out(['ok'=>false,'error'=>'Uno de los elementos seleccionados no es válido.'],422);
         $payload=ns_rep_payload_prepare($payload,$user);$payloadJson=json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-        if(strlen((string)$payloadJson)>100000)ns_rep_out(['ok'=>false,'error'=>'Uno de los elementos seleccionados es demasiado grande.'],422);
+        $maxPayload=strpos($key,'well_history_combined:')===0?400000:100000;
+        if(strlen((string)$payloadJson)>$maxPayload)ns_rep_out(['ok'=>false,'error'=>'Uno de los elementos seleccionados es demasiado grande.'],422);
         $id=$db->scalar("SELECT TOP 1 ID FROM dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS WHERE USUARIO=? AND ITEM_KEY=?",[$user,$key]);
         if($id!==null&&$id!=='')$ok=$db->execute("UPDATE dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS SET ITEM_TIPO=?,TITULO=?,PAYLOAD_JSON=?,ACTIVO=?,FECHA_CAMBIO=SYSDATETIME() WHERE ID=?",[$type,$title,$payloadJson,$active,(int)$id]);
         elseif($active)$ok=$db->execute("INSERT INTO dbo.CLEAR_NOVEDADES_SEMANALES_REPORTE_ITEMS(USUARIO,ITEM_KEY,ITEM_TIPO,TITULO,PAYLOAD_JSON,ACTIVO) VALUES(?,?,?,?,?,1)",[$user,$key,$type,$title,$payloadJson]);

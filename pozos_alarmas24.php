@@ -240,7 +240,10 @@ if ($db->ok()) {
         $baseConditions[] = "UPPER(LTRIM(RTRIM(CONVERT(nvarchar(4000),[$wellColumn])))) LIKE ?";
         $baseParams[] = strtoupper($wellPrefix) . '%';
     }
-    foreach (pa24_terms($wellSearch) as $term) {
+    if (($_GET['pozo_exacto'] ?? '') === '1' && $wellSearch !== '') {
+        $baseConditions[] = "LTRIM(RTRIM(CONVERT(nvarchar(4000),[$wellColumn]))) = ?";
+        $baseParams[] = $wellSearch;
+    } else foreach (pa24_terms($wellSearch) as $term) {
         $baseConditions[] = "(CONVERT(nvarchar(4000),[$wellColumn]) LIKE ? OR REPLACE(REPLACE(REPLACE(CONVERT(nvarchar(4000),[$wellColumn]),'_',''),'-',''),' ','') LIKE ?)";
         $baseParams[] = '%' . $term . '%';
         $baseParams[] = '%' . str_replace(['_', '-', ' '], '', $term) . '%';

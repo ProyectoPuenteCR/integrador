@@ -14,6 +14,7 @@ $TELEMETRY = [
     'display_order'=>['POZO','BATERIA','ALM','__COMUNICACION','ESTADO','ESTADO-GRAL','PT:LINEA','QT:RPM','ESTADO_RPM','PANTALLA','CARTAS'],
     'column_state_version'=>'343',
     'collapsible_filters'=>true,
+    'collapsible_toolbar'=>true,
     'labels'=>['Fecha'=>'ÚLTIMA ACTUALIZACIÓN','PT:LINEA'=>'PRESIÓN LÍNEA','QT:RPM'=>'RPM','ESTADO_RPM'=>'ESTADO POZO','PRODUCCION_PETROLEO'=>'PRODUCCIÓN PETRÓLEO','PRODUCCION_LIQUIDO'=>'PRODUCCIÓN LÍQUIDO','PRODUCCION_GAS'=>'PRODUCCIÓN GAS'],
     'non_numeric'=>['POZO','BATERIA','ESTADO','Fecha','ECO','ESTADO-GRAL','YAT:COM','PANTALLA','CARTAS','YT:CONTROL','YT:DEVICE','YT:LLAVE','YT:LLAVE-AUTO','ESTADO_RPM']
 ];

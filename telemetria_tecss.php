@@ -16,6 +16,7 @@ $tecssCacheReady = $tecssDb->ok()
 
 $TELEMETRY = [
     'key' => 'telemetria_tecss',
+    'collapsible_toolbar' => true,
     'title' => 'Telemetría TECCS',
     'subtitle' => 'Monitoreo de pozos TECCS',
     'table' => 'TECSS_RTQP',

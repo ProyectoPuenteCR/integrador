@@ -1,0 +1,50 @@
+<?php
+require_once __DIR__.'/includes/db.php';
+require_once __DIR__.'/includes/auth.php';
+require_once __DIR__.'/includes/permissions.php';
+require_once __DIR__.'/includes/appconfig.php';
+require_once __DIR__.'/includes/well_history.php';
+require_once __DIR__.'/includes/pi_transport.php';
+require_once __DIR__.'/includes/well_cards.php';
+auth_require();
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+function wh_out($data,$status=200){http_response_code($status);echo json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_INVALID_UTF8_SUBSTITUTE);exit;}
+if(!permissions_can_menu('monitoreo_pozos')||!permissions_can_menu('pi_historico'))wh_out(['ok'=>false,'error'=>'No tenés permiso para consultar estos históricos.'],403);
+try{
+    $input=$_GET;
+    if($_SERVER['REQUEST_METHOD']==='POST'){
+        if((int)($_SERVER['CONTENT_LENGTH']??0)>12000)throw new InvalidArgumentException('La selección es demasiado grande.');
+        $raw=file_get_contents('php://input',false,null,0,12001);
+        if(strlen($raw)>12000)throw new InvalidArgumentException('La selección es demasiado grande.');
+        $input=json_decode($raw,true);
+        if(!is_array($input))throw new InvalidArgumentException('La consulta no es válida.');
+    }
+    $well=wh_well($input['well']??'');$db=clear_db();
+    if(!$db->ok())throw new RuntimeException('Sin conexión a SQL Server.');
+    $catalog=wh_catalog($db,$well);
+    if($_SERVER['REQUEST_METHOD']==='GET'){
+        foreach($catalog as &$point)unset($point['webid']);unset($point);
+        wh_out(['ok'=>true,'well'=>$well,'columns'=>$catalog]);
+    }
+    if($_SERVER['REQUEST_METHOD']!=='POST')wh_out(['ok'=>false,'error'=>'Método no permitido.'],405);
+    // Reutilizar CLEAR_CONFIG con lecturas; no llamar config_ensure_table().
+    $app=require __DIR__.'/config.php';$fallback=$app['pi']??[];
+    $pi=['base'=>config_get('pi_base',$fallback['base']??'https://10.17.40.37/piwebapi'),
+        'ca_bundle'=>config_get('pi_ca_bundle',$fallback['ca_bundle']??'')];
+    $user=config_get('pi_user','');$pass=config_get('pi_pass','');
+    $auth=($user!==''||$pass!=='')?'Basic '.base64_encode($user.':'.$pass):($fallback['auth']??'');
+    $request=function($path)use($pi,$auth){
+        $response=clear_pi_transport($path,$pi,$auth,45);
+        $status=$response['status'];$body=$response['body'];
+        if($status<200||$status>=300)throw new RuntimeException('No se pudo consultar PI Web API (HTTP '.$status.').');
+        $data=json_decode($body,true);if(!is_array($data))throw new RuntimeException('La respuesta de PI no es válida.');return $data;
+    };
+    if(($input['action']??'')==='cards')wh_out(['ok'=>true,'well'=>$well]+wh_cards($catalog,$input['at']??'',$input['windowSeconds']??60,$request,($input['mode']??'manual')==='latest'));
+    $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request,$input['intervalSeconds']??3600);
+    foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode([$well,$series['column'],$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
+    $columns=array_column($result['series'],'column');sort($columns);
+    $result['combinedReportKey']='well_history_combined:'.sha1(json_encode([$well,$columns,$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
+    wh_out(['ok'=>true,'well'=>$well]+$result);
+}catch(InvalidArgumentException $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],422);}
+catch(Throwable $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],502);}
