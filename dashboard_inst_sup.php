@@ -7,6 +7,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/icons.php';
 require_once __DIR__ . '/includes/dashboard_data.php';
+require_once __DIR__ . '/includes/dashboard_inst_comparison.php';
 require_once __DIR__ . '/includes/recon_comments.php';
 require_once __DIR__ . '/includes/novedades_semanales_common.php';
 
@@ -179,6 +180,8 @@ $criticas    = $ok ? (int)$stats['criticas'] : 0;
 $activas     = $ok ? (int)$stats['activas'] : 0;
 $reconocidas = $ok ? (int)$stats['reconocidas'] : 0;
 $suprimidas  = $ok ? (int)$stats['suprimidas'] : 0;
+$hourlySummary = dsi_chart_summary($visualMetrics['hourly'] ?? [], ['high','medium','low'], $total24h, $criticas);
+$flowSummary = dsi_chart_summary($visualMetrics['flow'] ?? [], ['active','normalized'], $total24h);
 
 $trendValues = values_from_rows($moduleMetrics['tendencia'] ?? [], [18, 24, 16, 29, 22, 27, 21]);
 $priority = $moduleMetrics['prioridad'] ?? ['HIGH'=>0,'MEDIUM'=>0,'LOW'=>0,'INFO'=>0];
@@ -304,7 +307,7 @@ if($reportReady){
         'Demora'=>$latestDelayMin===null?'—':((int)$latestDelayMin.' min'),'Críticas 24h'=>fmt_num($criticas),'Sin comentario'=>fmt_num($visualMetrics['recognition']['pending']??0),
     ]);
     $reportRow('indicadores','Indicadores principales','',[
-        'Alarmas 24h indexadas'=>fmt_num($total24h),'Críticas'=>fmt_num($criticas),'Activas'=>fmt_num($activas),'Reconocidas'=>fmt_num($reconocidas),
+        'Eventos de alarmas · 24 h'=>fmt_num($total24h),'Críticas 24 h'=>fmt_num($criticas),'Alarmas vigentes (stock actual)'=>fmt_num($activas),'Reconocidas (registro disponible)'=>fmt_num($reconocidas),
         'Suprimidas 24h'=>fmt_num($suprimidas),'Comentarios'=>fmt_num($dashboardCommentCount),'Estado de servicios'=>$dbStatus?'SQL OK':'SQL ERROR',
     ]);
     $reportRow('atencion','Atención requerida','',['Reconocimientos sin comentario'=>fmt_num($visualMetrics['recognition']['pending']??0),'Alarmas críticas 24h'=>fmt_num($criticas)]);
@@ -317,8 +320,10 @@ if($reportReady){
         $high[]=(int)($hourlyRow['high']??0);$medium[]=(int)($hourlyRow['medium']??0);$low[]=(int)($hourlyRow['low']??0);
         $active[]=(int)($flowRow['active']??0);$normalized[]=(int)($flowRow['normalized']??0);
     }
-    $reportChart('alarmas_hora','Alarmas por hora',$hourLabels,[['label'=>'Alta','values'=>$high],['label'=>'Media','values'=>$medium],['label'=>'Baja','values'=>$low]],'bar','alarmas');
-    $reportChart('flujo','Activadas vs normalizadas',$hourLabels,[['label'=>'Activadas','values'=>$active],['label'=>'Normalizadas','values'=>$normalized]],'line','alarmas');
+    $reportChart('alarmas_hora','Alarmas por hora',$hourLabels,[['label'=>'Alta','values'=>$high],['label'=>'Media','values'=>$medium],['label'=>'Baja y otras','values'=>$low]],'bar','alarmas');
+    $reportChart('flujo','Eventos activados vs normalizados · 24 h',$hourLabels,[['label'=>'Activadas','values'=>$active],['label'=>'Normalizadas','values'=>$normalized]],'line','alarmas');
+    if($hourlySummary['available'])$reportRow('comparacion_horaria','Comparación de prioridades 24 h','',['Alta'=>fmt_num($hourlySummary['series']['high']),'Media'=>fmt_num($hourlySummary['series']['medium']),'Baja y otras'=>fmt_num($hourlySummary['series']['low']),'Suma del gráfico'=>fmt_num($hourlySummary['total']),'Tarjeta Alarmas 24 h'=>fmt_num($total24h),'Coincide'=>$hourlySummary['matches']?'Sí':'No; revisar caché']);
+    if($flowSummary['available'])$reportRow('comparacion_flujo','Comparación de eventos 24 h','',['Activadas'=>fmt_num($flowSummary['series']['active']),'Normalizadas'=>fmt_num($flowSummary['series']['normalized']),'Suma del gráfico'=>fmt_num($flowSummary['total']),'Tarjeta Alarmas 24 h'=>fmt_num($total24h),'Coincide'=>$flowSummary['matches']?'Sí':'No; revisar caché','Alcance'=>'Eventos de 24 h; no equivale al stock vigente.']);
 
     $pareto=(array)($visualMetrics['pareto']??[]);
     if($pareto)$reportChart('pareto','Pareto de alarmas',array_map(function($row){return(string)($row['tag']??'—');},$pareto),[
@@ -365,6 +370,7 @@ if($reportReady){
   <style>
 .dashboardCommentsDateRange{display:flex;align-items:center;gap:7px;border:1px solid var(--line-mid);background:#fff;border-radius:9px;padding:5px 8px}.dashboardCommentsDateRange label{font-size:10px;font-weight:700;color:var(--text-mut);text-transform:uppercase}.dashboardCommentsDateRange input{border:0;outline:0;font:inherit;color:var(--text);background:transparent;max-width:130px}.dashboardCommentsDateRange__sep{color:var(--text-mut)}@media(max-width:1100px){.dashboardCommentsModal__actions{flex-wrap:wrap}.dashboardCommentsDateRange{order:2}}
         .ops-strip{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:10px;margin:0 0 18px}.ops-chip{background:#fff;border:1px solid var(--line-mid);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;min-height:68px}.ops-chip__dot{width:12px;height:12px;border-radius:50%;background:#94a3b8;box-shadow:0 0 0 5px rgba(148,163,184,.12)}.ops-chip.is-ok .ops-chip__dot{background:#0f9f6e;box-shadow:0 0 0 5px rgba(15,159,110,.12)}.ops-chip.is-warn .ops-chip__dot{background:#e28a00;box-shadow:0 0 0 5px rgba(226,138,0,.12)}.ops-chip.is-danger .ops-chip__dot{background:#ef3b30;box-shadow:0 0 0 5px rgba(239,59,48,.12)}.ops-chip span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--text-mut)}.ops-chip b{display:block;margin-top:2px;color:var(--petrol);font-size:15px}.analytics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:18px}.analytics-card{background:#fff;border:1px solid var(--line-mid);border-top:3px solid var(--petrol);border-radius:16px;padding:16px;min-width:0}.analytics-card--wide{grid-column:1/-1}.analytics-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}.analytics-card__head h3{font-family:var(--font-head);font-size:19px;margin:0;color:var(--text)}.analytics-card__head p{font-size:11px;color:var(--text-mut);margin:3px 0 0}.analytics-card__badge{font-size:10px;border:1px solid var(--line-mid);border-radius:999px;padding:5px 9px;color:var(--petrol);white-space:nowrap}.analytics-canvas{height:260px;position:relative}.analytics-canvas--small{height:220px}.heatmap-wrap{overflow:auto}.heatmap{display:grid;grid-template-columns:76px repeat(24,minmax(30px,1fr));gap:4px;min-width:940px}.heatmap__head,.heatmap__day,.heatmap__cell{height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:10px}.heatmap__head{color:var(--text-mut)}.heatmap__day{justify-content:flex-start;font-weight:700;color:var(--petrol)}.heatmap__cell{background:rgba(26,77,92,var(--heat,.04));color:transparent;cursor:default}.heatmap__cell:hover{outline:2px solid var(--petrol);color:var(--text);background:#fff}.inst-list{display:flex;flex-direction:column;gap:9px}.inst-row{display:grid;grid-template-columns:90px 1fr 70px 70px;gap:8px;align-items:center;font-size:12px}.inst-row__track{height:9px;border-radius:999px;background:#eaf0f3;overflow:hidden}.inst-row__fill{height:100%;border-radius:999px;background:var(--petrol)}.inst-row b{color:var(--petrol)}.coverage{display:grid;grid-template-columns:170px 1fr;gap:18px;align-items:center}.coverage__ring{width:140px;height:140px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) var(--coverage),#e8eef1 0);position:relative}.coverage__ring:after{content:"";position:absolute;inset:20px;background:#fff;border-radius:50%}.coverage__ring strong{position:relative;z-index:1;font-size:28px;color:var(--green-tx)}.coverage__stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.coverage__stat{border:1px solid var(--line);border-radius:12px;padding:12px}.coverage__stat span{display:block;font-size:10px;text-transform:uppercase;color:var(--text-mut)}.coverage__stat b{font-size:21px;color:var(--petrol)}.pending-table{width:100%;border-collapse:collapse}.pending-table th,.pending-table td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:12px}.pending-table th{font-size:10px;text-transform:uppercase;color:var(--text-mut)}.priority-pill{display:inline-flex;padding:4px 8px;border-radius:999px;background:#eef5f7;color:var(--petrol);font-size:10px}.priority-pill.is-high{background:#fff0ef;color:#c72f26}.attention-box{display:flex;align-items:center;justify-content:space-between;gap:14px;background:linear-gradient(135deg,#fff,#f7fbfc);border:1px solid var(--line-mid);border-left:4px solid var(--amber);border-radius:14px;padding:14px 16px;margin-bottom:18px}.attention-box h3{margin:0;font-family:var(--font-head);color:var(--petrol);font-size:18px}.attention-box p{margin:3px 0 0;color:var(--text-soft);font-size:12px}.attention-box a{white-space:nowrap}.view-density-hint{font-size:11px;color:var(--text-mut);margin-top:8px}@media(max-width:1200px){.ops-strip{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.analytics-grid{grid-template-columns:1fr}.analytics-card--wide{grid-column:auto}.coverage{grid-template-columns:1fr}.ops-strip{grid-template-columns:repeat(2,1fr)}}
+.dashboard-chart-totals{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.dashboard-chart-totals>span{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line-mid);border-radius:8px;background:var(--surface,#fff);font-size:12px;color:var(--text)}.dashboard-chart-totals .dashboard-chart-total{margin-left:auto;font-weight:700}.dashboard-chart-check{font-size:11px;line-height:1.5;color:var(--text-mut);margin:8px 0 0}.dashboard-chart-check.is-warning{padding:9px 11px;border-left:3px solid var(--amber);background:var(--amber-bg,#fff7e6);color:var(--text)}@media(max-width:600px){.dashboard-chart-totals .dashboard-chart-total{margin-left:0}}
   </style>
 </head>
 <body>
@@ -395,22 +401,22 @@ if($reportReady){
     <?php if ($stats['ok']): ?>
     <section class="stats stats--dashboard">
       <div class="stat">
-        <div class="stat__label">Alarmas 24h indexadas</div>
+        <div class="stat__label">Eventos de alarmas · 24 h</div>
         <div class="stat__value"><?php echo fmt_num($stats['total24h']); ?></div>
         <div class="stat__detail">Total de eventos registrados en las últimas 24 horas.</div>
       </div>
       <div class="stat">
-        <div class="stat__label">Críticas (alta prioridad)</div>
+        <div class="stat__label">Críticas · 24 h (alta prioridad)</div>
         <div class="stat__value is-red"><?php echo fmt_num($stats['criticas']); ?></div>
-        <div class="stat__detail">Requieren atención prioritaria del operador.</div>
+        <div class="stat__detail">Eventos de alta prioridad de las últimas 24 horas. Coinciden con la serie Alta.</div>
       </div>
       <div class="stat">
-        <div class="stat__label">Activas</div>
+        <div class="stat__label">Alarmas vigentes · stock actual</div>
         <div class="stat__value is-amber"><?php echo fmt_num($stats['activas']); ?></div>
-        <div class="stat__detail">Alarmas actualmente vigentes en planta.</div>
+        <div class="stat__detail">Condiciones vigentes, aunque se hayan activado antes de las últimas 24 horas.</div>
       </div>
       <div class="stat">
-        <div class="stat__label">Reconocidas</div>
+        <div class="stat__label">Reconocidas · registro disponible</div>
         <div class="stat__value is-green with-icon"><?php echo icon('check'); ?><?php echo fmt_num($stats['reconocidas']); ?></div>
         <div class="stat__detail"><span class="muted">Suprimidas 24h:</span> <b><?php echo fmt_num($stats['suprimidas']); ?></b></div>
       </div>
@@ -440,8 +446,8 @@ if($reportReady){
 
     <div class="sectitle"><span>Análisis operativo</span><div class="rule"></div></div>
     <section class="analytics-grid">
-      <article class="analytics-card"><div class="analytics-card__head"><div><h3>Alarmas por hora</h3><p>Distribución de criticidad durante las últimas 24 horas.</p></div><span class="analytics-card__badge">24 horas</span></div><div class="analytics-canvas"><canvas id="hourlyChart"></canvas></div></article>
-      <article class="analytics-card"><div class="analytics-card__head"><div><h3>Activadas vs normalizadas</h3><p>Permite detectar acumulación de condiciones anormales.</p></div><span class="analytics-card__badge">Flujo horario</span></div><div class="analytics-canvas"><canvas id="flowChart"></canvas></div></article>
+      <article class="analytics-card"><div class="analytics-card__head"><div><h3>Alarmas por hora</h3><p>Eventos de las últimas 24 horas, agrupados por hora del día. Alta corresponde a Críticas 24 h.</p></div><span class="analytics-card__badge">24 horas</span></div><div class="analytics-canvas"><canvas id="hourlyChart"></canvas></div><?php echo dsi_chart_summary_html($hourlySummary, 'hourly'); ?></article>
+      <article class="analytics-card"><div class="analytics-card__head"><div><h3>Eventos activados vs normalizados · 24 h</h3><p>Eventos del período; no representa el stock de alarmas vigentes.</p></div><span class="analytics-card__badge">24 horas</span></div><div class="analytics-canvas"><canvas id="flowChart"></canvas></div><?php echo dsi_chart_summary_html($flowSummary, 'flow'); ?></article>
       <article class="analytics-card analytics-card--wide"><div class="analytics-card__head"><div><h3>Pareto de alarmas</h3><p>Barras por TAG y porcentaje acumulado para localizar el 80 % del problema.</p></div><span class="analytics-card__badge">Top 20</span></div><div class="analytics-canvas"><canvas id="paretoChart"></canvas></div></article>
       <article class="analytics-card analytics-card--wide"><div class="analytics-card__head"><div><h3>Mapa de calor semanal</h3><p>Intensidad de alarmas por día y hora.</p></div><span class="analytics-card__badge">7 días × 24 h</span></div><div class="heatmap-wrap"><div class="heatmap" id="alarmHeatmap"></div></div></article>
       <article class="analytics-card"><div class="analytics-card__head"><div><h3>Alarmas por instalación</h3><p>Volumen total y cantidad crítica por prefijo de TAG.</p></div><span class="analytics-card__badge">Ranking</span></div><div class="inst-list" id="installationRanking"></div></article>
@@ -617,7 +623,7 @@ if($reportReady){
   function hours(rows){var out=[];for(var h=0;h<24;h++){var f=rows.find(function(r){return Number(r.hour)===h;})||{};out.push(f);}return out;}
   function baseOptions(){return {responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{grid:{display:false},ticks:{maxRotation:0}},y:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}}}};}
   if(window.Chart){
-    var h=hours(hourly),hc=document.getElementById('hourlyChart'); if(hc)new Chart(hc,{type:'bar',data:{labels:h.map(function(_,i){return String(i).padStart(2,'0')+'h';}),datasets:[{label:'Alta',data:h.map(function(r){return Number(r.high||0);}),backgroundColor:'rgba(239,59,48,.75)'},{label:'Media',data:h.map(function(r){return Number(r.medium||0);}),backgroundColor:'rgba(226,138,0,.75)'},{label:'Baja',data:h.map(function(r){return Number(r.low||0);}),backgroundColor:'rgba(15,159,110,.72)'}]},options:Object.assign(baseOptions(),{scales:{x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:12}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}}}})});
+    var h=hours(hourly),hc=document.getElementById('hourlyChart'); if(hc)new Chart(hc,{type:'bar',data:{labels:h.map(function(_,i){return String(i).padStart(2,'0')+'h';}),datasets:[{label:'Alta',data:h.map(function(r){return Number(r.high||0);}),backgroundColor:'rgba(239,59,48,.75)'},{label:'Media',data:h.map(function(r){return Number(r.medium||0);}),backgroundColor:'rgba(226,138,0,.75)'},{label:'Baja y otras',data:h.map(function(r){return Number(r.low||0);}),backgroundColor:'rgba(15,159,110,.72)'}]},options:Object.assign(baseOptions(),{scales:{x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:12}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}}}})});
     var fl=hours(flow),fc=document.getElementById('flowChart'); if(fc)new Chart(fc,{type:'line',data:{labels:fl.map(function(_,i){return String(i).padStart(2,'0')+'h';}),datasets:[{label:'Activadas',data:fl.map(function(r){return Number(r.active||0);}),borderColor:'#ef3b30',backgroundColor:'rgba(239,59,48,.08)',fill:true,tension:.25},{label:'Normalizadas',data:fl.map(function(r){return Number(r.normalized||0);}),borderColor:'#0f9f6e',backgroundColor:'rgba(15,159,110,.06)',fill:true,tension:.25}]},options:baseOptions()});
     var pc=document.getElementById('paretoChart'); if(pc)new Chart(pc,{data:{labels:pareto.map(function(r){return r.tag;}),datasets:[{type:'bar',label:'Alarmas',data:pareto.map(function(r){return Number(r.value||0);}),backgroundColor:'rgba(26,77,92,.78)',yAxisID:'y'},{type:'line',label:'Acumulado %',data:pareto.map(function(r){return Number(r.cum||0);}),borderColor:'#e28a00',backgroundColor:'#e28a00',tension:.2,yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{ticks:{maxRotation:55,minRotation:35}},y:{beginAtZero:true,grid:{color:'rgba(26,77,92,.08)'}},y1:{position:'right',min:0,max:100,ticks:{callback:function(v){return v+'%';}},grid:{drawOnChartArea:false}}}}});
   }
