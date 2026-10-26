@@ -2,9 +2,11 @@ USE [LC_MDB];
 GO
 
 /*
-  3Sigma TECSS - caché diaria de bajo impacto
+  3Sigma TECSS - caché cada 4 horas
   La pantalla web nunca consulta RTQP ni recorre la tabla histórica.
-  Esta caché contiene como máximo una fila por POZO y se actualiza a las 06:00.
+  Esta caché contiene como máximo una fila por POZO.
+  Horarios del servidor: 03:00, 07:00, 11:00, 15:00, 19:00 y 23:00.
+  Las 03:00 mantienen la cadencia nocturna tomando las 07:00 como referencia.
   La actualización lee únicamente la última captura de la tabla histórica.
 */
 SET NOCOUNT ON;
@@ -112,7 +114,7 @@ BEGIN
 
     /*
       El índice permite ubicar la última captura sin recorrer el histórico.
-      ROW_NUMBER se aplica solo a esa captura diaria. Después se actualiza la
+      ROW_NUMBER se aplica solo a esa última captura. Después se actualiza la
       caché por POZO si HOY es más reciente, conservando el último valor ya
       conocido de los pozos que no vinieron en la captura actual.
     */
@@ -208,17 +210,18 @@ BEGIN
 END;
 GO
 
-/* Primera carga: deja la pantalla operativa sin esperar al día siguiente. */
+/* Primera carga: deja la pantalla operativa sin esperar al próximo horario. */
 EXEC [dbo].[SP_TECSS_ACTUALIZAR_3SIGMA_CACHE];
 GO
 
 USE [msdb];
 GO
 
+/* Se conservan los nombres existentes para actualizar el mismo job y horario. */
 DECLARE @JobName sysname = N'CLEAR - Histórico TECSS diario 06hs';
 DECLARE @StepName sysname = N'Guardar histórico TECSS';
 DECLARE @ScheduleName sysname = N'CLEAR - TECSS todos los días 06hs';
-DECLARE @Description nvarchar(512) = N'Guarda el histórico TECSS y actualiza la caché 3Sigma una vez al día a las 06:00.';
+DECLARE @Description nvarchar(512) = N'Guarda el histórico TECSS y actualiza la caché 3Sigma cada 4 horas: 03, 07, 11, 15, 19 y 23 h (hora del servidor).';
 DECLARE @JobId uniqueidentifier;
 DECLARE @StepId int;
 DECLARE @FechaInicio int = CONVERT(int, CONVERT(char(8), GETDATE(), 112));
@@ -283,10 +286,11 @@ BEGIN
         @enabled=1,
         @freq_type=4,
         @freq_interval=1,
-        @freq_subday_type=1,
-        @freq_subday_interval=0,
+        @freq_subday_type=8,
+        @freq_subday_interval=4,
         @active_start_date=@FechaInicio,
-        @active_start_time=060000;
+        @active_start_time=030000,
+        @active_end_time=235959;
 END
 ELSE
 BEGIN
@@ -295,10 +299,11 @@ BEGIN
         @enabled=1,
         @freq_type=4,
         @freq_interval=1,
-        @freq_subday_type=1,
-        @freq_subday_interval=0,
+        @freq_subday_type=8,
+        @freq_subday_interval=4,
         @active_start_date=@FechaInicio,
-        @active_start_time=060000;
+        @active_start_time=030000,
+        @active_end_time=235959;
 END;
 
 IF NOT EXISTS
@@ -313,5 +318,5 @@ IF NOT EXISTS
 IF NOT EXISTS (SELECT 1 FROM dbo.sysjobservers WHERE job_id=@JobId)
     EXEC dbo.sp_add_jobserver @job_id=@JobId, @server_name=N'(LOCAL)';
 
-PRINT N'3Sigma TECSS instalado. Caché local actualizada y Job diario configurado a las 06:00.';
+PRINT N'3Sigma TECSS instalado. Caché local actualizada y job cada 4 horas: 03, 07, 11, 15, 19 y 23 h (hora del servidor).';
 GO

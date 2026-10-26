@@ -131,7 +131,7 @@ function sigma_header_filter($column, array $spec, array $filters, array $option
         <?php include __DIR__ . '/includes/topbar.php'; ?>
         <section class="sigma-page">
             <header class="sigma-head">
-                <div><div class="sigma-eyebrow">Telemetría de Pozos</div><h1>3Sigma TECSS</h1><p>Último valor registrado por pozo · fuente SQL local</p></div>
+                <div><div class="sigma-eyebrow">Telemetría de Pozos</div><h1>3Sigma TECSS</h1><p>Último valor registrado por pozo · fuente SQL local · captura cada 4 horas: 03, 07, 11, 15, 19 y 23 h</p></div>
                 <div class="sigma-source"><span class="sigma-source__dot"></span>Caché: <?php echo h(sigma_date($summary['ULTIMA_CACHE'] ?? null)); ?></div>
             </header>
 
@@ -145,9 +145,9 @@ function sigma_header_filter($column, array $spec, array $filters, array $option
                     <a class="sigma-btn" href="tecss_3sigma.php">Limpiar filtros</a>
 	                    <a class="sigma-btn" href="<?php echo h(sigma_export_url()); ?>"><?php echo icon('download'); ?> Exportar Excel</a>
 	                    <?php if($reportEnabled): ?><button class="sigma-btn" type="button" data-ns-report-open>Ver reporte <span data-ns-report-count class="nsReportCount" hidden>0</span></button><?php endif; ?>
-                    <button class="sigma-btn" id="sigmaRefresh" type="button">Actualizar</button>
+                    <button class="sigma-btn" id="sigmaRefresh" type="button" title="Vuelve a consultar la caché local; no ejecuta la captura ni actualiza la caché SQL">Recargar vista</button>
                     <label class="sigma-page-size"><span>FILAS</span><select name="filas" id="sigmaPageSize"><option value="50"<?php echo $pageSize===50?' selected':''; ?>>50</option><option value="100"<?php echo $pageSize===100?' selected':''; ?>>100</option></select></label>
-                    <select class="sigma-interval" id="sigmaInterval" aria-label="Actualización automática"><option value="60">Cada 1 minuto</option><option value="300">Cada 5 minutos</option><option value="600">Cada 10 minutos</option><option value="0">Sin actualizar</option></select>
+                    <select class="sigma-interval" id="sigmaInterval" aria-label="Recarga automática de la vista" title="Intervalo de recarga de la vista; la captura SQL tiene su propio horario"><option value="60">Recargar cada 1 minuto</option><option value="300">Recargar cada 5 minutos</option><option value="600">Recargar cada 10 minutos</option><option value="0">Sin recarga automática</option></select>
                     <div class="sigma-columns"><button class="sigma-btn" id="sigmaColumnsBtn" type="button">Columnas ▾</button><div class="sigma-columns-menu" id="sigmaColumnsMenu"></div></div>
                     <span class="sigma-count">Mostrando <?php echo count($rows); ?> de <?php echo number_format($totalFiltered,0,',','.'); ?> visibles</span>
                 </div>
@@ -159,7 +159,7 @@ function sigma_header_filter($column, array $spec, array $filters, array $option
                     <article class="sigma-kpi sigma-kpi--danger"><span class="sigma-kpi__icon"><?php echo icon('chart'); ?></span><div><strong><?php echo h(sigma_number($summary['MAX_EXCESOS'],0)); ?></strong><span>Mayor CONT_EXCESOS</span></div></article>
                 </div>
 
-                <div class="sigma-meta"><span>Consulta local: <?php echo h($queryMs); ?> ms</span><span>Una fila por pozo</span><span>Orden: excesos de mayor a menor</span></div>
+                <div class="sigma-meta"><span>Consulta local: <?php echo h($queryMs); ?> ms</span><span>Una fila por pozo</span><span>Orden: excesos de mayor a menor</span><span>HOY: fecha del dato histórico · Caché: última actualización registrada</span></div>
 
                 <div class="sigma-table-wrap">
 	                    <table class="sigma-table<?php echo $reportEnabled?' has-report':''; ?>" id="sigmaTable">
