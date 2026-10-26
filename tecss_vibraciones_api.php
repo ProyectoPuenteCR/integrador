@@ -3,9 +3,12 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/tecss_vibraciones_query.php';
+require_once __DIR__ . '/includes/tecss_vibraciones_pi.php';
 
 auth_require();
 permissions_require_menu('tecss_vibraciones');
+$cfg = require __DIR__ . '/config.php';
+date_default_timezone_set($cfg['app']['tz'] ?? 'America/Argentina/Buenos_Aires');
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
@@ -112,6 +115,7 @@ tecss_vib_api_reply(true, [
     'state' => $state,
     'series' => $series,
     'events' => $events,
+    'pi' => tecss_vib_pi_detail($db, $well, $from->format('Y-m-d H:i:s'), $endExclusive),
     'series_limit' => 5000,
     'event_limit' => 200,
 ]);

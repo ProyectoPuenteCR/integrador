@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/tecss_vibraciones_query.php';
+require_once __DIR__ . '/includes/tecss_vibraciones_pi.php';
 require_once __DIR__ . '/includes/alarm_event_comments.php';
 
 auth_require();
@@ -25,6 +26,10 @@ $rows = $db->all(
     $params
 );
 
+$piSync = tecss_vib_pi_sync($db);
+$piOverview = [];
+try { $piOverview = tecss_vib_pi_overview($db, array_column($rows, 'POZO'), $piSync); }
+catch (Throwable $e) { $piSync = ['available'=>false]; }
 $commentMap = [];
 if (permissions_can('comments.view') && $rows) {
     $subjects = [];
@@ -45,7 +50,7 @@ function tecss_vib_export_safe($value)
 }
 
 $columns = [
-    'POZO','BATERIA','ESTADO','ULTIMO DATO','VIBR ACTUAL','GPM ACTUAL','MEDIANA','P25','P75',
+    'POZO','BATERIA','ESTADO CLEAR','3SIGMA PI','ULTIMO EVENTO PI','SINCRONIZACION PI','ULTIMO DATO','VIBR ACTUAL','GPM ACTUAL','MEDIANA','P25','P75',
     'UMBRAL ALERTA','UMBRAL CRITICO','FRECUENCIA MIN','REGISTROS','ALERTAS 48H',
     'EXCESOS 48H','SEVERIDAD','EXCESO PROMEDIO %','EXCESO MAXIMO %','ULTIMA ALERTA',
     'ULTIMA CRITICA','FECHA ANALISIS','COMENTARIO'
@@ -63,7 +68,10 @@ foreach ($rows as $row) {
     $commentRow = $subject !== '' ? ($commentMap[strtoupper($subject)] ?? []) : [];
     $comment = trim((string)($commentRow['COMENTARIO'] ?? $commentRow['comentario'] ?? ''));
     $values = [
-        $well, $row['BATERIA'] ?? '', $row['ESTADO_ETIQUETA'] ?? '', tecss_vib_date($row['FECHA_ULTIMO_DATO'] ?? null),
+        $well, $row['BATERIA'] ?? '', $row['ESTADO_ETIQUETA'] ?? '',
+        tecss_vib_pi_label($piSync, $piOverview[$well] ?? []),
+        tecss_vib_date($piOverview[$well]['ULTIMO_EVENTO'] ?? null), tecss_vib_date($piSync['synced_at'] ?? null),
+        tecss_vib_date($row['FECHA_ULTIMO_DATO'] ?? null),
         $row['VIBR_ACTUAL'] ?? '', $row['GPM_ACTUAL'] ?? '', $row['VIBR_MEDIANA'] ?? '', $row['VIBR_P25'] ?? '', $row['VIBR_P75'] ?? '',
         $row['UMBRAL_ALERTA'] ?? '', $row['UMBRAL_CRITICO'] ?? '', $row['FRECUENCIA_MEDIANA_MIN'] ?? '', $row['N_REGISTROS'] ?? '',
         $row['ALERTAS_48H'] ?? '', $row['EXCESOS_48H'] ?? '', $row['SCORE_SEVERIDAD'] ?? '', $row['EXCESO_PROMEDIO_PCT'] ?? '',

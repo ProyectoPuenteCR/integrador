@@ -1,0 +1,8 @@
+{
+  "base": "https://10.17.40.37/piwebapi",
+  "af_path": "\\\\SWPCRDLHSCD51\\IUP",
+  "template": "3Sigma_Superado",
+  "auth_env": "CLEAR_PI_AUTH",
+  "ca_bundle": "COMPLETAR_RUTA_CERTIFICADO_CA",
+  "days": 90
+}

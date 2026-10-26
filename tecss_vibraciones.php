@@ -4,6 +4,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/icons.php';
 require_once __DIR__ . '/includes/tecss_vibraciones_query.php';
+require_once __DIR__ . '/includes/tecss_vibraciones_pi.php';
 require_once __DIR__ . '/includes/alarm_actions.php';
 require_once __DIR__ . '/includes/novedades_semanales_common.php';
 
@@ -84,6 +85,10 @@ if (!$db->ok()) {
     elseif ($db->error()) $error = $db->error();
 }
 
+$piSync = tecss_vib_pi_sync($db);
+$piOverview = [];
+try { $piOverview = tecss_vib_pi_overview($db, array_column($rows, 'POZO'), $piSync); }
+catch (Throwable $e) { $piSync = ['available'=>false, 'reason'=>'Error al consultar PI']; }
 $canViewComments = permissions_can('comments.view');
 $commentMap = [];
 if ($canViewComments && $rows) {
@@ -120,7 +125,7 @@ $sortMark = static function ($column) use ($sort) {
     <link rel="stylesheet" href="assets/css/app.css?v=20260903-vibraciones-1">
     <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260903-vibraciones-1">
     <link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260903-vibraciones-1">
-    <link rel="stylesheet" href="assets/css/tecss_vibraciones.css?v=20260903-vibraciones-3">
+    <link rel="stylesheet" href="assets/css/tecss_vibraciones.css?v=20261026-pi-1">
 </head>
 <body>
 <div class="app">
@@ -132,7 +137,7 @@ $sortMark = static function ($column) use ($sort) {
                 <div>
                     <div class="vib-eyebrow">Telemetría de Pozos · Procesamiento estadístico</div>
                     <h1>Análisis de Vibraciones TECSS</h1>
-                    <p>Vibración y golpes por minuto, con umbrales individuales y detección sostenida por pozo.</p>
+                    <p>Dos análisis: eventos 3Sigma de PI y detección estadística de CLEAR.</p>
                 </div>
                 <div class="vib-source <?php echo strtolower((string)($lastRun['ESTADO'] ?? '')) === 'error' ? 'is-error' : ''; ?>">
                     <span></span>
@@ -174,6 +179,8 @@ $sortMark = static function ($column) use ($sort) {
             </form>
 
             <div class="vib-meta">
+                <span>PI: <b><?php echo h(empty($piSync['available']) ? ($piSync['reason'] ?? 'Sin sincronizar') : ((!empty($piSync['stale']) ? 'Pendiente de actualizar · ' : 'Sincronizado · ') . tecss_vib_date($piSync['synced_at']))); ?></b></span>
+                <span>Los indicadores y el filtro de estado corresponden al análisis estadístico CLEAR.</span>
                 <span>Análisis: <b><?php echo h(tecss_vib_date($summary['ULTIMO_ANALISIS'] ?? null)); ?></b></span>
                 <span>Consulta local: <b><?php echo h($queryMs); ?> ms</b></span>
                 <span>Mostrando <b><?php echo count($rows); ?></b> de <b><?php echo number_format($totalFiltered, 0, ',', '.'); ?></b></span>
@@ -188,7 +195,9 @@ $sortMark = static function ($column) use ($sort) {
                         <th data-column="DETALLE" data-report-exclude="1">TENDENCIA</th>
                         <th data-column="POZO" data-report-label="POZO"><a class="vib-sort" draggable="false" href="<?php echo h($sortUrl('pozo')); ?>">POZO <span><?php echo h($sortMark('pozo')); ?></span></a></th>
                         <th data-column="BATERIA" data-report-label="BATERÍA"><a class="vib-sort" draggable="false" href="<?php echo h($sortUrl('bateria')); ?>">BATERÍA <span><?php echo h($sortMark('bateria')); ?></span></a></th>
-                        <th data-column="ESTADO" data-report-label="ESTADO"><a class="vib-sort" draggable="false" href="<?php echo h($sortUrl('estado')); ?>">ESTADO <span><?php echo h($sortMark('estado')); ?></span></a></th>
+                        <th data-column="ESTADO" data-report-label="ESTADO CLEAR"><a class="vib-sort" draggable="false" href="<?php echo h($sortUrl('estado')); ?>">ESTADO CLEAR <span><?php echo h($sortMark('estado')); ?></span></a></th>
+                        <th data-column="PI_ESTADO" data-report-label="3SIGMA PI">3SIGMA PI</th>
+                        <th data-column="PI_ULTIMO" data-report-label="ÚLTIMO EVENTO PI">ÚLTIMO EVENTO PI</th>
                         <th data-column="FECHA_ULTIMO_DATO" data-report-label="ÚLTIMO DATO">ÚLTIMO DATO</th>
                         <th data-column="VIBR_ACTUAL" data-report-label="VIBR ACTUAL">VIBR ACTUAL</th>
                         <th data-column="GPM_ACTUAL" data-report-label="GPM ACTUAL">GPM ACTUAL</th>
@@ -207,6 +216,8 @@ $sortMark = static function ($column) use ($sort) {
                         <th data-column="POZO"><input type="search" id="vibGridPozo" value="<?php echo h($filters['pozo']); ?>" placeholder="Filtrar pozo…" aria-label="Filtrar por pozo"></th>
                         <th data-column="BATERIA"><select id="vibGridBateria" aria-label="Filtrar por batería"><option value="">Todas</option><?php foreach ($batteryOptions as $battery): ?><option value="<?php echo h($battery); ?>"<?php echo $filters['bateria'] === $battery ? ' selected' : ''; ?>><?php echo h($battery); ?></option><?php endforeach; ?></select></th>
                         <th data-column="ESTADO"><select id="vibGridEstado" aria-label="Filtrar por estado"><option value="">Todos</option><?php foreach ($stateLabels as $stateKey => $stateLabel): ?><option value="<?php echo h($stateKey); ?>"<?php echo $filters['estado'] === $stateKey ? ' selected' : ''; ?>><?php echo h($stateLabel); ?></option><?php endforeach; ?></select></th>
+                        <th data-column="PI_ESTADO"></th>
+                        <th data-column="PI_ULTIMO"></th>
                         <th data-column="FECHA_ULTIMO_DATO"></th>
                         <th data-column="VIBR_ACTUAL"></th>
                         <th data-column="GPM_ACTUAL"></th>
@@ -222,11 +233,13 @@ $sortMark = static function ($column) use ($sort) {
                     </thead>
                     <tbody>
                     <?php if (!$rows): ?>
-                        <tr><td class="vib-empty" colspan="<?php echo 15 + ($reportEnabled ? 1 : 0); ?>">No hay registros para los filtros seleccionados.</td></tr>
+                        <tr><td class="vib-empty" colspan="<?php echo 18 + ($reportEnabled ? 1 : 0); ?>">No hay registros para los filtros seleccionados.</td></tr>
                     <?php else: foreach ($rows as $row):
                         $well = tecss_vib_text($row['POZO'] ?? '');
                         $battery = tecss_vib_text($row['BATERIA'] ?? '');
                         $state = strtolower(tecss_vib_text($row['ESTADO'] ?? 'normal'));
+                        $piRow = $piOverview[$well] ?? [];
+                        $piLabel = tecss_vib_pi_label($piSync, $piRow);
                         $commentSubject = clear_alarm_comment_subject($well, 'pozo');
                         $commentRow = $commentSubject !== '' ? ($commentMap[strtoupper($commentSubject)] ?? []) : [];
                         $comment = trim((string)($commentRow['COMENTARIO'] ?? $commentRow['comentario'] ?? ''));
@@ -237,6 +250,8 @@ $sortMark = static function ($column) use ($sort) {
                             <td data-column="POZO" data-raw="<?php echo h($well); ?>"><b class="vib-well"><?php echo h($well); ?></b></td>
                             <td data-column="BATERIA" data-raw="<?php echo h($battery); ?>"><?php echo $battery !== '' ? h($battery) : '<span class="vib-muted">Sin batería</span>'; ?></td>
                             <td data-column="ESTADO" data-raw="<?php echo h($stateLabels[$state] ?? $state); ?>"><span class="vib-status is-<?php echo h($state); ?>"><i></i><?php echo h($stateLabels[$state] ?? $state); ?></span></td>
+                            <td data-column="PI_ESTADO" data-raw="<?php echo h($piLabel); ?>"><b class="vib-pi-label"><?php echo h($piLabel); ?></b></td>
+                            <td data-column="PI_ULTIMO" data-raw="<?php echo h(tecss_vib_text($piRow['ULTIMO_EVENTO'] ?? '')); ?>"><?php echo h(tecss_vib_date($piRow['ULTIMO_EVENTO'] ?? null)); ?></td>
                             <td data-column="FECHA_ULTIMO_DATO" data-raw="<?php echo h(tecss_vib_text($row['FECHA_ULTIMO_DATO'] ?? '')); ?>"><?php echo h(tecss_vib_date($row['FECHA_ULTIMO_DATO'] ?? null)); ?></td>
                             <td data-column="VIBR_ACTUAL" data-raw="<?php echo h(tecss_vib_text($row['VIBR_ACTUAL'] ?? '')); ?>" class="is-number"><b><?php echo h(tecss_vib_number($row['VIBR_ACTUAL'] ?? null, 1)); ?></b></td>
                             <td data-column="GPM_ACTUAL" data-raw="<?php echo h(tecss_vib_text($row['GPM_ACTUAL'] ?? '')); ?>" class="is-number"><?php echo h(tecss_vib_number($row['GPM_ACTUAL'] ?? null, 1)); ?></td>
@@ -262,9 +277,11 @@ $sortMark = static function ($column) use ($sort) {
 <div class="vib-modal" id="vibModal" aria-hidden="true">
     <div class="vib-modal__backdrop" data-vib-close></div>
     <section class="vib-modal__panel" role="dialog" aria-modal="true" aria-labelledby="vibModalTitle">
-        <header><div><div class="vib-eyebrow">Detalle estadístico</div><h2 id="vibModalTitle">Tendencia del pozo</h2><p id="vibModalState"></p></div><button type="button" data-vib-close aria-label="Cerrar">×</button></header>
+        <header><div><div class="vib-eyebrow">3Sigma PI y estadístico CLEAR</div><h2 id="vibModalTitle">Tendencia del pozo</h2><p id="vibModalState"></p></div><button type="button" data-vib-close aria-label="Cerrar">×</button></header>
         <form class="vib-modal__filters" id="vibDetailForm"><input type="hidden" id="vibDetailWell"><label><span>DESDE</span><input type="date" id="vibDetailFrom" required></label><label><span>HASTA</span><input type="date" id="vibDetailTo" required></label><button class="vib-btn is-primary" type="submit">Aplicar</button></form>
         <div class="vib-modal__status" id="vibDetailStatus"></div>
+        <section class="vib-pi-panel" aria-label="Eventos 3Sigma PI"><h3>3Sigma PI · eventos que activan notificaciones</h3><p id="vibPiStatus" role="status"></p><div id="vibPiEvents"></div></section>
+        <h3 class="vib-section-title">Análisis estadístico CLEAR</h3>
         <div class="vib-modal__metrics" id="vibDetailMetrics"></div>
         <article class="vib-modal__chart-card nsCard" id="vibChartCard">
             <div class="vib-chart-actions">
@@ -280,7 +297,7 @@ $sortMark = static function ($column) use ($sort) {
             </div>
             <div class="vib-modal__chart"><canvas id="vibDetailChart"></canvas><div class="vib-modal__empty" id="vibDetailEmpty">No hay datos en el período seleccionado.</div></div>
         </article>
-        <div class="vib-modal__events"><h3>Alertas y picos detectados</h3><div id="vibDetailEvents"></div></div>
+        <div class="vib-modal__events"><h3>Alertas y picos estadísticos CLEAR</h3><div id="vibDetailEvents"></div></div>
     </section>
 </div>
 
@@ -288,7 +305,7 @@ $sortMark = static function ($column) use ($sort) {
 <script src="assets/js/app.js?v=20260903-vibraciones-1"></script>
 <script src="assets/js/chart.umd.js"></script>
 <script src="assets/js/alarm_actions.js?v=20260903-vibraciones-1"></script>
-<script src="assets/js/tecss_vibraciones.js?v=20260903-vibraciones-3"></script>
+<script src="assets/js/tecss_vibraciones.js?v=20261026-pi-1"></script>
 <?php if ($reportEnabled): ?><script>window.CLEAR_WEEKLY_NEWS={};</script><script src="assets/js/novedades_semanales.js?v=20260903-vibraciones-1"></script><?php endif; ?>
 </body>
 </html>

@@ -1,0 +1,37 @@
+USE [LC_MDB];
+GO
+-- Instalación manual. No modifica el análisis estadístico, PI ni sus notificaciones.
+SET XACT_ABORT ON;
+GO
+IF OBJECT_ID(N'dbo.CLEAR_TECSS_VIBRACIONES_PI_EVENTO', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CLEAR_TECSS_VIBRACIONES_PI_EVENTO (
+        WEBID varchar(512) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+        POZO nvarchar(255) NOT NULL,
+        NOMBRE nvarchar(512) NOT NULL,
+        INICIO datetime2(3) NOT NULL,
+        FIN datetime2(3) NULL,
+        VIBR_INICIO float NULL,
+        UMBRAL_INICIO float NULL,
+        ENVIO_REGISTRADO datetime2(3) NULL,
+        ANOTACIONES_LEIDAS bit NOT NULL,
+        FECHA_SYNC datetime2(3) NOT NULL
+    );
+    CREATE INDEX IX_CLEAR_TECSS_VIB_PI_POZO
+        ON dbo.CLEAR_TECSS_VIBRACIONES_PI_EVENTO(POZO, INICIO DESC)
+        INCLUDE(FIN, UMBRAL_INICIO, ENVIO_REGISTRADO);
+END;
+GO
+IF OBJECT_ID(N'dbo.CLEAR_TECSS_VIBRACIONES_PI_SYNC', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CLEAR_TECSS_VIBRACIONES_PI_SYNC (
+        ID int NOT NULL PRIMARY KEY CHECK(ID=1),
+        FUENTE nvarchar(1024) NOT NULL,
+        DESDE datetime2(3) NOT NULL,
+        HASTA datetime2(3) NOT NULL,
+        ULTIMO_OK datetime2(3) NOT NULL,
+        ULTIMO_INTENTO datetime2(3) NOT NULL,
+        ULTIMO_ERROR bit NOT NULL DEFAULT 0
+    );
+END;
+GO
