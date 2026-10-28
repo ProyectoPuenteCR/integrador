@@ -4,6 +4,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/tecss_3sigma_events.php';
 require_once __DIR__ . '/includes/tecss_3sigma_trend.php';
+require_once __DIR__ . '/includes/tecss_3sigma_range.php';
 
 auth_require();
 permissions_require_menu('tecss_3sigma');
@@ -23,15 +24,9 @@ $well=trim((string)($_GET['pozo']??''));
 $startText=trim((string)($_GET['desde']??''));
 $endText=trim((string)($_GET['hasta']??''));
 if($well===''||strlen($well)>255)sigma_history_reply(false,['error'=>'Pozo inválido.'],400);
-if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$startText)||!preg_match('/^\d{4}-\d{2}-\d{2}$/',$endText))sigma_history_reply(false,['error'=>'Rango de fechas inválido.'],400);
-
 try{
-    $start=new DateTimeImmutable($startText.' 00:00:00');
-    $end=new DateTimeImmutable($endText.' 00:00:00');
-}catch(Throwable $error){sigma_history_reply(false,['error'=>'Rango de fechas inválido.'],400);}
-if($start->format('Y-m-d')!==$startText||$end->format('Y-m-d')!==$endText)sigma_history_reply(false,['error'=>'Rango de fechas inválido.'],400);
-if($start>$end)sigma_history_reply(false,['error'=>'La fecha Desde no puede ser posterior a Hasta.'],400);
-if((int)$start->diff($end)->format('%a')>366)sigma_history_reply(false,['error'=>'El rango máximo permitido es de 366 días.'],400);
+    list($start,$end)=sigma_history_dates($startText,$endText);
+}catch(InvalidArgumentException $error){sigma_history_reply(false,['error'=>$error->getMessage()],400);}
 
 $db=clear_db();
 if(!$db->ok())sigma_history_reply(false,['error'=>$db->error()],503);
@@ -46,7 +41,7 @@ $sql="SELECT TOP (2000)
         AND [FECHA_CAPTURA]>=?
         AND [FECHA_CAPTURA]<?
       ORDER BY [FECHA_CAPTURA] ASC";
-$rows=$db->all($sql,[$well,$start->format('Y-m-d H:i:s'),$end->modify('+1 day')->format('Y-m-d H:i:s')]);
+$rows=$db->all($sql,[$well,$start->format('Y-m-d H:i:s'),$end->format('Y-m-d H:i:s')]);
 if(!$rows&&$db->error())sigma_history_reply(false,['error'=>$db->error()],500);
 
 $items=[];
@@ -77,14 +72,14 @@ $events=[];$warnings=[];$eventsAvailable=false;$trend=['available'=>false];$get=
 try{
     $connection=sigma_af_connection($db,$app);
     $get=sigma_af_getter($connection);
-    $audit=sigma_af_collect($get,$well,$start,$end->modify('+1 day'));
+    $audit=sigma_af_collect($get,$well,$start,$end);
     $events=$audit['events'];$warnings=$audit['warnings'];$eventsAvailable=true;
 }catch(Throwable $error){
     $warnings[]='Eventos y auditoría AF no disponibles. Los valores SQL se muestran sin presumir alertas ni envíos. '.$error->getMessage();
 }
 try{
     if(!$get)throw new RuntimeException('Sin conexión AF.');
-    $trend=sigma_af_trend($get,$well,$start,$end->modify('+1 day'));
+    $trend=sigma_af_trend($get,$well,$start,$end);
     $warnings=array_merge($warnings,$trend['warnings']);
 }catch(Throwable $error){$warnings[]='Duraciones y vibración PI no disponibles. '.$error->getMessage();}
 if(count($items)===2000)$warnings[]='Se alcanzó el límite de 2.000 valores SQL; reducí el rango para consultar todos.';
