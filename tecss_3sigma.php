@@ -187,7 +187,7 @@ function sigma_header_filter($column, array $spec, array $filters, array $option
 	                            <?php foreach ($columns as $column): $raw=sigma_text($row[$column]??null); ?>
                                 <td data-column="<?php echo h($column); ?>" data-raw="<?php echo h($raw); ?>" class="<?php echo in_array($column,['3SIGMA','CONT_EXCESOS','FC','PI-005-PL','VI-001-V','SI-002-SPM','YL-007-WS','QT:GOLPES-MIN','TI-002-TAE','TI-003-TBP','TI-004-TE'],true)?'is-number':''; ?>">
                                 <?php if ($column==='POZO'): ?>
-                                    <span class="sigma-well"><b><?php echo h($well); ?></b><?php if ($well!==''): ?><a class="sigma-icon-link" href="tecss_3sigma_historico.php?<?php echo h(http_build_query(['pozo'=>$well])); ?>" data-telemetry-modal-url="tecss_3sigma_historico.php?<?php echo h(http_build_query(['pozo'=>$well,'embedded'=>'1'])); ?>" data-telemetry-modal-open-url="tecss_3sigma_historico.php?<?php echo h(http_build_query(['pozo'=>$well])); ?>" data-telemetry-modal-title="<?php echo h('Histórico 3Sigma · '.$well); ?>" data-telemetry-modal-subtitle="Tendencia registrada en la tabla histórica SQL" data-telemetry-modal-eyebrow="Histórico 3Sigma" title="Ver histórico 3Sigma del pozo"><?php echo icon('chart'); ?></a><?php endif; ?></span>
+                                    <span class="sigma-well"><b><?php echo h($well); ?></b><?php if ($well!==''): ?><a class="sigma-icon-link" href="tecss_3sigma_historico.php?<?php echo h(http_build_query(['pozo'=>$well])); ?>" data-telemetry-modal-url="tecss_3sigma_historico.php?<?php echo h(http_build_query(['pozo'=>$well,'embedded'=>'1'])); ?>" data-telemetry-modal-open-url="tecss_3sigma_historico.php?<?php echo h(http_build_query(['pozo'=>$well])); ?>" data-telemetry-modal-title="<?php echo h('Histórico 3Sigma · '.$well); ?>" data-telemetry-modal-subtitle="Tendencia registrada en la tabla histórica SQL" data-telemetry-modal-eyebrow="Histórico 3Sigma" data-telemetry-modal-maximized="true" title="Ver histórico 3Sigma del pozo"><?php echo icon('chart'); ?></a><?php endif; ?></span>
                                 <?php elseif ($column==='PANTALLA'): ?>
                                     <?php if (sigma_is_link($raw)): ?><a class="sigma-icon-link" href="<?php echo h($raw); ?>" target="_blank" rel="noopener" data-telemetry-popup-url="<?php echo h($raw); ?>" data-telemetry-popup-name="CLEAR_PI_VISION" title="Abrir pantalla"><?php echo icon('monitor'); ?></a><?php else: ?><span class="sigma-muted">—</span><?php endif; ?>
                                 <?php elseif ($column==='3SIGMA'): ?>
@@ -214,7 +214,7 @@ function sigma_header_filter($column, array $spec, array $filters, array $option
 	<?php include __DIR__ . '/includes/telemetry_modal.php'; ?>
 	<?php clear_alarm_actions_modal(); ?>
 	<script src="assets/js/app.js?v=20260812-sigma2"></script>
-	<script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
+	<script src="assets/js/telemetry_modal.js?v=20261028-sigma-maximized"></script>
 	<script src="assets/js/tecss_3sigma.js?v=20260812-sigma2"></script>
 	<script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
 	<?php if($reportEnabled): ?><script>window.CLEAR_WEEKLY_NEWS={};</script><script src="assets/js/novedades_semanales.js?v=20260901-report-grid-1"></script><?php endif; ?>

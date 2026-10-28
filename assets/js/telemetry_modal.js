@@ -11,6 +11,13 @@
   const loading=document.getElementById('telemetryModalLoading');
   let lastFocused=null;
 
+  function setMaximized(active){
+    modal.classList.toggle('is-maximized',active);
+    maximize.textContent=active?'Restaurar':'Maximizar';
+    maximize.setAttribute('aria-label',active?'Restaurar ventana':'Maximizar ventana');
+    maximize.setAttribute('aria-pressed',String(active));
+  }
+
   function setLoading(show){
     if(!loading)return;
     loading.classList.toggle('is-hidden',!show);
@@ -50,8 +57,7 @@
     openPage.href=trigger.dataset.telemetryModalOpenUrl||trigger.getAttribute('href')||url;
     modal.hidden=false;
     modal.setAttribute('aria-hidden','false');
-    modal.classList.remove('is-maximized');
-    maximize.textContent='Maximizar';
+    setMaximized(trigger.dataset.telemetryModalMaximized==='true');
     document.body.classList.add('telemetry-modal-open');
     setLoading(true);
     frame.src='about:blank';
@@ -62,7 +68,7 @@
   function close(){
     modal.hidden=true;
     modal.setAttribute('aria-hidden','true');
-    modal.classList.remove('is-maximized');
+    setMaximized(false);
     document.body.classList.remove('telemetry-modal-open');
     frame.src='about:blank';
     setLoading(true);
@@ -82,9 +88,7 @@
     if(event.target.closest('[data-telemetry-modal-close]'))close();
   });
   maximize.addEventListener('click',function(){
-    const active=modal.classList.toggle('is-maximized');
-    maximize.textContent=active?'Restaurar':'Maximizar';
-    maximize.setAttribute('aria-label',active?'Restaurar ventana':'Maximizar ventana');
+    setMaximized(!modal.classList.contains('is-maximized'));
   });
   document.addEventListener('keydown',function(event){
     if(modal.hidden)return;

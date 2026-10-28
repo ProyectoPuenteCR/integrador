@@ -2,9 +2,12 @@
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
+require_once __DIR__ . '/includes/tecss_3sigma_events.php';
 
 auth_require();
 permissions_require_menu('tecss_3sigma');
+$app=require __DIR__ . '/config.php';
+date_default_timezone_set($app['app']['tz']??'America/Argentina/Buenos_Aires');
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
@@ -25,6 +28,7 @@ try{
     $start=new DateTimeImmutable($startText.' 00:00:00');
     $end=new DateTimeImmutable($endText.' 00:00:00');
 }catch(Throwable $error){sigma_history_reply(false,['error'=>'Rango de fechas inválido.'],400);}
+if($start->format('Y-m-d')!==$startText||$end->format('Y-m-d')!==$endText)sigma_history_reply(false,['error'=>'Rango de fechas inválido.'],400);
 if($start>$end)sigma_history_reply(false,['error'=>'La fecha Desde no puede ser posterior a Hasta.'],400);
 if((int)$start->diff($end)->format('%a')>366)sigma_history_reply(false,['error'=>'El rango máximo permitido es de 366 días.'],400);
 
@@ -56,6 +60,7 @@ foreach($rows as $row){
     if($today instanceof DateTimeInterface)$today=$today->format('Y-m-d H:i:s');
     $items[]=[
         'capture'=>(string)$capture,
+        'capture_iso'=>$capture!==''?(new DateTimeImmutable((string)$capture))->format(DATE_ATOM):null,
         'today'=>(string)$today,
         'well'=>(string)($row['POZO']??$well),
         'battery'=>(string)($row['BATERIA']??''),
@@ -67,4 +72,14 @@ foreach($rows as $row){
     ];
 }
 
-sigma_history_reply(true,['pozo'=>$well,'count'=>count($items),'limit'=>2000,'items'=>$items]);
+$events=[];$warnings=[];$eventsAvailable=false;
+try{
+    $connection=sigma_af_connection($db,$app);
+    $audit=sigma_af_collect(sigma_af_getter($connection),$well,$start,$end->modify('+1 day'));
+    $events=$audit['events'];$warnings=$audit['warnings'];$eventsAvailable=true;
+}catch(Throwable $error){
+    $warnings[]='Eventos y auditoría AF no disponibles. Los valores SQL se muestran sin presumir alertas ni envíos. '.$error->getMessage();
+}
+if(count($items)===2000)$warnings[]='Se alcanzó el límite de 2.000 valores SQL; reducí el rango para consultar todos.';
+sigma_history_reply(true,['pozo'=>$well,'count'=>count($items),'limit'=>2000,'items'=>$items,
+    'events'=>$events,'events_available'=>$eventsAvailable,'warnings'=>$warnings]);
