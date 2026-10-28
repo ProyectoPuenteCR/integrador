@@ -57,7 +57,9 @@
     openPage.href=trigger.dataset.telemetryModalOpenUrl||trigger.getAttribute('href')||url;
     modal.hidden=false;
     modal.setAttribute('aria-hidden','false');
-    setMaximized(trigger.dataset.telemetryModalMaximized==='true');
+    const historyUrl=new URL(url,window.location.href);
+    const sigmaHistory=historyUrl.pathname.endsWith('/tecss_3sigma_historico.php');
+    setMaximized(trigger.dataset.telemetryModalMaximized==='true'||sigmaHistory);
     document.body.classList.add('telemetry-modal-open');
     setLoading(true);
     frame.src='about:blank';

@@ -89,7 +89,10 @@
         var emails=records.filter(function(x){return x.kind==='email';}).length;
         document.getElementById('historyAuditStatus').textContent=data.events_available?events.length+' alertas reales AF · '+emails+' registros de email en el período. Los eventos pueden comenzar antes del rango.':'Eventos y auditoría AF no disponibles.';
         var warnings=Array.isArray(data.warnings)?data.warnings:[];
-        setStatus('Consulta completada: '+items.length+' valores SQL. '+warnings.join(' '),warnings.length?'warning':'ok');
+        var noNotifications=data.events_available&&warnings.length===0&&events.every(function(event){return event.audit_available&&event.audits.length===0;});
+        var noNotificationText='NO SE CUMPLIÓ LA CONDICIÓN DE TIEMPO PARA EL ENVÍO DE NOTIFICACIONES';
+        if(noNotifications)document.getElementById('historyAuditStatus').textContent=noNotificationText+' · Sin envíos registrados en el período consultado.';
+        setStatus(noNotifications?noNotificationText:'Consulta completada: '+items.length+' valores SQL. '+warnings.join(' '),warnings.length||noNotifications?'warning':'ok');
       })
       .catch(function(error){if(current!==request||error.name==='AbortError')return;items=[];events=[];records=[];metrics();drawTable();drawChart();document.getElementById('historyAuditStatus').textContent='Consulta no disponible.';setStatus(error.message||'No se pudo consultar el histórico.','error');})
       .finally(function(){if(current===request){apply.disabled=false;document.getElementById('historyExcel').disabled=!records.length;}});
