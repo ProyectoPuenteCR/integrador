@@ -214,7 +214,7 @@ function sigma_header_filter($column, array $spec, array $filters, array $option
 	<?php include __DIR__ . '/includes/telemetry_modal.php'; ?>
 	<?php clear_alarm_actions_modal(); ?>
 	<script src="assets/js/app.js?v=20260812-sigma2"></script>
-	<script src="assets/js/telemetry_modal.js?v=20261028-sigma-maximized"></script>
+	<script src="assets/js/telemetry_modal.js?v=20261028-sigma-maximized-r2"></script>
 	<script src="assets/js/tecss_3sigma.js?v=20260812-sigma2"></script>
 	<script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
 	<?php if($reportEnabled): ?><script>window.CLEAR_WEEKLY_NEWS={};</script><script src="assets/js/novedades_semanales.js?v=20260901-report-grid-1"></script><?php endif; ?>
