@@ -125,7 +125,7 @@ $sortMark = static function ($column) use ($sort) {
     <link rel="stylesheet" href="assets/css/app.css?v=20260903-vibraciones-1">
     <link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260903-vibraciones-1">
     <link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260903-vibraciones-1">
-    <link rel="stylesheet" href="assets/css/tecss_vibraciones.css?v=20261026-pi-1">
+    <link rel="stylesheet" href="assets/css/tecss_vibraciones.css?v=20261026-pi-3">
 </head>
 <body>
 <div class="app">
@@ -172,6 +172,7 @@ $sortMark = static function ($column) use ($sort) {
                 <button class="vib-btn is-primary" type="submit">Aplicar</button>
                 <a class="vib-btn" href="tecss_vibraciones.php">Limpiar</a>
                 <a class="vib-btn" href="<?php echo h(tecss_vib_export_url()); ?>"><?php echo icon('download'); ?> Excel</a>
+                <a class="vib-btn" href="tecss_3sigma_guia.php" target="_blank" rel="noopener">Guía animada 3Sigma</a>
                 <?php if ($reportEnabled): ?><button class="vib-btn" type="button" data-ns-report-open>Ver reporte <span data-ns-report-count class="nsReportCount" hidden>0</span></button><?php endif; ?>
                 <button class="vib-btn" type="button" id="vibReload">Actualizar vista</button>
                 <label class="vib-page-size"><span>FILAS</span><select name="filas" id="vibPageSize"><option value="50"<?php echo $pageSize === 50 ? ' selected' : ''; ?>>50</option><option value="100"<?php echo $pageSize === 100 ? ' selected' : ''; ?>>100</option></select></label>
@@ -295,7 +296,7 @@ $sortMark = static function ($column) use ($sort) {
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="vib-modal__chart"><canvas id="vibDetailChart"></canvas><div class="vib-modal__empty" id="vibDetailEmpty">No hay datos en el período seleccionado.</div></div>
+            <div class="vib-modal__chart"><canvas id="vibDetailChart" data-clear-chart-local="true"></canvas><div class="vib-modal__empty" id="vibDetailEmpty">No hay datos en el período seleccionado.</div></div>
         </article>
         <div class="vib-modal__events"><h3>Alertas y picos estadísticos CLEAR</h3><div id="vibDetailEvents"></div></div>
     </section>
@@ -305,7 +306,7 @@ $sortMark = static function ($column) use ($sort) {
 <script src="assets/js/app.js?v=20260903-vibraciones-1"></script>
 <script src="assets/js/chart.umd.js"></script>
 <script src="assets/js/alarm_actions.js?v=20260903-vibraciones-1"></script>
-<script src="assets/js/tecss_vibraciones.js?v=20261026-pi-1"></script>
+<script src="assets/js/tecss_vibraciones.js?v=20261026-pi-2"></script>
 <?php if ($reportEnabled): ?><script>window.CLEAR_WEEKLY_NEWS={};</script><script src="assets/js/novedades_semanales.js?v=20260903-vibraciones-1"></script><?php endif; ?>
 </body>
 </html>

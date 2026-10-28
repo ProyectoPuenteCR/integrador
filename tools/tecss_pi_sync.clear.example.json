@@ -1,0 +1,14 @@
+{
+  "connection": "clear",
+  "af_path": "\\\\SWPCRDLHSCD51\\IUP",
+  "template": "3Sigma_Superado",
+  "ca_bundle": "COMPLETAR_RUTA_CERTIFICADO_CA",
+  "tls_server_name": "SWPCRDLHSCD51",
+  "well_aliases": {
+    "CG-457": "CG-457[00]",
+    "CG-544": "CG-544[00]",
+    "CG-715": "CG-715[00]",
+    "CnE-320": "CnE-320[00]"
+  },
+  "days": 90
+}

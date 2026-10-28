@@ -2,6 +2,7 @@
 // Sólo CLI. Por defecto lee y valida; --apply publica la copia en SQL local.
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__.'/../includes/tecss_pi_reader.php';
+require_once __DIR__.'/../includes/tecss_pi_connection.php';
 require_once __DIR__.'/../includes/tecss_vibraciones_query.php';
 require_once __DIR__.'/../includes/tecss_vibraciones_pi.php';
 
@@ -19,22 +20,16 @@ try {
     if ($days < 2 || $days > 120 || empty($config['af_path']) || ($config['template'] ?? '') !== '3Sigma_Superado') {
         throw new RuntimeException('Revisar days (2..120), af_path y template en la configuración.');
     }
-    if (!preg_match('#^https://[^/?\#]+/piwebapi/?$#i', $config['base'] ?? '') || empty($config['ca_bundle'])) {
-        throw new RuntimeException('Se requiere base HTTPS PI Web API y ca_bundle válido.');
-    }
-    $auth = getenv($config['auth_env'] ?? 'CLEAR_PI_AUTH');
-    if (!$auth || preg_match('/[\r\n]/', $auth)) throw new RuntimeException('Falta la autenticación PI en la variable de entorno indicada.');
     require_once __DIR__.'/../includes/db.php';
     $db = clear_db();
     if (!$db->ok()) throw new RuntimeException('SQL local no disponible.');
+    list($config, $auth) = tecss_pi_connection($config, function() use ($db) {
+        $app = require __DIR__.'/../config.php';
+        return tecss_pi_load_clear_connection($db, $app);
+    }, 'getenv');
     $wellRows = $db->all('SELECT POZO FROM dbo.CLEAR_TECSS_VIBRACIONES_ESTADO');
     if (!$wellRows || $db->error()) throw new RuntimeException('No se pudo obtener el catálogo de pozos CLEAR.');
-    $wellMap = [];
-    foreach ($wellRows as $row) {
-        $key = tecss_pi_well_key($row['POZO']);
-        if (isset($wellMap[$key])) throw new RuntimeException('Catálogo de pozos ambiguo.');
-        $wellMap[$key] = $row['POZO'];
-    }
+    $wellMap = tecss_pi_well_map($wellRows, $config['well_aliases'] ?? []);
     if (isset($options['apply'])) {
         if (!tecss_vib_pi_ready($db)) throw new RuntimeException('Instalar primero SQL/CLEAR_TECSS_VIBRACIONES_PI.sql.');
         $lock = $db->scalar("DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'CLEAR_TECSS_PI_SYNC',@LockMode='Exclusive',@LockOwner='Session',@LockTimeout=0; SELECT @r");
@@ -60,7 +55,7 @@ try {
         }
     }
     $reader = new TecssPiReader(function($path) use ($config, $auth) {
-        $response = clear_pi_transport($path, $config, $auth, 45);
+        $response = tecss_pi_secure_transport($path, $config, $auth, 45);
         if ($response['status'] === 404) throw new TecssPiNotFound('Objeto PI no encontrado.');
         if ($response['status'] !== 200) throw new RuntimeException('Consulta PI falló con HTTP '.$response['status']);
         return json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
