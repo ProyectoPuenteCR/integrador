@@ -1,12 +1,22 @@
 (function(){
   'use strict';
   var form=document.getElementById('sigmaHistoryForm'),well=document.getElementById('historyWell'),from=document.getElementById('historyFrom'),to=document.getElementById('historyTo'),apply=document.getElementById('historyApply'),status=document.getElementById('historyStatus'),rowsBox=document.getElementById('historyRows'),empty=document.getElementById('historyEmpty');
-  var items=[],events=[],records=[],chart=null,request=0,controller=null;
+  var items=[],events=[],records=[],trend={},chart=null,request=0,controller=null;
   var zone='America/Argentina/Buenos_Aires';
   function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
   function number(v,d){return v==null||isNaN(Number(v))?'—':Number(v).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});}
   function date(v){if(!v)return '—';var d=new Date(v);return isNaN(d.getTime())?String(v):d.toLocaleString('es-AR',{timeZone:zone,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});}
   function stamp(v){return new Date(v).getTime();}
+  function duration(seconds){if(seconds==null)return '—';seconds=Math.floor(seconds);return Math.floor(seconds/3600)+' h '+Math.floor(seconds%3600/60)+' min '+seconds%60+' s';}
+  function intervalText(x){return (x.complete?'':'Al menos ')+duration(x.duration_seconds)+(x.state==='gap'?' · lectura interrumpida':x.end?'':' · sin cierre observado');}
+  function timeCondition(x){var required=trend.minimum_duration_seconds;if(!required)return 'Tiempo requerido no verificado';if(!x.complete)return 'Requerido actualmente: '+duration(required)+' · tramo parcial';return x.duration_seconds<required?'NO SE CUMPLIÓ LA CONDICIÓN DE TIEMPO PARA EL ENVÍO DE NOTIFICACIONES · requerido actualmente: '+duration(required):'Alcanzó el tiempo mínimo actual de '+duration(required)+'; el envío se confirma en la auditoría';}
+  function trendSummary(){
+    var list=trend.intervals||[],last=list[list.length-1],card=document.getElementById('historyLastDuration'),box=document.getElementById('historyExcessList');
+    if(card)card.textContent=last?intervalText(last):trend.intervals_available?'Sin excesos':'Sin datos PI';
+    if(!box)return;
+    var rule=trend.notification_status==='Disabled'?'Regla de notificación actualmente DESHABILITADA. ':trend.notification_status==='Enabled'?'Regla de notificación actualmente habilitada. ':'Estado actual de la regla no disponible. ';
+    box.innerHTML='<p>'+esc(rule)+(trend.minimum_duration_seconds?'Tiempo mínimo configurado actualmente: '+esc(duration(trend.minimum_duration_seconds))+'. ':'')+'La configuración actual no prueba su estado histórico. Duraciones observadas en muestras PI de 3SIGMA_SUP; no se calculan desde CONT_EXCESOS ni prueban el envío de emails.</p>'+(list.length?list.slice(-5).reverse().map(function(x,i){return '<article><strong>Exceso #'+(list.length-i)+' · '+esc(intervalText(x))+'</strong><span>Desde '+esc(date(x.start))+(x.start_known?'':' (inicio anterior no confirmado)')+' · '+(x.end?'Hasta '+esc(date(x.end)):'Última muestra '+esc(date(x.observed_until)))+'</span><span>'+esc(timeCondition(x))+'</span></article>';}).join(''):'<p>'+esc(trend.intervals_available?'Sin tramos de exceso registrados en el período.':'No fue posible obtener los tramos de exceso de PI.')+'</p>');
+  }
   function range(){return [stamp(from.value+'T00:00:00-03:00'),stamp(to.value+'T00:00:00-03:00')+86400000];}
   function setStatus(message,type){status.textContent=message||'';status.className='sigma-history__status'+(message?' is-visible':'')+(type?' is-'+type:'');}
   function sample(source,max){if(source.length<=max)return source.slice();var out=[],step=(source.length-1)/(max-1);for(var i=0;i<max;i++)out.push(source[Math.round(i*step)]);return out;}
@@ -31,6 +41,7 @@
           detail:'Estado PI: '+(audit.status_raw||'no registrado')+' · Reintentos: '+(audit.retry_count==null?'no registrados':audit.retry_count)+' · Registro: '+date(audit.recorded_at)});
       });
     });
+    (trend.intervals||[]).forEach(function(interval,i){records.push({kind:'excess',time:interval.start,interval:interval,event_label:'Exceso observado #'+(i+1),email_status:'No acredita envío',detail:'Desde '+date(interval.start)+' · '+(interval.end?'Hasta '+date(interval.end):'Última muestra '+date(interval.observed_until))+' · '+intervalText(interval)+' · '+timeCondition(interval)});});
     records.sort(function(a,b){return (stamp(a.time)||0)-(stamp(b.time)||0);});
   }
   function cells(x){
@@ -50,7 +61,9 @@
   }
   function drawChart(){
     if(chart){chart.destroy();chart=null;}
-    empty.classList.toggle('is-visible',records.length===0);if(!records.length)return;
+    var vibration=trend.series&&trend.series['VI-001-V'],threshold=trend.series&&trend.series['3SIGMA'];
+    var hasPi=vibration&&vibration.samples.length;
+    empty.classList.toggle('is-visible',records.length===0&&!hasPi);if(!records.length&&!hasPi)return;
     var bounds=range(),points=sample(items,1000);
     function metricPoint(x,key){return {x:stamp(x.capture_iso||x.capture),y:x[key]};}
     var datasets=[
@@ -64,10 +77,18 @@
     markers('Email enviado',function(x){return x.kind==='email'&&x.email_status==='Enviado';},'#16824b','rectRot',2);
     markers('Email con error',function(x){return x.kind==='email'&&x.email_status==='Error';},'#c42d38','crossRot',3);
     markers('Email pendiente / otro estado',function(x){return x.kind==='email'&&x.email_status!=='Enviado'&&x.email_status!=='Error';},'#ac7100','rect',2.5);
-    chart=new Chart(document.getElementById('sigmaHistoryChart'),{type:'line',data:{datasets:datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'top'},tooltip:{callbacks:{title:function(context){return context.length?date(context[0].parsed.x):'';},label:function(context){
+    if(hasPi)datasets.push({label:'Vibración VI-001-V ('+vibration.unit+')',data:vibration.samples.map(function(p){return {x:stamp(p.time),y:p.value};}),borderColor:'#bd237c',borderWidth:1.5,pointRadius:0,tension:0,spanGaps:false,yAxisID:'y'});
+    if(threshold&&threshold.samples.length){datasets[0].label='3Sigma · PI';datasets[0].data=threshold.samples.map(function(p){return {x:stamp(p.time),y:p.value};});datasets[0].stepped=true;datasets[0].spanGaps=false;}
+    markers('Tramo de exceso observado',function(x){return x.kind==='excess';},'#e89b24','rect',.45);
+    var intervalBands={id:'sigmaExcessBands',beforeDatasetsDraw:function(c){
+      var ctx=c.ctx,area=c.chartArea,scale=c.scales.x;if(!area)return;ctx.save();ctx.beginPath();ctx.rect(area.left,area.top,area.right-area.left,area.bottom-area.top);ctx.clip();
+      (trend.intervals||[]).forEach(function(x,i){var left=scale.getPixelForValue(Math.max(bounds[0],stamp(x.start))),right=scale.getPixelForValue(Math.min(bounds[1],stamp(x.end||x.observed_until)));if(right<left)return;ctx.fillStyle='rgba(232,155,36,.13)';ctx.fillRect(left,area.top,Math.max(1,right-left),area.bottom-area.top);ctx.strokeStyle='#b67718';ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(left,area.top);ctx.lineTo(left,area.bottom);ctx.moveTo(right,area.top);ctx.lineTo(right,area.bottom);ctx.stroke();if(right-left>90){ctx.fillStyle='#80510a';ctx.font='10px Segoe UI';ctx.fillText('#'+(i+1)+' '+duration(x.duration_seconds),left+4,area.top+12+(i%2)*12);}});ctx.restore();
+    }};
+    chart=new Chart(document.getElementById('sigmaHistoryChart'),{type:'line',plugins:[intervalBands],data:{datasets:datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'top'},tooltip:{callbacks:{title:function(context){return context.length?date(context[0].parsed.x):'';},label:function(context){
       var row=context.raw.record;
       if(!row)return context.dataset.label+': '+number(context.parsed.y,context.datasetIndex===0?4:0);
       if(row.kind==='alert')return ['Alerta real: '+row.event.name,'Inicio: '+date(row.event.start),row.email_status];
+      if(row.kind==='excess')return [row.event_label,row.detail];
       return [row.email_status+' · '+row.audit.recipients.length+' destinatario(s)','Envío: '+date(row.audit.sent_at),row.detail].concat(row.audit.recipients).concat(row.audit.error?[row.audit.error]:[]);
     }}}},scales:{x:{type:'linear',min:bounds[0],max:bounds[1]-1,ticks:{maxTicksLimit:9,maxRotation:0,callback:function(value){return new Date(value).toLocaleDateString('es-AR',{timeZone:zone,day:'2-digit',month:'2-digit'});}},grid:{display:false}},y:{position:'left',title:{display:true,text:'3Sigma'}},y1:{position:'right',beginAtZero:true,title:{display:true,text:'Excesos'},grid:{drawOnChartArea:false}},audit:{display:false,min:0,max:4}}}});
   }
@@ -76,7 +97,7 @@
     if(from.value>to.value){setStatus('La fecha Desde no puede ser posterior a Hasta.','error');return;}
     var current=++request;if(controller)controller.abort();controller=new AbortController();
     apply.disabled=true;document.getElementById('historyExcel').disabled=true;
-    items=[];events=[];records=[];metrics();drawTable();drawChart();
+    items=[];events=[];records=[];trend={};metrics();trendSummary();drawTable();drawChart();
     document.getElementById('historyAuditStatus').textContent='Consultando eventos y auditoría AF…';
     setStatus('Consultando valores SQL, eventos reales y registros de email…','loading');
     fetch('tecss_3sigma_historico_api.php?'+new URLSearchParams({pozo:well.value,desde:from.value,hasta:to.value}).toString(),{signal:controller.signal,cache:'no-store',headers:{'X-Requested-With':'XMLHttpRequest'}})
@@ -84,17 +105,18 @@
       .then(function(data){
         if(current!==request)return;
         items=Array.isArray(data.items)?data.items:[];events=Array.isArray(data.events)?data.events:[];
-        buildRecords();metrics();drawTable();drawChart();
+        trend=data.trend||{};
+        buildRecords();metrics();trendSummary();drawTable();drawChart();
         document.getElementById('historyRange').textContent=from.value+' a '+to.value;
         var emails=records.filter(function(x){return x.kind==='email';}).length;
         document.getElementById('historyAuditStatus').textContent=data.events_available?events.length+' alertas reales AF · '+emails+' registros de email en el período. Los eventos pueden comenzar antes del rango.':'Eventos y auditoría AF no disponibles.';
         var warnings=Array.isArray(data.warnings)?data.warnings:[];
         var noNotifications=data.events_available&&warnings.length===0&&events.every(function(event){return event.audit_available&&event.audits.length===0;});
-        var noNotificationText='NO SE CUMPLIÓ LA CONDICIÓN DE TIEMPO PARA EL ENVÍO DE NOTIFICACIONES';
+        var noNotificationText=trend.notification_status==='Disabled'?'REGLA DE NOTIFICACIÓN ACTUALMENTE DESHABILITADA':'SIN ENVÍOS DE NOTIFICACIONES REGISTRADOS · Consultá los tramos de exceso y su duración; no se pudo verificar la condición de tiempo requerida.';
         if(noNotifications)document.getElementById('historyAuditStatus').textContent=noNotificationText+' · Sin envíos registrados en el período consultado.';
         setStatus(noNotifications?noNotificationText:'Consulta completada: '+items.length+' valores SQL. '+warnings.join(' '),warnings.length||noNotifications?'warning':'ok');
       })
-      .catch(function(error){if(current!==request||error.name==='AbortError')return;items=[];events=[];records=[];metrics();drawTable();drawChart();document.getElementById('historyAuditStatus').textContent='Consulta no disponible.';setStatus(error.message||'No se pudo consultar el histórico.','error');})
+      .catch(function(error){if(current!==request||error.name==='AbortError')return;items=[];events=[];records=[];trend={};metrics();trendSummary();drawTable();drawChart();document.getElementById('historyAuditStatus').textContent='Consulta no disponible.';setStatus(error.message||'No se pudo consultar el histórico.','error');})
       .finally(function(){if(current===request){apply.disabled=false;document.getElementById('historyExcel').disabled=!records.length;}});
   }
   function exportExcel(){
@@ -103,6 +125,7 @@
     function excelText(v){v=String(v==null?'':v);return esc(/^[\s]*[=+@-]/.test(v)?"'"+v:v);}
     var html='<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse}th,td{border:1px solid #9fb2bd;padding:6px}th{background:#174f5e;color:#fff}</style></head><body><h2>Histórico 3Sigma · '+esc(well.value)+'</h2><p>Desde: '+esc(from.value)+' | Hasta: '+esc(to.value)+'</p><p>'+esc(document.getElementById('historyAuditStatus').textContent)+'</p><p>'+esc(status.textContent)+'</p><table><thead><tr>'+headers.map(function(x){return '<th>'+esc(x)+'</th>';}).join('')+'</tr></thead><tbody>';
     records.forEach(function(x){var event=x.event||{},audit=x.audit||{};html+='<tr>'+cells(x).concat([event.id,event.name,event.end?date(event.end):'',audit.annotation_id,audit.status_raw,audit.retry_count]).map(function(v){return '<td>'+excelText(v)+'</td>';}).join('')+'</tr>';});html+='</tbody></table></body></html>';
+    html=html.replace('</body>','<h3>Series PI registradas</h3><table><tr><th>Variable</th><th>Unidad</th><th>Fecha</th><th>Valor</th></tr>'+Object.keys(trend.series||{}).map(function(key){var series=trend.series[key];return series.samples.map(function(p){return '<tr>'+[key,series.unit,date(p.time),p.value==null?'Sin dato válido':p.value].map(function(v){return '<td>'+excelText(v)+'</td>';}).join('')+'</tr>';}).join('');}).join('')+'</table></body>');
     var blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Historico_3Sigma_'+well.value.replace(/[^A-Za-z0-9_-]+/g,'_')+'_'+from.value+'_'+to.value+'.xls';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},500);
   }
   form.addEventListener('submit',function(event){event.preventDefault();load();});document.getElementById('historyExcel').addEventListener('click',exportExcel);if(well.value)load();
