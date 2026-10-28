@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/tecss_3sigma_events.php';
+require_once __DIR__ . '/includes/tecss_3sigma_trend.php';
 
 auth_require();
 permissions_require_menu('tecss_3sigma');
@@ -72,14 +73,20 @@ foreach($rows as $row){
     ];
 }
 
-$events=[];$warnings=[];$eventsAvailable=false;
+$events=[];$warnings=[];$eventsAvailable=false;$trend=['available'=>false];$get=null;
 try{
     $connection=sigma_af_connection($db,$app);
-    $audit=sigma_af_collect(sigma_af_getter($connection),$well,$start,$end->modify('+1 day'));
+    $get=sigma_af_getter($connection);
+    $audit=sigma_af_collect($get,$well,$start,$end->modify('+1 day'));
     $events=$audit['events'];$warnings=$audit['warnings'];$eventsAvailable=true;
 }catch(Throwable $error){
     $warnings[]='Eventos y auditoría AF no disponibles. Los valores SQL se muestran sin presumir alertas ni envíos. '.$error->getMessage();
 }
+try{
+    if(!$get)throw new RuntimeException('Sin conexión AF.');
+    $trend=sigma_af_trend($get,$well,$start,$end->modify('+1 day'));
+    $warnings=array_merge($warnings,$trend['warnings']);
+}catch(Throwable $error){$warnings[]='Duraciones y vibración PI no disponibles. '.$error->getMessage();}
 if(count($items)===2000)$warnings[]='Se alcanzó el límite de 2.000 valores SQL; reducí el rango para consultar todos.';
 sigma_history_reply(true,['pozo'=>$well,'count'=>count($items),'limit'=>2000,'items'=>$items,
-    'events'=>$events,'events_available'=>$eventsAvailable,'warnings'=>$warnings]);
+    'events'=>$events,'events_available'=>$eventsAvailable,'warnings'=>$warnings,'trend'=>$trend]);
