@@ -114,6 +114,8 @@ SQL
     'filter_columns' => ['BATERIA','PLANTILLA','YT:POZO','YAT:COM'],
     'labels' => [
         'Description' => 'DESCRIPCIÓN',
+        'YT:POZO' => 'ESTADO DEL POZO',
+        'PT:FONDO' => 'PRESIÓN DE FONDO',
         '__COMUNICACION' => 'FALLA DE COMUNICACIÓN',
         'PRODUCCION_PETROLEO' => 'PRODUCCIÓN PETRÓLEO',
         'PRODUCCION_LIQUIDO' => 'PRODUCCIÓN LÍQUIDO',

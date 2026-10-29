@@ -10,8 +10,8 @@ auth_require();
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 function wh_out($data,$status=200){http_response_code($status);echo json_encode($data,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_INVALID_UTF8_SUBSTITUTE);exit;}
-if(!permissions_can_menu('monitoreo_pozos')||!permissions_can_menu('pi_historico'))wh_out(['ok'=>false,'error'=>'No tenés permiso para consultar estos históricos.'],403);
 try{
+    if(!in_array($_SERVER['REQUEST_METHOD'],['GET','POST'],true))wh_out(['ok'=>false,'error'=>'Método no permitido.'],405);
     $input=$_GET;
     if($_SERVER['REQUEST_METHOD']==='POST'){
         if((int)($_SERVER['CONTENT_LENGTH']??0)>12000)throw new InvalidArgumentException('La selección es demasiado grande.');
@@ -20,14 +20,17 @@ try{
         $input=json_decode($raw,true);
         if(!is_array($input))throw new InvalidArgumentException('La consulta no es válida.');
     }
+    $source=wh_source(array_key_exists('source',$input)?$input['source']:'monitoreo_pozos');
+    if(!wh_can_history($source))wh_out(['ok'=>false,'error'=>'No tenés permiso para consultar estos históricos.'],403);
+    if(($input['action']??'')==='cards'&&!wh_cards_allowed($source))
+        throw new InvalidArgumentException('Las cartas dinamométricas no corresponden a la ficha PCP.');
     $well=wh_well($input['well']??'');$db=clear_db();
     if(!$db->ok())throw new RuntimeException('Sin conexión a SQL Server.');
-    $catalog=wh_catalog($db,$well);
+    $catalog=wh_catalog($db,$well,$source);
     if($_SERVER['REQUEST_METHOD']==='GET'){
         foreach($catalog as &$point)unset($point['webid']);unset($point);
-        wh_out(['ok'=>true,'well'=>$well,'columns'=>$catalog]);
+        wh_out(['ok'=>true,'well'=>$well,'source'=>$source,'columns'=>$catalog]);
     }
-    if($_SERVER['REQUEST_METHOD']!=='POST')wh_out(['ok'=>false,'error'=>'Método no permitido.'],405);
     // Reutilizar CLEAR_CONFIG con lecturas; no llamar config_ensure_table().
     $app=require __DIR__.'/config.php';$fallback=$app['pi']??[];
     $pi=['base'=>config_get('pi_base',$fallback['base']??'https://10.17.40.37/piwebapi'),
@@ -42,9 +45,11 @@ try{
     };
     if(($input['action']??'')==='cards')wh_out(['ok'=>true,'well'=>$well]+wh_cards($catalog,$input['at']??'',$input['windowSeconds']??60,$request,($input['mode']??'manual')==='latest'));
     $result=wh_history($catalog,$input['columns']??[],$input['from']??'',$input['to']??'',$request,$input['intervalSeconds']??3600);
-    foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode([$well,$series['column'],$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
+    // Conservar las claves BM existentes y separar el origen de los reportes PCP.
+    $reportScope=$source==='monitoreo_pozos'?[]:[$source];
+    foreach($result['series'] as &$series)$series['reportKey']='well_history:'.sha1(json_encode(array_merge($reportScope,[$well,$series['column'],$result['start'],$result['end'],$result['interval']]),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));unset($series);
     $columns=array_column($result['series'],'column');sort($columns);
-    $result['combinedReportKey']='well_history_combined:'.sha1(json_encode([$well,$columns,$result['start'],$result['end'],$result['interval']],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
-    wh_out(['ok'=>true,'well'=>$well]+$result);
+    $result['combinedReportKey']='well_history_combined:'.sha1(json_encode(array_merge($reportScope,[$well,$columns,$result['start'],$result['end'],$result['interval']]),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
+    wh_out(['ok'=>true,'well'=>$well,'source'=>$source]+$result);
 }catch(InvalidArgumentException $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],422);}
 catch(Throwable $e){wh_out(['ok'=>false,'error'=>$e->getMessage()],502);}

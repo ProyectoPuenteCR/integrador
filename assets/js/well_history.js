@@ -1,7 +1,8 @@
 (function(){
   'use strict';
   const cfg=window.CLEAR_TELEMETRY_GRID||{};
-  if(cfg.key!=='monitoreo_pozos'||!cfg.wellHistory)return;
+  if(!['monitoreo_pozos','telemetria_pcp'].includes(cfg.key)||!cfg.wellHistory)return;
+  const source=cfg.key,isPcp=source==='telemetria_pcp';
   const cache=new Map(),selections=new Map(),defaultsApplied=new Set(),tokens=new WeakMap();
   const lightColors=['#16855f','#ad6800','#7452af','#bc3868','#087fa9','#bf4c24','#66821a','#425ec3','#a43c98','#087e79','#935b2d','#526777'];
   const darkColors=['#53d6a4','#ffc857','#b8a1ef','#f57ca7','#5fc9f8','#ff9473','#c5df72','#96a9ff','#eb9ae3','#5ce0dc','#e9b486','#d3dce5'];
@@ -26,14 +27,16 @@
     if(!response.ok||!data.ok)throw Error(data.error||'No se pudo completar la consulta.');return data;
   }
   function catalog(well){
-    if(!cache.has(well))cache.set(well,json('well_history_api.php?well='+encodeURIComponent(well)).catch(error=>{cache.delete(well);throw error;}));
-    return cache.get(well);
+    const key=source+'\u0000'+well;
+    if(!cache.has(key))cache.set(key,json('well_history_api.php?'+new URLSearchParams({well,source})).catch(error=>{cache.delete(key);throw error;}));
+    return cache.get(key);
   }
   async function decorate({well,body,actions,historyHost,cardsHost}){
     detach();
     const token={};tokens.set(body,token);
     if(historyHost)mount(well,historyHost,cardsHost);
-    const chosen=selections.get(well)||new Map();selections.set(well,chosen);
+    const selectionKey=source+'\u0000'+well;
+    const chosen=selections.get(selectionKey)||new Map();selections.set(selectionKey,chosen);
     const button=element('button','tg-btn wh-open','Histórico');button.type='button';button.disabled=true;actions.prepend(button);
     const note=element('p','wh-catalog-status','Buscando variables con histórico en PI…');note.setAttribute('role','status');body.prepend(note);
     const fields=Array.from(body.querySelectorAll('[data-history-column]'));
@@ -42,15 +45,15 @@
     if(inlineHost)context={well,variables:Array.from(chosen.values())};
     try{
       const data=await catalog(well);if(tokens.get(body)!==token||(historyHost&&(!active()||context?.well!==well)))return;
-      const defaultColumns=['ESTADO_RPM','QT:RPM','PT:CABEZA'];
+      const defaultColumns=isPcp?['YT:POZO','PT:FONDO','__COMUNICACION']:['ESTADO_RPM','QT:RPM','PT:CABEZA'];
       const missingDefaults=[];
-      if(!defaultsApplied.has(well)){
+      if(!defaultsApplied.has(selectionKey)){
         defaultColumns.forEach(column=>{
           const field=fields.find(item=>item.dataset.historyColumn===column);
           if(field&&data.columns[column]?.available)chosen.set(column,{column,label:field.querySelector('dt').textContent});
           else missingDefaults.push(column);
         });
-        defaultsApplied.add(well);
+        defaultsApplied.add(selectionKey);
       }
       for(const column of chosen.keys())if(!data.columns[column]?.available)chosen.delete(column);
       let available=0;
@@ -77,6 +80,7 @@
 
   const dialog=element('dialog','well-details wh-dialog');dialog.setAttribute('aria-labelledby','whTitle');
   dialog.innerHTML='<header class="well-details__head"><div><div class="well-details__eyebrow">Históricos PI · Monitoreo SCADA</div><h2 id="whTitle"></h2><p class="well-details__subtitle">Frecuencia configurable · Fechas y horarios de Argentina</p></div><div class="wh-head-actions"><button type="button" class="tg-btn" data-wh-maximize aria-label="Maximizar históricos" aria-pressed="false" title="Maximizar">⛶</button><button type="button" class="tg-btn" data-wh-close aria-label="Cerrar históricos" autofocus>×</button></div></header><div class="well-details__body"><form class="wh-toolbar"><label>Desde<input type="datetime-local" name="from" required aria-label="Histórico desde"></label><label>Hasta<input type="datetime-local" name="to" required aria-label="Histórico hasta"></label><label>Frecuencia (minutos)<input type="number" name="intervalMinutes" value="60" min="0.5" max="1440" step="0.5" required aria-label="Frecuencia en minutos" list="whIntervals"><datalist id="whIntervals"><option value="0.5">0,5 minutos</option><option value="1">1 minuto</option><option value="5">5 minutos</option><option value="15">15 minutos</option><option value="60">60 minutos</option></datalist></label><button class="tg-btn" type="submit">Traer históricos</button><button class="tg-btn" type="button" data-wh-export disabled>Exportar Excel</button><button class="tg-btn" type="button" data-wh-report disabled>Agregar al reporte</button></form><p class="wh-status" role="status" aria-live="polite"></p><div class="wh-charts"></div></div><footer class="well-details__footer"><span>Mínimo 0,5 minutos · Máximo 31 días · Hasta 60.000 muestras por consulta</span><button type="button" class="tg-btn" data-wh-close>Volver a la ficha</button></footer>';
+  if(isPcp)dialog.querySelector('.well-details__eyebrow').textContent='Históricos PI · Telemetría PCP';
   document.body.append(dialog);
   const form=dialog.querySelector('form'),from=form.elements.from,to=form.elements.to,frequency=form.elements.intervalMinutes;
   const status=dialog.querySelector('.wh-status'),chartBox=dialog.querySelector('.wh-charts');
@@ -117,7 +121,7 @@
     const end=new Date();end.setMinutes(0,0,0);from.value=localDate(new Date(end.getTime()-86400000));to.value=localDate(end);
     context={well,variables:[]};exportButton.disabled=reportButton.disabled=true;
     status.textContent='Seleccioná variables con los checkbox de abajo y presioná Histórico.';
-    if(cardsHost)mountCards(well,cardsHost);
+    if(cardsHost&&!isPcp&&cfg.wellCards!==false)mountCards(well,cardsHost);
   }
   function open(well,variables,opener){
     if(!variables.length||(!inlineHost&&dialog.open))return;
@@ -135,7 +139,7 @@
     result=null;destroy();exportButton.disabled=reportButton.disabled=true;
     status.textContent='Consultando PI Web API…';status.classList.remove('is-error');
     try{
-      const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,columns:context.variables.map(item=>item.column),from:from.value,to:to.value,intervalSeconds:Math.round(Number(frequency.value)*60)})});
+      const data=await json('well_history_api.php',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({well:context.well,source:cfg.key,columns:context.variables.map(item=>item.column),from:from.value,to:to.value,intervalSeconds:Math.round(Number(frequency.value)*60)})});
       if(number!==requestNumber||!active())return;
       result=data;
       if(typeof window.Chart!=='function')throw Error('No se pudo cargar el componente de gráficos. Recargá la página.');
@@ -266,7 +270,7 @@
       cardsController?.abort();const pending=new AbortController();cardsController=pending;get.disabled=true;
       cardCharts.forEach(chart=>chart.destroy());cardCharts=[];cards.forEach(card=>{card.plot.replaceChildren();card.message.textContent='Consultando PI…';});
       try{
-        const data=await json('well_history_api.php',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cards',well,mode:mode.value,at:at.value,windowSeconds:Number(windowInput.value)})});
+        const data=await json('well_history_api.php',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'cards',well,source:cfg.key,mode:mode.value,at:at.value,windowSeconds:Number(windowInput.value)})});
         if(pending!==cardsController||!active())return;
         cards.forEach((card,index)=>{
           const series=data.cards.find(item=>item.kind===card.kind);

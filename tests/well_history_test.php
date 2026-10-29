@@ -55,4 +55,86 @@ foreach([29,0,-30,86401,30.5,true,[],null,'1h','30 OR 1=1'] as $value)rejects(fu
 check(wh_interval('60')===60,'Aceptar segundos enteros.');
 rejects(function()use($catalog){wh_history($catalog,['QT:RPM'],'2026-10-01T00:00','2026-10-22T00:00',function(){throw new RuntimeException('No debe consultar PI sobre el límite.');},30);});
 check($derived['series'][0]['samples'][0]['plot_value']===0&&$derived['series'][0]['samples'][1]['plot_value']===1,'Estado derivado con código 0/1.');
-echo "OK: catálogo, correspondencias, rango, muestreo horario, calidad, estados y errores parciales.\n";
+
+// El origen lo determina una lista cerrada; un permiso de BM no habilita PCP.
+$allowedMenus=[];
+function permissions_can_menu($menu){global $allowedMenus;return in_array($menu,$allowedMenus,true);}
+check(wh_source()==='monitoreo_pozos','Mantener origen BM cuando el cliente antiguo no envía source.');
+check(wh_source('telemetria_pcp')==='telemetria_pcp','Aceptar el identificador real de PCP.');
+foreach(['','telemetry_pcp','pi_historico','../telemetria_pcp','monitoreo_pozos ',[],null,true,1] as $source)
+    rejects(function()use($source){wh_source($source);});
+foreach(['monitoreo_pozos','telemetria_pcp'] as $source){
+    $other=$source==='monitoreo_pozos'?'telemetria_pcp':'monitoreo_pozos';
+    $allowedMenus=[$source];
+    check(!wh_can_history($source)&&!wh_can_activity($source),'El permiso de la grilla no reemplaza los de históricos o alarmas.');
+    $allowedMenus=[$source,'pi_historico'];
+    check(wh_can_history($source)&&!wh_can_history($other),'Históricos exige permiso de la pantalla exacta.');
+    foreach(['pozos_alarmas24','pozos_todas_alarmas'] as $alarmMenu){
+        $allowedMenus=[$source,$alarmMenu];
+        check(wh_can_activity($source)&&!wh_can_activity($other),'Alarmas exige permiso de la pantalla exacta y de alarmas.');
+    }
+}
+$allowedMenus=['pi_historico','pozos_alarmas24','pozos_todas_alarmas'];
+check(!wh_can_history('telemetria_pcp')&&!wh_can_activity('telemetria_pcp'),'Sin acceso PCP no se habilitan sus API.');
+check(wh_cards_allowed('monitoreo_pozos')&&!wh_cards_allowed('telemetria_pcp'),'Las cartas dinamométricas son exclusivas de BM.');
+
+// Candidatos de nombres, no afirmaciones sobre tags presentes en producción.
+$pcpSource='telemetria_pcp';$pcpWell='YPF.SC.PCP-17';
+$stateId=str_repeat('S',30);$pressureId=str_repeat('P',30);$communicationId=str_repeat('C',30);
+foreach(['(PC12)_','(PC14)_','(PCP)_','_'] as $family){
+    $candidateDb=new WhTestDb();
+    $candidateDb->rows=[['Name'=>'"'.$pcpWell.$family.'PT:FONDO.PV"','WebId'=>'"'.$pressureId.'"','EngineeringUnits'=>'"bar"','PointType'=>'Float32','Step'=>'false']];
+    $candidate=wh_catalog($candidateDb,$pcpWell,$pcpSource);
+    check($candidate['PT:FONDO']['available']&&$candidate['PT:FONDO']['webid']===$pressureId,'Aceptar únicamente el candidato exacto presente en catálogo: '.$family);
+    check($candidate['PT:FONDO']['tag']===$pcpWell.$family.'PT:FONDO.PV'&&$candidate['PT:FONDO']['unit']==='bar','Conservar el nombre y la unidad observados, sin conversión.');
+}
+$pcpDb=new WhTestDb();
+$pcpDb->rows=[
+    ['Name'=>$pcpWell.'(PC12)_YT:POZO.PV','WebId'=>$stateId,'PointType'=>'Digital','Step'=>'true'],
+    ['Name'=>$pcpWell.'(PC12)_PT:FONDO','WebId'=>$pressureId,'EngineeringUnits'=>'bar','PointType'=>'Float32','Step'=>'false'],
+    ['Name'=>$pcpWell.'(PC12)_YAT:COM.PV','WebId'=>$communicationId,'PointType'=>'Digital','Step'=>'true'],
+    ['Name'=>$pcpWell.'(PC12)_QT:RPM.PV','WebId'=>str_repeat('R',30)],
+    ['Name'=>$pcpWell.'0(PC12)_PT:FONDO.PV','WebId'=>str_repeat('N',30)],
+    ['Name'=>$pcpWell.'(RPC)_PT:FONDO.PV','WebId'=>str_repeat('B',30)],
+    ['Name'=>$pcpWell.'(PC12)_PT:FONDO.PV_EXTRA','WebId'=>str_repeat('E',30)]
+];
+$pcpCatalog=wh_catalog($pcpDb,$pcpWell,$pcpSource);
+check(array_keys($pcpCatalog)===['YT:POZO','PT:FONDO','YAT:COM','__COMUNICACION'],'PCP publica solo sus cuatro variables, sin estado derivado de RPM.');
+check($pcpCatalog['YT:POZO']['webid']===$stateId&&!isset($pcpCatalog['YT:POZO']['derived']),'Estado PCP proviene de su propio tag.');
+check($pcpCatalog['PT:FONDO']['webid']===$pressureId,'No confundir pozo vecino, sufijo extra o familia RPC.');
+check($pcpCatalog['YAT:COM']['webid']===$communicationId&&$pcpCatalog['__COMUNICACION']['webid']===$communicationId,'Alias de comunicación usa el mismo WebId observado.');
+$pcpParams=[];
+foreach(['(PC12)_','(PC14)_','(PCP)_','_'] as $family){$prefix=wh_like($pcpWell.$family);$pcpParams[]=$prefix.'%';$pcpParams[]='"'.$prefix.'%';}
+check($pcpDb->params===$pcpParams,'Consulta PCP acotada a prefijos exactos y parametrizados, con guion bajo escapado.');
+
+$excludedDb=new WhTestDb();
+$excludedDb->rows=[
+    ['Name'=>$pcpWell.'(RPC)_YT:POZO.PV','WebId'=>$stateId],
+    ['Name'=>$pcpWell.'0(PCP)_PT:FONDO.PV','WebId'=>$pressureId],
+    ['Name'=>$pcpWell.'(BES)_YAT:COM.PV','WebId'=>$communicationId],
+    ['Name'=>$pcpWell.'(PCP)_YT:POZO.ALM','WebId'=>$stateId]
+];
+$excluded=wh_catalog($excludedDb,$pcpWell,$pcpSource);
+foreach($excluded as $point)check(!$point['available']&&strpos($point['reason'],'PCP verificada')!==false,'Sin candidato exacto no inventar una correspondencia PCP.');
+$bmFromPcp=wh_catalog($pcpDb,$pcpWell);
+check(!$bmFromPcp['YAT:COM']['available']&&!isset($bmFromPcp['YT:POZO']),'El catálogo BM no consume tags PCP ni cambia sus columnas.');
+
+$ambiguousDb=new WhTestDb();
+$ambiguousDb->rows=[
+    ['Name'=>$pcpWell.'(PC12)_PT:FONDO','WebId'=>$pressureId],
+    ['Name'=>$pcpWell.'(PC14)_PT:FONDO.PV','WebId'=>str_repeat('D',30)]
+];
+check(!wh_catalog($ambiguousDb,$pcpWell,$pcpSource)['PT:FONDO']['available'],'Dos familias con distintos WebId son ambiguas, no se elige una por prioridad.');
+$ambiguousDb->rows[1]['Name']=$pcpWell.'(PC12)_PT:FONDO';
+check(!wh_catalog($ambiguousDb,$pcpWell,$pcpSource)['PT:FONDO']['available'],'Un mismo nombre con dos WebId distintos también es ambiguo.');
+
+$pcpHistory=wh_history($pcpCatalog,['YT:POZO','PT:FONDO'],'2026-10-21T00:00','2026-10-22T00:00',function()use($stateId,$pressureId){
+    return ['Items'=>[
+        ['WebId'=>$stateId,'Items'=>[['Timestamp'=>'2026-10-21T03:00:00Z','Value'=>['Name'=>'PARADO','Value'=>4],'Good'=>true]]],
+        ['WebId'=>$pressureId,'Items'=>[['Timestamp'=>'2026-10-21T03:00:00Z','Value'=>0,'Good'=>true]]]
+    ]];
+});
+check($pcpHistory['series'][0]['samples'][0]['value']==='PARADO'&&$pcpHistory['series'][0]['samples'][0]['plot_value']===4.0,'Conservar nombre y código de estado PCP sin derivarlo de RPM.');
+check($pcpHistory['series'][1]['samples'][0]['value']===0&&$pcpHistory['series'][1]['unit']==='bar','Conservar presión PCP cero y unidad del catálogo.');
+rejects(function()use($pcpCatalog){wh_history($pcpCatalog,['ESTADO_RPM'],'2026-10-21T00:00','2026-10-22T00:00',function(){throw new RuntimeException('No debe llamar PI con una variable de BM.');});});
+echo "OK: catálogo BM/PCP, origen y permisos, correspondencias exactas, aislamiento, rango, calidad, estados y errores parciales.\n";

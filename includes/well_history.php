@@ -1,7 +1,20 @@
 <?php
 /* Lectura del catálogo existente. No crea ni modifica objetos SQL. */
 function wh_clean($value) { return trim(trim((string)$value), "\" \t\r\n"); }
-function wh_columns() {
+function wh_source($value='monitoreo_pozos') {
+    if(!is_string($value)||!in_array($value,['monitoreo_pozos','telemetria_pcp'],true))
+        throw new InvalidArgumentException('La pantalla de origen no es válida.');
+    return $value;
+}
+function wh_can_history($source) {
+    return permissions_can_menu(wh_source($source))&&permissions_can_menu('pi_historico');
+}
+function wh_can_activity($source) {
+    return permissions_can_menu(wh_source($source))&&(permissions_can_menu('pozos_alarmas24')||permissions_can_menu('pozos_todas_alarmas'));
+}
+function wh_cards_allowed($source) { return wh_source($source)==='monitoreo_pozos'; }
+function wh_columns($source='monitoreo_pozos') {
+    if(wh_source($source)==='telemetria_pcp')return ['YT:POZO','PT:FONDO','YAT:COM','__COMUNICACION'];
     return ['TIME:SUP','TIME:FONDO','ZT:SUP-POS','WT:SUP-LOAD','ZT:FONDO-POS','WT:FONDO-LOAD','ESTADO','Fecha','ECO','ESTADO-GRAL','PT:LINEA','YAT:COM','__COMUNICACION',
         'ET:VARIADOR','FP','FT:AGUA_ACU','FT:AGUA_CIERRE','FT:FONDO-LLENADO.PV',
         'FT:LLENADO.SP','FT:LLENADO-ACTUAL','FT:OIL_ACU','FT:OIL_CIERRE','FT:PROD_ACU',
@@ -17,9 +30,23 @@ function wh_well($value) {
     return $well;
 }
 function wh_like($value) { return strtr($value,['['=>'[[]','%'=>'[%]','_'=>'[_]']); }
-function wh_catalog($db,$well) {
-    $prefix=wh_like($well.'(RPC)_');
-    $rows=$db->all('SELECT TOP (501) [Name],[WebId],[EngineeringUnits],[PointType],[Step] FROM [LC_MDB].[dbo].[PI_Points_Stage] WHERE [Name] LIKE ? OR [Name] LIKE ?',[$prefix.'%','"'.$prefix.'%']);
+function wh_catalog($db,$well,$source='monitoreo_pozos') {
+    $source=wh_source($source);
+    /*
+     * PCP: candidatos estrictos, no una convención confirmada de producción.
+     * PC12/PC14 son las plantillas de la grilla; PCP y el nombre directo se
+     * verifican únicamente contra filas reales del catálogo. No se fabrican
+     * WebId ni se reutiliza la familia RPC de bombeo mecánico.
+     */
+    $prefixes=$source==='telemetria_pcp'
+        ?[$well.'(PC12)_',$well.'(PC14)_',$well.'(PCP)_',$well.'_']
+        :[$well.'(RPC)_'];
+    $conditions=[];$params=[];
+    foreach($prefixes as $prefix){
+        $conditions[]='[Name] LIKE ?';$params[]=wh_like($prefix).'%';
+        $conditions[]='[Name] LIKE ?';$params[]='"'.wh_like($prefix).'%';
+    }
+    $rows=$db->all('SELECT TOP (501) [Name],[WebId],[EngineeringUnits],[PointType],[Step] FROM [LC_MDB].[dbo].[PI_Points_Stage] WHERE '.implode(' OR ',$conditions),$params);
     if($db->error())throw new RuntimeException('No se pudo leer LC_MDB.dbo.PI_Points_Stage.');
     if(count($rows)>500)throw new RuntimeException('El catálogo del pozo supera el límite de búsqueda.');
     $byName=[];
@@ -32,16 +59,19 @@ function wh_catalog($db,$well) {
             'step'=>in_array(strtolower(wh_clean($row['Step']??'')),['true','1'],true)];
     }
     $output=[];
-    foreach(wh_columns() as $column){
-        $source=$column==='__COMUNICACION'?'YAT:COM':$column;
-        $stem=strtoupper($well.'(RPC)_'.$source);
-        $names=[$stem];if(!preg_match('/\.(PV|SP|CAL|ANL)$/i',$source))$names[]=$stem.'.PV';
+    foreach(wh_columns($source) as $column){
+        $attribute=$column==='__COMUNICACION'?'YAT:COM':$column;
+        $names=[];
+        foreach($prefixes as $prefix){
+            $stem=strtoupper($prefix.$attribute);$names[]=$stem;
+            if(!preg_match('/\.(PV|SP|CAL|ANL)$/i',$attribute))$names[]=$stem.'.PV';
+        }
         $matches=[];foreach($names as $name)foreach($byName[$name]??[] as $id=>$point)$matches[$id]=$point;
         if(count($matches)===1)$output[$column]=array_values($matches)[0]+['available'=>true];
-        else $output[$column]=['available'=>false,'reason'=>count($matches)>1?'Hay más de un tag posible; falta verificar la correspondencia.':'Sin tag verificado en PI_Points_Stage.'];
+        else $output[$column]=['available'=>false,'reason'=>count($matches)>1?'Hay más de un tag posible; falta verificar la correspondencia.':($source==='telemetria_pcp'?'Sin correspondencia PCP verificada en PI_Points_Stage.':'Sin tag verificado en PI_Points_Stage.')];
     }
     // Misma regla de ESTADO_RPM que usa telemetry_grid.php, sobre el RPM horario.
-    if(!empty($output['QT:RPM']['available']))$output['ESTADO_RPM']=array_merge($output['QT:RPM'],[
+    if($source==='monitoreo_pozos'&&!empty($output['QT:RPM']['available']))$output['ESTADO_RPM']=array_merge($output['QT:RPM'],[
         'type'=>'Digital','unit'=>'','step'=>true,'derived'=>'rpm_state',
         'derivation_label'=>'Estado calculado a partir de RPM en cada muestra.'
     ]);

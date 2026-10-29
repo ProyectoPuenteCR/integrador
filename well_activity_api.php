@@ -8,9 +8,10 @@ auth_require();
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 function wa_out($data,$status=200){http_response_code($status);echo json_encode($data,JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE);exit;}
-if(!permissions_can_menu('monitoreo_pozos')||(!permissions_can_menu('pozos_alarmas24')&&!permissions_can_menu('pozos_todas_alarmas')))wa_out(['ok'=>false,'error'=>'No tenés permiso para ver las alarmas del pozo.'],403);
 if($_SERVER['REQUEST_METHOD']!=='GET')wa_out(['ok'=>false,'error'=>'Método no permitido.'],405);
 try{
+    $source=wh_source(array_key_exists('source',$_GET)?$_GET['source']:'monitoreo_pozos');
+    if(!wh_can_activity($source))wa_out(['ok'=>false,'error'=>'No tenés permiso para ver las alarmas del pozo.'],403);
     $well=wh_well($_GET['well']??'');
     $config=require __DIR__.'/config.php';date_default_timezone_set($config['timezone']??'America/Argentina/Buenos_Aires');
     $db=clear_db();if(!$db->ok())throw new RuntimeException('Sin conexión a SQL Server.');

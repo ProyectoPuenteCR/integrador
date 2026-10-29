@@ -1,6 +1,7 @@
 (function(){
   'use strict';
   const cfg=window.CLEAR_TELEMETRY_GRID||{};
+  if(!['monitoreo_pozos','telemetria_pcp'].includes(cfg.key))return;
   const bell='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>';
   let active=null;
   function node(tag,className,text){const el=document.createElement(tag);el.className=className||'';if(text!==undefined)el.textContent=text;return el;}
@@ -69,7 +70,7 @@
     const url=(cfg.wellAlarmsHistory?'pozos_todas_alarmas.php':'pozos_alarmas24.php')+'?'+new URLSearchParams({pozo:well,pozo_exacto:'1',prefijo_pozo:''});
     link.href=url;link.dataset.telemetryModalUrl=url+'&embed=1';link.dataset.telemetryModalOpenUrl=url;link.dataset.telemetryModalTitle='Historial de alarmas · '+well;link.dataset.telemetryModalEyebrow='Alarmas de pozo';link.setAttribute('aria-label','Abrir historial de alarmas de '+well);link.addEventListener('click',close);alarmHead.append(link);
     last.textContent='Consultando última alarma…';
-    request('well_activity_api.php?'+new URLSearchParams({well}),{signal:state.controller.signal}).then(data=>{
+    request('well_activity_api.php?'+new URLSearchParams({well,source:cfg.key}),{signal:state.controller.signal}).then(data=>{
       if(!current())return;count.textContent=String(data.count24h);link.classList.toggle('has-alarms',data.count24h>0);link.title=data.count24h+' alarmas en las últimas 24 horas. Abrir historial.';
       last.replaceChildren();if(!data.latest){last.textContent='Sin alarmas registradas para este pozo.';return;}
       const item=data.latest;last.append(node('strong','',item.description||item.tag||'Alarma'));

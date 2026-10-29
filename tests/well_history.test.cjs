@@ -6,9 +6,9 @@ const {chromium}=require('playwright');
 const root=path.join(__dirname,'..');
 const fields={POZO:'YPF.SC.BB-130',BATERIA:'BB 03','QT:RPM':'750',FP:'0,85',ECO:'NORMAL',Fecha:'2026-10-22 12:00','PT:LINEA':'0',ESTADO_RPM:'EN MARCHA','PT:CABEZA':'10.45'};
 const config={key:'monitoreo_pozos',title:'Monitoreo Pozos',batteryColumn:'BATERIA',wellHistory:true,wellHistoryReport:true};
-function fixture(){
+function fixture(values=fields,settings=config){
   const styles=fs.readFileSync(path.join(root,'includes/telemetry_grid.php'),'utf8').match(/<style>([\s\S]*?)<\/style>/)[1].split('<?php')[0];
-  return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+['app','well_details','well_history'].map(name=>fs.readFileSync(path.join(root,'assets/css/'+name+'.css'),'utf8')).join('\n')+styles+'</style><table id="tgTable"><thead><tr>'+Object.keys(fields).map(column=>'<th data-column="'+column+'" data-report-label="'+column+'">'+column+'</th>').join('')+'</tr></thead><tbody><tr>'+Object.entries(fields).map(([column,value])=>'<td data-column="'+column+'" data-raw="'+value+'">'+value+'</td>').join('')+'</tr></tbody></table><script>window.CLEAR_TELEMETRY_GRID='+JSON.stringify(config)+'</script></html>';
+  return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+['app','well_details','well_history'].map(name=>fs.readFileSync(path.join(root,'assets/css/'+name+'.css'),'utf8')).join('\n')+styles+'</style><table id="tgTable"><thead><tr>'+Object.keys(values).map(column=>'<th data-column="'+column+'" data-report-label="'+column+'">'+column+'</th>').join('')+'</tr></thead><tbody><tr>'+Object.entries(values).map(([column,value])=>'<td data-column="'+column+'" data-raw="'+value+'">'+value+'</td>').join('')+'</tr></tbody></table><script>window.CLEAR_TELEMETRY_GRID='+JSON.stringify(settings)+'</script></html>';
 }
 const catalog={};for(const column of ['QT:RPM','FP','ECO','ESTADO_RPM','PT:CABEZA'])catalog[column]={available:true,tag:fields.POZO+'(RPC)_'+column+'.PV',unit:column==='QT:RPM'?'rpm':'',type:column==='ECO'?'Digital':'Float32'};
 catalog.Fecha={available:false,reason:'Sin tag verificado'};catalog['PT:LINEA']={available:false,reason:'Sin tag verificado'};
@@ -191,6 +191,56 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
     await page.waitForFunction(()=>document.querySelectorAll('.wh-pick input:enabled').length===5);
     assert.equal(await detail.getByRole('checkbox',{name:'Seleccionar QT:RPM para histórico',exact:true}).isChecked(),true);
     assert.deepEqual(errors,[]);
+  }finally{await browser.close();}
+});
+test('PCP integra ficha, históricos y alarmas con su fuente y sólo variables verificadas',async()=>{
+  const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'msedge'});
+  try{
+    for(const communicationVerified of [true,false]){
+      const page=await browser.newPage();
+      const values={POZO:'YPF.SC.PC-101',BATERIA:'PC 01','YT:POZO':'PARADO','PT:FONDO':'0',__COMUNICACION:'Comunicando',PLANTILLA:'PC12',ALM:'2'};
+      const settings={...config,key:'telemetria_pcp',title:'Telemetría PCP',wellHistoryReport:false,wellAlarms:true,wellCommentView:false};
+      const columns={};
+      for(const column of ['YT:POZO','PT:FONDO','__COMUNICACION'])columns[column]={available:true,tag:values.POZO+'(PCP)_'+(column==='__COMUNICACION'?'YAT:COM':column)+'.PV',unit:column==='PT:FONDO'?'kg/cm2':'',type:column==='PT:FONDO'?'Float32':'Digital'};
+      if(!communicationVerified)columns.__COMUNICACION={available:false,reason:'Sin tag verificado'};
+      const gets=[],posts=[],alarms=[],errors=[];
+      page.on('pageerror',error=>errors.push(error.message));
+      await page.route('http://clear.test/**',async route=>{
+        const request=route.request(),url=new URL(request.url());
+        if(url.pathname.endsWith('/well_history_api.php')){
+          if(request.method()==='GET'){gets.push(Object.fromEntries(url.searchParams));return route.fulfill({json:{ok:true,columns}});}
+          const body=request.postDataJSON();posts.push(body);
+          if(body.action==='cards')return route.fulfill({status:422,json:{ok:false,error:'PCP no tiene cartas dinamométricas.'}});
+          return route.fulfill({json:{ok:true,well:values.POZO,intervalSeconds:body.intervalSeconds,start:'2026-10-21T00:00:00-03:00',end:'2026-10-22T00:00:00-03:00',series:body.columns.map(column=>({column,...columns[column],step:column!=='PT:FONDO',samples:[0,1,2].map(hour=>({timestamp:'2026-10-21T0'+(hour+3)+':00:00Z',value:column==='YT:POZO'?(hour?'EN MARCHA':'PARADO'):column==='PT:FONDO'?[0,12.5,13][hour]:'NORMAL',plot_value:column==='YT:POZO'?(hour?7:0):column==='PT:FONDO'?[0,12.5,13][hour]:0,good:column!=='YT:POZO'||hour!==1,questionable:false,substituted:false}))}))}});
+        }
+        if(url.pathname.endsWith('/well_activity_api.php')){
+          alarms.push(Object.fromEntries(url.searchParams));return route.fulfill({json:{ok:true,count24h:2,latest:{description:'Estado del pozo',value:'PARADO',status:'ACTIVA',started_at:'21/10/2026 00:00',last_at:'21/10/2026 02:00'}}});
+        }
+        if(url.pathname==='/telemetria_pcp.php')return route.fulfill({contentType:'text/html; charset=utf-8',body:fixture(values,settings)});
+        return route.fulfill({status:404,body:''});
+      });
+      await page.goto('http://clear.test/telemetria_pcp.php');
+      for(const file of ['chart.umd.js','chartjs-plugin-zoom.min.js','well_history.js','well_activity.js','well_details.js'])await page.addScriptTag({path:path.join(root,'assets/js',file)});
+      await page.locator('td[data-column=POZO]').click();
+      await page.waitForFunction(()=>document.querySelector('.wh-chart canvas')&&!document.querySelector('[data-wh-export]').disabled&&document.querySelector('.wd-alarm-bell strong')?.textContent==='2');
+      const detail=page.locator('dialog.well-details:not(.wh-dialog)');
+      const expected=communicationVerified?['YT:POZO','PT:FONDO','__COMUNICACION']:['YT:POZO','PT:FONDO'];
+      assert.deepEqual(gets,[{well:values.POZO,source:'telemetria_pcp'}]);
+      assert.deepEqual(alarms,[{well:values.POZO,source:'telemetria_pcp'}]);
+      assert.equal(posts.length,1);assert.equal(posts[0].source,'telemetria_pcp');assert.equal(posts[0].well,values.POZO);assert.deepEqual(posts[0].columns,expected);
+      assert.equal(posts.some(item=>item.action==='cards'),false);assert.equal(await detail.locator('.wd-cards-host').count(),0);
+      assert.equal(await detail.locator('[data-history-column="PLANTILLA"] input').count(),0);
+      const communication=detail.locator('[data-history-column="__COMUNICACION"] input');
+      assert.equal(await communication.isChecked(),communicationVerified);assert.equal(await communication.isDisabled(),!communicationVerified);
+      assert.deepEqual(await detail.locator('.wh-pick input:checked').evaluateAll(nodes=>nodes.map(node=>node.closest('[data-history-column]').dataset.historyColumn).sort()),[...expected].sort());
+      const chart=await detail.locator('.wh-chart canvas').evaluate(canvas=>Chart.getChart(canvas).data.datasets.map(dataset=>({column:dataset.historySeries.column,data:dataset.data,values:dataset.historySamples.map(sample=>sample.value),step:dataset.stepped})));
+      assert.deepEqual(chart.find(item=>item.column==='YT:POZO'),{column:'YT:POZO',data:[0,null,7],values:['PARADO','EN MARCHA','EN MARCHA'],step:true});
+      assert.deepEqual(chart.find(item=>item.column==='PT:FONDO').data,[0,12.5,13]);
+      assert.ok((await detail.locator('.wh-values').textContent()).includes('PARADO'));
+      assert.ok((await detail.locator('.wh-values').textContent()).includes('0,00'));
+      assert.equal(await detail.locator('[data-wh-report]').isVisible(),false);
+      assert.deepEqual(errors,[]);await page.close();
+    }
   }finally{await browser.close();}
 });
 test('el permiso de histórico desactiva la función',async()=>{

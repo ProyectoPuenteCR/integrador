@@ -1,7 +1,13 @@
 (function(){
   'use strict';
   const cfg=window.CLEAR_TELEMETRY_GRID||{};
-  if(cfg.key!=='monitoreo_pozos')return;
+  if(!['monitoreo_pozos','telemetria_pcp'].includes(cfg.key))return;
+  const isPcp=cfg.key==='telemetria_pcp';
+  const stateColumn=isPcp?(cfg.stateColumn||'YT:POZO'):'ESTADO_RPM';
+  const showCards=!isPcp&&cfg.wellCards!==false;
+  const kpiColumns=isPcp
+    ?[['Petróleo','PRODUCCION_PETROLEO'],['Líquido','PRODUCCION_LIQUIDO'],['Gas','PRODUCCION_GAS'],['Estado del pozo',stateColumn],['Presión de fondo','PT:FONDO'],['Alarmas 24 h','ALM']]
+    :[['Petróleo','PRODUCCION_PETROLEO'],['Líquido','PRODUCCION_LIQUIDO'],['Llenado','FT:FONDO-LLENADO.PV'],['Motor','QT:RPM'],['Presión de línea','PT:LINEA'],['Alarmas 24 h','ALM']];
   const table=document.getElementById('tgTable');
   if(!table||!table.tBodies[0])return;
 
@@ -22,8 +28,8 @@
   const identity=titleLine.parentElement;
   identity.classList.add('well-details__identity');
   const pump=document.createElement('img');pump.className='well-details__pump';
-  pump.src=document.querySelector('.tg-hero__visual img')?.getAttribute('src')||'assets/img/telemetry/monitoreo_pozos.png';
-  pump.alt='Bombeo mecánico';pump.addEventListener('error',()=>pump.hidden=true);
+  pump.src=document.querySelector('.tg-hero__visual img')?.getAttribute('src')||'assets/img/telemetry/'+(isPcp?'telemetria_pcp':'monitoreo_pozos')+'.png';
+  pump.alt=isPcp?'Bombeo PCP':'Bombeo mecánico';pump.addEventListener('error',()=>pump.hidden=true);
   identity.prepend(pump);
   const monitorSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M7 20h10M9 16v4M15 16v4"/></svg>';
   let opener=null;
@@ -31,7 +37,7 @@
   const groupFor=column=>{
     if(['POZO',cfg.batteryColumn||'BATERIA','Estado Zafiro','Método Zafiro','Zafiro Activo'].includes(column))return 'Identificación';
     if(/^PRODUCCION_|^FT:(AGUA|OIL|PROD)/.test(column))return 'Producción';
-    if(['ALM','__COMUNICACION','ESTADO','ESTADO-GRAL','ESTADO_RPM','AF-ESTADO-PARO-REMOTO','Fecha','COMENTARIO'].includes(column))return 'Operación';
+    if(['ALM','__COMUNICACION','YAT:COM','ESTADO','ESTADO-GRAL','ESTADO_RPM','YT:POZO','AF-ESTADO-PARO-REMOTO','Fecha','COMENTARIO',stateColumn].includes(column))return 'Operación';
     return 'Variables de telemetría';
   };
   const isNoData=text=>/^(?:sin\s+datos?|[—–-])?$/i.test(String(text).trim());
@@ -94,9 +100,15 @@
       titleIcons.append(warning);
     }
     addAction(cells.get('PANTALLA')?.querySelector('a'),'Abrir pantalla de PI Vision',{target:titleIcons,screen:true,iconOnly:true});
-    subtitle.textContent=[cfg.title||'Monitoreo de Pozos',value(cfg.batteryColumn||'BATERIA')].filter(Boolean).join(' · ');
+    subtitle.textContent=[cfg.title||(isPcp?'Telemetría PCP':'Monitoreo de Pozos'),value(cfg.batteryColumn||'BATERIA')].filter(Boolean).join(' · ');
     liveStatus.replaceChildren();
-    ['__COMUNICACION','ESTADO_RPM'].forEach(column=>{if(!value(column))return;const badge=document.createElement('span');badge.textContent=value(column);if(column==='__COMUNICACION'&&communication==='sin comunicacion')badge.className='is-error';liveStatus.append(badge);});
+    ['__COMUNICACION',stateColumn].forEach(column=>{
+      const text=value(column);if(!text)return;
+      const badge=document.createElement('span');badge.textContent=text;
+      if((column==='__COMUNICACION'&&communication==='sin comunicacion')||(isPcp&&column===stateColumn&&/^parado$/i.test(text)))badge.className='is-error';
+      else if(isPcp&&isNoData(text))badge.className='is-no-data';
+      liveStatus.append(badge);
+    });
     body.replaceChildren();actions.replaceChildren();
     const groups=new Map(['Identificación','Operación','Producción','Variables de telemetría'].map(name=>[name,[]]));
     originalColumns.forEach(({column,label})=>{
@@ -114,16 +126,18 @@
       field.append(term,description);groups.get(groupFor(column)).push(field);
     });
     const kpis=document.createElement('div');kpis.className='wd-kpis';
-    [['Petróleo','PRODUCCION_PETROLEO'],['Líquido','PRODUCCION_LIQUIDO'],['Llenado','FT:FONDO-LLENADO.PV'],['Motor','QT:RPM'],['Presión de línea','PT:LINEA'],['Alarmas 24 h','ALM']].forEach(([label,column])=>{
+    kpiColumns.forEach(([label,column])=>{
       const card=document.createElement('article');card.className='wd-kpi';const heading=document.createElement('span');heading.textContent=label;
       const reading=document.createElement('strong');reading.textContent=displayValue(column,value(column));
       card.classList.toggle('is-no-data',isNoData(reading.textContent));
       card.append(heading,reading);kpis.append(card);
     });body.append(kpis);
-    const workspace=document.createElement('div');workspace.className='wd-workspace';
+    const workspace=document.createElement('div');workspace.className=showCards?'wd-workspace':'wd-workspace wd-workspace--history-only';
     const historyHost=document.createElement('section');historyHost.className='wd-history-host';historyHost.setAttribute('aria-label','Tendencias seleccionadas');
-    const cardsHost=document.createElement('aside');cardsHost.className='wd-cards-host';cardsHost.setAttribute('aria-label','Cartas dinamométricas');
-    workspace.append(historyHost,cardsHost);body.append(workspace);
+    const cardsHost=showCards?document.createElement('aside'):null;
+    workspace.append(historyHost);
+    if(cardsHost){cardsHost.className='wd-cards-host';cardsHost.setAttribute('aria-label','Cartas dinamométricas');workspace.append(cardsHost);}
+    body.append(workspace);
     const details=document.createElement('div');details.className='wd-data-groups';details.tabIndex=-1;body.append(details);
     dialog.querySelector('[data-well-choose]').onclick=()=>{details.scrollIntoView({block:'start',behavior:'smooth'});details.focus({preventScroll:true});};
     groups.forEach((fields,name)=>{
@@ -134,9 +148,9 @@
     });
     addAction(row.querySelector('.tg-alarm-link'),'Ver alarmas ('+(value('ALM')||'0')+')');
     addAction(cells.get('PANTALLA')?.querySelector('a'),'Abrir pantalla',{screen:true});
-    addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
+    if(showCards)addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
     if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions,historyHost,cardsHost});
-    if(!window.CLEAR_WELL_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
+    if(!window.CLEAR_WELL_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';if(cardsHost)cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
     window.CLEAR_WELL_ACTIVITY?.decorate({row,body,activityHost,well:value('POZO'),close});
     resize(true);dialog.showModal();body.scrollTop=0;document.body.classList.add('well-details-open');
   }
