@@ -5,6 +5,7 @@ require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/icons.php';
 require_once __DIR__ . '/includes/zones.php';
 require_once __DIR__ . '/includes/alarm_actions.php';
+require_once __DIR__ . '/includes/pozos_alarmas_exact.php';
 
 auth_require();
 $historyMode = defined('POZOS_ALARMAS_HISTORY_MODE') && POZOS_ALARMAS_HISTORY_MODE === true;
@@ -36,6 +37,7 @@ if ($showAllRows) $page = 1;
 
 $wellPrefix = trim((string)($_GET['prefijo_pozo'] ?? 'YPF.SC'));
 $wellSearch = trim((string)($_GET['pozo'] ?? ''));
+$wellExact = pa_well_exact_requested($_GET);
 $descSearch = trim((string)($_GET['descripcion'] ?? ''));
 $statusFilter = trim((string)($_GET['f_estado'] ?? ''));
 if (!$showCfnStatus && strtoupper($statusFilter) === 'CFN') $statusFilter = '';
@@ -189,11 +191,13 @@ $priorityColumn = 'ALM_ALMPRIORITY';
 $unitColumn = 'ALM_UNIT';
 
 if ($db->ok()) {
-    $metaRows = $db->all("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='FIXALARMS' ORDER BY ORDINAL_POSITION");
+    $metaRows = $db->all("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='FIXALARMS' ORDER BY ORDINAL_POSITION");
     $allColumns = [];
+    $wellMetadata = [];
     foreach ($metaRows as $metaRow) {
         $column = trim((string)($metaRow['COLUMN_NAME'] ?? $metaRow['column_name'] ?? reset($metaRow)));
         if ($column !== '') $allColumns[] = $column;
+        if (strtoupper($column) === 'ALM_ALMEXTFLD2') $wellMetadata = $metaRow;
     }
     if (!$allColumns) {
         $sample = $db->all("SELECT TOP 1 * FROM $table");
@@ -225,7 +229,7 @@ if ($db->ok()) {
         if ($filterValue !== '') $columnFilters[$index] = $filterValue;
     }
 
-    $baseConditions = [
+    $baseConditions = $wellExact ? [] : [
         "[$wellColumn] IS NOT NULL",
         "LTRIM(RTRIM(CONVERT(nvarchar(4000),[$wellColumn]))) <> ''"
     ];
@@ -240,7 +244,11 @@ if ($db->ok()) {
         $baseConditions[] = "UPPER(LTRIM(RTRIM(CONVERT(nvarchar(4000),[$wellColumn])))) LIKE ?";
         $baseParams[] = strtoupper($wellPrefix) . '%';
     }
-    foreach (pa24_terms($wellSearch) as $term) {
+    if ($wellExact) {
+        $exactFilter = pa_well_exact_filter($wellColumn, $wellSearch, $wellMetadata);
+        $baseConditions[] = $exactFilter['sql'];
+        $baseParams = array_merge($baseParams, $exactFilter['params']);
+    } else foreach (pa24_terms($wellSearch) as $term) {
         $baseConditions[] = "(CONVERT(nvarchar(4000),[$wellColumn]) LIKE ? OR REPLACE(REPLACE(REPLACE(CONVERT(nvarchar(4000),[$wellColumn]),'_',''),'-',''),' ','') LIKE ?)";
         $baseParams[] = '%' . $term . '%';
         $baseParams[] = '%' . str_replace(['_', '-', ' '], '', $term) . '%';
@@ -340,7 +348,7 @@ if ($db->ok()) {
 }
 
 $totalPages = $showAllRows ? 1 : max(1, (int)ceil($total / max(1,$perPage)));
-$hasFilters = $zoneFilter !== '' || $wellSearch !== '' || $descSearch !== '' || $wellPrefix !== 'YPF.SC' || $statusFilter !== '' || $priorityFilter !== '' || $valueBucketFilter !== '' || $hasExplicitDateInputs || !empty($columnFilters);
+$hasFilters = $wellExact || $zoneFilter !== '' || $wellSearch !== '' || $descSearch !== '' || $wellPrefix !== 'YPF.SC' || $statusFilter !== '' || $priorityFilter !== '' || $valueBucketFilter !== '' || $hasExplicitDateInputs || !empty($columnFilters);
 
 $statusCounts = pa24_sort_count_map($statusCounts, ['HI','HIHI','LO','LOLO','OK','NORMAL','RTN','PARADA','STOP','CFN']);
 $priorityCounts = pa24_sort_count_map($priorityCounts, ['HIGH','MEDIUM','LOW','INFO']);
@@ -452,6 +460,7 @@ function pa24_column_label($column, $labels) {
 
       <form class="pozosToolbar" method="get" action="<?php echo h($screenUrl); ?>" id="pozosAlarmasFilters">
         <?php if ($embedMode): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
+        <?php if ($wellExact): ?><input type="hidden" name="pozo_exacto" value="1"><?php endif; ?>
         <label class="allAlarmsSearch">
           <?php echo icon('map'); ?><span>ZONA</span>
           <select name="zona" onchange="this.form.submit()"><option value="">Todas</option><?php foreach($zones as $z): ?><option value="<?php echo h($z); ?>"<?php echo $zoneFilter===$z?' selected':''; ?>><?php echo h($z); ?></option><?php endforeach; ?></select>
@@ -461,8 +470,8 @@ function pa24_column_label($column, $labels) {
           <input type="text" name="prefijo_pozo" value="<?php echo h($wellPrefix); ?>" placeholder="Ej. YPF.SC" autocomplete="off">
         </label>
         <label class="allAlarmsSearch">
-          <?php echo icon('search'); ?><span>POZO</span>
-          <input type="text" name="pozo" value="<?php echo h($wellSearch); ?>" placeholder="Buscar pozo aproximado…" autocomplete="off">
+          <?php echo icon('search'); ?><span><?php echo $wellExact ? 'POZO EXACTO' : 'POZO'; ?></span>
+          <input type="text" name="pozo" value="<?php echo h($wellSearch); ?>" placeholder="<?php echo $wellExact ? 'Nombre completo del pozo…' : 'Buscar pozo aproximado…'; ?>" autocomplete="off">
         </label>
         <label class="allAlarmsSearch allAlarmsSearch--wide">
           <?php echo icon('search'); ?><span>DESCRIPCIÓN</span>

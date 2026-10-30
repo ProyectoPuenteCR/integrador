@@ -12,6 +12,7 @@
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/appconfig.php';
+require_once __DIR__ . '/includes/pi_transport.php';
 
 auth_require(); // solo usuarios logueados
 
@@ -40,48 +41,14 @@ if ($path[0] !== '/') $path = '/' . $path;
 
 $url = $base . $path;
 
-// --- Llamada a PI usando cURL (ignora el certificado autofirmado) ---
-if (function_exists('curl_init')) {
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // certificado autofirmado
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    $headers = ['X-Requested-With: XMLHttpRequest'];
-    if ($auth) $headers[] = 'Authorization: ' . $auth;
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-    $resp = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err = curl_error($ch);
-    curl_close($ch);
-
-    if ($resp === false) {
-        http_response_code(502);
-        echo json_encode(['Errors' => ['No se pudo conectar a PI: ' . $err]]);
-        exit;
-    }
-    http_response_code($httpCode ?: 200);
-    echo $resp;
-    exit;
-}
-
-// --- Fallback con file_get_contents si no hay cURL ---
-$ctx = stream_context_create([
-    'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
-    'http' => [
-        'method' => 'GET',
-        'header' => ($auth ? "Authorization: $auth\r\n" : '') . "X-Requested-With: XMLHttpRequest\r\n",
-        'timeout' => 30,
-        'ignore_errors' => true,
-    ],
-]);
-$resp = @file_get_contents($url, false, $ctx);
-if ($resp === false) {
+// La misma conexión se utiliza en SCADA e históricos de pozos.
+$app = require __DIR__ . '/config.php';
+$pi['ca_bundle'] = config_get('pi_ca_bundle', $app['pi']['ca_bundle'] ?? '');
+try {
+    $response = clear_pi_transport($path, $pi, $auth);
+    http_response_code($response['status']);
+    echo $response['body'];
+} catch (Throwable $e) {
     http_response_code(502);
-    echo json_encode(['Errors' => ['No se pudo conectar a PI (sin cURL).']]);
-    exit;
+    echo json_encode(['Errors' => [$e->getMessage()]], JSON_UNESCAPED_UNICODE);
 }
-echo $resp;
