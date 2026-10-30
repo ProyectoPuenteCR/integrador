@@ -83,6 +83,7 @@
     else link.textContent=label;
     link.addEventListener('click',()=>close());
     target.append(link);
+    return link;
   }
 
   function open(row){
@@ -127,9 +128,10 @@
     });
     const kpis=document.createElement('div');kpis.className='wd-kpis';
     kpiColumns.forEach(([label,column])=>{
-      const card=document.createElement('article');card.className='wd-kpi';const heading=document.createElement('span');heading.textContent=label;
+      const card=document.createElement('article');card.className='wd-kpi';card.dataset.kpiColumn=column;const heading=document.createElement('span');heading.textContent=label;
       const reading=document.createElement('strong');reading.textContent=displayValue(column,value(column));
       card.classList.toggle('is-no-data',isNoData(reading.textContent));
+      card.classList.toggle('is-stopped',isPcp&&column===stateColumn&&/^parado$/i.test(value(column)));
       card.append(heading,reading);kpis.append(card);
     });body.append(kpis);
     const workspace=document.createElement('div');workspace.className=showCards?'wd-workspace':'wd-workspace wd-workspace--history-only';
@@ -146,7 +148,16 @@
       const heading=document.createElement('h3');heading.textContent=name;
       const list=document.createElement('dl');list.append(...fields);section.append(heading,list);details.append(section);
     });
-    addAction(row.querySelector('.tg-alarm-link'),'Ver alarmas ('+(value('ALM')||'0')+')');
+    const alarmSource=row.querySelector('.tg-alarm-link');
+    const alarmAction=addAction(alarmSource,'Ver alarmas ('+(value('ALM')||'0')+')');
+    if(alarmAction){
+      const originalUrl=alarmSource.dataset.telemetryModalOpenUrl||alarmSource.getAttribute('href')||'';
+      const params=new URLSearchParams(originalUrl.includes('?')?originalUrl.split('?')[1].split('#')[0]:'');
+      params.set('pozo',value('POZO'));params.set('pozo_exacto','1');params.set('prefijo_pozo','');params.delete('embed');
+      const alarmUrl='pozos_alarmas24.php?'+params.toString();
+      alarmAction.href=alarmUrl;alarmAction.dataset.telemetryModalOpenUrl=alarmUrl;alarmAction.dataset.telemetryModalUrl=alarmUrl+'&embed=1';
+      alarmAction.dataset.wellAlarmAction='true';
+    }
     addAction(cells.get('PANTALLA')?.querySelector('a'),'Abrir pantalla',{screen:true});
     if(showCards)addAction(cells.get('CARTAS')?.querySelector('a'),'Abrir carta');
     if(window.CLEAR_WELL_HISTORY)window.CLEAR_WELL_HISTORY.decorate({well:value('POZO'),body,actions,historyHost,cardsHost});

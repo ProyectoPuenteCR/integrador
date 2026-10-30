@@ -7,7 +7,8 @@
   function node(tag,className,text){const el=document.createElement(tag);el.className=className||'';if(text!==undefined)el.textContent=text;return el;}
   async function request(url,options={}){
     const response=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{'X-Requested-With':'XMLHttpRequest'},...options});
-    const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'No se pudo completar la consulta.');return data;
+    let data;try{data=await response.json();}catch(error){throw new Error('No se pudo leer la respuesta. Verificá la sesión de CLEAR.');}
+    if(!response.ok||!data.ok)throw new Error(data.error||'No se pudo completar la consulta.');return data;
   }
   function detach(){if(active){active.controller.abort();active=null;}}
   function decorate({row,body,activityHost,well,close}){
@@ -41,10 +42,11 @@
       const buttons=node('div','wd-comment-buttons');const save=node('button','tg-btn','Guardar comentario');save.type='submit';const cancel=node('button','tg-btn','Cancelar');cancel.type='button';buttons.append(save,cancel);form.append(textLabel,authorLabel,buttons);comment.append(form);
       edit.onclick=()=>{if(!loaded)return;editing=true;text.value=latestComment;author.value=latestAuthor;form.hidden=false;preview.hidden=true;edit.hidden=true;status.textContent='';text.focus();};
       cancel.onclick=()=>{editing=false;form.hidden=true;preview.hidden=false;edit.hidden=false;status.textContent='';};
-      request('alarm_events_api.php?'+new URLSearchParams({action:'get_comment',subject}),{signal:state.controller.signal}).then(data=>{
+      if(canRead)request('alarm_events_api.php?'+new URLSearchParams({action:'get_comment',subject}),{signal:state.controller.signal}).then(data=>{
         if(!current())return;loaded=true;latestComment=data.comment||'';latestAuthor=data.author||'';saved=latestComment||'Sin comentario';
         if(canRead){preview.textContent=saved;updateGrid(latestComment);}edit.disabled=false;
       }).catch(error=>{if(current()&&error.name!=='AbortError'){status.textContent=error.message;status.classList.add('is-error');}});
+      else {loaded=true;edit.disabled=false;edit.textContent='Agregar comentario';}
       form.onsubmit=async event=>{
         event.preventDefault();if(save.disabled||!editing)return;
         const value=text.value.trim(),name=author.value.trim().replace(/\s+/g,' ');
@@ -56,7 +58,7 @@
           // Un guardado iniciado por el usuario termina aunque cierre la ficha.
           await request('alarm_events_api.php',{method:'POST',body:data});
           if(!current())return;
-          latestComment=value;latestAuthor=name;saved=value;preview.textContent=value;updateGrid(value);
+          latestComment=value;latestAuthor=name;saved=value;preview.textContent=canRead?value:'Comentario guardado. Sin permiso para ver el contenido.';updateGrid(value);
           editing=false;form.hidden=true;preview.hidden=false;edit.hidden=false;status.textContent='Comentario guardado.';
         }catch(error){if(current()){status.textContent=error.message;status.classList.add('is-error');}}
         finally{save.disabled=false;cancel.disabled=false;text.disabled=false;author.disabled=false;}
@@ -71,7 +73,16 @@
     link.href=url;link.dataset.telemetryModalUrl=url+'&embed=1';link.dataset.telemetryModalOpenUrl=url;link.dataset.telemetryModalTitle='Historial de alarmas · '+well;link.dataset.telemetryModalEyebrow='Alarmas de pozo';link.setAttribute('aria-label','Abrir historial de alarmas de '+well);link.addEventListener('click',close);alarmHead.append(link);
     last.textContent='Consultando última alarma…';
     request('well_activity_api.php?'+new URLSearchParams({well,source:cfg.key}),{signal:state.controller.signal}).then(data=>{
-      if(!current())return;count.textContent=String(data.count24h);link.classList.toggle('has-alarms',data.count24h>0);link.title=data.count24h+' alarmas en las últimas 24 horas. Abrir historial.';
+      if(!current())return;
+      const validCount=typeof data.count24h==='number'&&Number.isInteger(data.count24h)&&data.count24h>=0;
+      count.textContent=validCount?String(data.count24h):'—';link.classList.toggle('has-alarms',validCount&&data.count24h>0);
+      link.title=validCount?data.count24h+' alarmas en las últimas 24 horas (caché de telemetría). Abrir historial.':'Contador de alarmas no disponible. Abrir historial.';
+      const alarmKpi=body.querySelector('[data-kpi-column="ALM"]');
+      if(alarmKpi){alarmKpi.querySelector('strong').textContent=validCount?String(data.count24h):'—';alarmKpi.classList.toggle('is-no-data',!validCount);alarmKpi.title=link.title;}
+      const alarmField=body.querySelector('[data-history-column="ALM"]');
+      if(alarmField){alarmField.querySelector('dd').textContent=validCount?String(data.count24h):'—';alarmField.classList.toggle('is-no-data',!validCount);}
+      const alarmAction=body.closest('dialog')?.querySelector('[data-well-alarm-action]');
+      if(alarmAction){const label=validCount?'Ver alarmas ('+data.count24h+')':'Ver alarmas';alarmAction.textContent=label;alarmAction.setAttribute('aria-label',label);alarmAction.title=link.title;}
       last.replaceChildren();if(!data.latest){last.textContent='Sin alarmas registradas para este pozo.';return;}
       const item=data.latest;last.append(node('strong','',item.description||item.tag||'Alarma'));
       const list=node('dl','wd-alarm-fields');

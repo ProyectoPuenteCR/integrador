@@ -13,9 +13,8 @@ try{
     $source=wh_source(array_key_exists('source',$_GET)?$_GET['source']:'monitoreo_pozos');
     if(!wh_can_activity($source))wa_out(['ok'=>false,'error'=>'No tenés permiso para ver las alarmas del pozo.'],403);
     $well=wh_well($_GET['well']??'');
-    $config=require __DIR__.'/config.php';date_default_timezone_set($config['timezone']??'America/Argentina/Buenos_Aires');
+    if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
     $db=clear_db();if(!$db->ok())throw new RuntimeException('Sin conexión a SQL Server.');
-    $now=new DateTimeImmutable();
-    wa_out(['ok'=>true]+wa_alarms($db,$well,$now->modify('-24 hours')->format('Y-m-d\TH:i:s'),$now->format('Y-m-d\TH:i:s')));
+    wa_out(['ok'=>true]+wa_alarms($db,$well));
 }catch(InvalidArgumentException $e){wa_out(['ok'=>false,'error'=>$e->getMessage()],422);}
 catch(Throwable $e){wa_out(['ok'=>false,'error'=>'No se pudo consultar el historial de alarmas.'],502);}

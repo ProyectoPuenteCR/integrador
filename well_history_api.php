@@ -22,6 +22,7 @@ try{
     }
     $source=wh_source(array_key_exists('source',$input)?$input['source']:'monitoreo_pozos');
     if(!wh_can_history($source))wh_out(['ok'=>false,'error'=>'No tenés permiso para consultar estos históricos.'],403);
+    if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
     if(($input['action']??'')==='cards'&&!wh_cards_allowed($source))
         throw new InvalidArgumentException('Las cartas dinamométricas no corresponden a la ficha PCP.');
     $well=wh_well($input['well']??'');$db=clear_db();

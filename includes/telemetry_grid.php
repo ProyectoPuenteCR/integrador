@@ -779,7 +779,7 @@ if($batteryCounts)$filterGroups[]=['column'=>$batteryCol,'label'=>'Baterías','v
 ?>
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?php echo h($TELEMETRY['title']); ?> · CLEAR</title><link rel="stylesheet" href="assets/css/app.css?v=20260902-column-menu-1"><link rel="stylesheet" href="assets/css/telemetry_modal.css?v=3.1.9"><link rel="stylesheet" href="assets/css/alarm_actions.css?v=20260826-central-1"><link rel="stylesheet" href="assets/css/novedades_semanales.css?v=20260904-dashboard-full-1">
-<?php if($wellDetailsEnabled): ?><link rel="stylesheet" href="assets/css/well_details.css?v=20261029-pcp-1"><link rel="stylesheet" href="assets/css/well_history.css?v=20261022-7"><?php endif; ?>
+<?php if($wellDetailsEnabled): ?><link rel="stylesheet" href="assets/css/well_details.css?v=20261030-pcp-1"><link rel="stylesheet" href="assets/css/well_history.css?v=20261022-7"><?php endif; ?>
 <style>
 .tg{padding:0 20px 24px}
 .tg-hero{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:8px 0 10px}
@@ -899,7 +899,7 @@ button.tg-card.is-active{outline:2px solid rgba(184,50,43,.18);border-color:#e3a
   $alarmClass=tg_alarm_class($alarmCount);
   $alarmColorState=$alarmCount<=0?'0 alarmas':($alarmCount<=5?'1-5 alarmas':($alarmCount<=15?'6-15 alarmas':'16+ alarmas'));
   $alarmColorStyle=clear_colors_style('ALARMAS',$alarmColorState,$colorOverrides);
-  $alarmUrl='pozos_alarmas24.php?'.http_build_query(['pozo'=>$wellName,'desde'=>date('Y-m-d',strtotime('-24 hours')),'hora_desde'=>date('H:i',strtotime('-24 hours')),'hasta'=>date('Y-m-d'),'hora_hasta'=>date('H:i')]);
+  $alarmUrl='pozos_alarmas24.php?'.http_build_query(['pozo'=>$wellName,'desde'=>date('Y-m-d',strtotime('-24 hours')),'hora_desde'=>date('H:i',strtotime('-24 hours')),'hasta'=>date('Y-m-d'),'hora_hasta'=>date('H:i')]+($wellDetailsEnabled?['pozo_exacto'=>'1','prefijo_pozo'=>'']:[]));
   $alarmEmbedUrl=$alarmUrl.'&embed=1';
   $alarmCommentSubject=clear_alarm_comment_subject($wellName,'pozo');
 ?>
@@ -959,9 +959,9 @@ document.querySelectorAll('[data-server-filter]').forEach(function(select){
 </script>
 <script src="assets/js/app.js?v=3.1.7"></script>
 <script>window.CLEAR_TELEMETRY_GRID=<?php echo json_encode(['key'=>$TELEMETRY['key'],'title'=>$TELEMETRY['title'],'batteryColumn'=>$batteryCol,'stateColumn'=>($TELEMETRY['rpm_state_column']??$stateCol),'wellCards'=>($TELEMETRY['key']==='monitoreo_pozos'),'remoteStopColumn'=>$remoteStopEnabled?$remoteStopColumn:'','persistFilters'=>$persistFiltersEnabled,'wellHistory'=>($wellDetailsEnabled&&permissions_can_menu('pi_historico')),'wellHistoryReport'=>$reportEnabled,'wellCommentView'=>permissions_can('comments.view'),'wellAlarms'=>(permissions_can_menu('pozos_alarmas24')||permissions_can_menu('pozos_todas_alarmas')),'wellAlarmsHistory'=>permissions_can_menu('pozos_todas_alarmas'),'columnStateVersion'=>(string)($TELEMETRY['column_state_version'] ?? '317').'-zafiro-activo-1'],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;</script>
-<script src="assets/js/telemetry_grid.js?v=20261029-pcp-1"></script>
+<script src="assets/js/telemetry_grid.js?v=20261030-pcp-1"></script>
 <script src="assets/js/telemetry_modal.js?v=3.1.9"></script>
-<?php if($wellDetailsEnabled): ?><script src="assets/js/chart.umd.js"></script><script src="assets/js/chartjs-plugin-zoom.min.js?v=2.0.1"></script><script src="assets/js/well_history.js?v=20261029-pcp-1"></script><script src="assets/js/well_activity.js?v=20261029-pcp-1"></script><script src="assets/js/well_details.js?v=20261029-pcp-1"></script><?php endif; ?>
+<?php if($wellDetailsEnabled): ?><script src="assets/js/chart.umd.js"></script><script src="assets/js/chartjs-plugin-zoom.min.js?v=2.0.1"></script><script src="assets/js/well_history.js?v=20261030-pcp-1"></script><script src="assets/js/well_activity.js?v=20261030-pcp-1"></script><script src="assets/js/well_details.js?v=20261030-pcp-1"></script><?php endif; ?>
 <script src="assets/js/alarm_actions.js?v=20260901-report-grid-1"></script>
 <?php if($reportEnabled): ?><script>window.CLEAR_WEEKLY_NEWS={};</script><script src="assets/js/novedades_semanales.js?v=20260904-dashboard-full-1"></script><?php endif; ?>
 </body></html>

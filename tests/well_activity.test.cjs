@@ -1,11 +1,12 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
+const browserOptions={headless:true,...(process.env.PLAYWRIGHT_CHANNEL?{channel:process.env.PLAYWRIGHT_CHANNEL}:{}),...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})};
 const path=require('node:path');
 const fs=require('node:fs');
 const root=path.join(__dirname,'..');
 for(const width of [1520,390])test('comentario y alarma en cabecera '+width,async()=>{
- const browser=await chromium.launch({headless:true,channel:'msedge'});
+ const browser=await chromium.launch(browserOptions);
  try{
   const page=await browser.newPage({viewport:{width,height:900}});let saved='Pendiente: falla sensor RPM',posted='';
   await page.route('http://clear.test/**',async route=>{
@@ -33,5 +34,50 @@ for(const width of [1520,390])test('comentario y alarma en cabecera '+width,asyn
   await page.evaluate(()=>{window.CLEAR_TELEMETRY_GRID.wellCommentView=false;window.CLEAR_TELEMETRY_GRID.wellAlarms=false;document.querySelector('[data-alarm-comment]').dataset.canCreate='0';});
   await page.locator('#tgTable td[data-column="POZO"]').click();
   assert.equal(await dialog.locator('.wd-comment-preview').textContent(),'Sin permiso para ver comentarios');assert.equal(await dialog.locator('.wd-activity textarea').count(),0);assert.equal(await dialog.locator('.wd-alarm-bell').count(),0);
+ }finally{await browser.close();}
+});
+
+test('PCP: contador desconocido y permiso de escritura sin lectura',async()=>{
+ const browser=await chromium.launch(browserOptions);
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:900}});
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  let commentReads=0,posted='';const activityQueries=[];
+  await page.route('http://clear.test/**',async route=>{
+   const url=new URL(route.request().url());
+   if(url.pathname.endsWith('alarm_events_api.php')){
+    if(route.request().method()==='POST'){posted=route.request().postData();return route.fulfill({json:{ok:true}});}
+    commentReads++;return route.fulfill({status:403,json:{ok:false,error:'Sin permiso de lectura.'}});
+   }
+   if(url.pathname.endsWith('well_activity_api.php')){
+    activityQueries.push(Object.fromEntries(url.searchParams));
+    return route.fulfill({json:{ok:true,count24h:null,latest:null}});
+   }
+   return route.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><html lang="es"><head><meta charset="utf-8"><style>${fs.readFileSync(path.join(root,'assets/css/well_details.css'),'utf8')}</style></head><body><table id="tgTable"><thead><tr><th data-column="POZO">POZO</th><th data-column="ALM">ALM</th><th data-column="COMENTARIO">COMENTARIO</th></tr></thead><tbody><tr><td data-column="POZO" data-raw="PCP-DEMO-001">PCP-DEMO-001</td><td data-column="ALM" data-raw="7"><button data-alarm-comment="true" data-subject="POZO:PCP-DEMO-001" data-event-key="demo-event" data-can-create="1">Comentario</button></td><td data-column="COMENTARIO" data-raw="Texto privado de prueba"><span data-comment-subject="POZO:PCP-DEMO-001" data-comment-preview>Sin permiso</span></td></tr></tbody></table><script>window.CLEAR_TELEMETRY_GRID={key:'telemetria_pcp',title:'Telemetría PCP',wellCommentView:false,wellAlarms:true,wellAlarmsHistory:false};</script></body></html>`});
+  });
+  await page.goto('http://clear.test/telemetria_pcp.php');
+  for(const file of ['well_activity.js','well_details.js'])await page.addScriptTag({path:path.join(root,'assets/js',file)});
+  await page.locator('#tgTable td[data-column="POZO"]').click();
+  const dialog=page.locator('dialog.wd-dashboard');
+  await page.waitForFunction(()=>document.querySelector('.wd-alarm-bell strong')?.textContent==='—');
+  assert.equal(await dialog.locator('[data-kpi-column="ALM"] strong').textContent(),'—');
+  assert.equal(await dialog.locator('[data-kpi-column="ALM"]').getAttribute('class'),'wd-kpi is-no-data');
+  assert.equal(await dialog.locator('.wd-alarm-bell').getAttribute('title'),'Contador de alarmas no disponible. Abrir historial.');
+  assert.equal(await dialog.locator('.wd-comment-preview').textContent(),'Sin permiso para ver comentarios');
+  assert.equal(commentReads,0);
+  assert.deepEqual(activityQueries,[{well:'PCP-DEMO-001',source:'telemetria_pcp'}]);
+  await dialog.getByRole('button',{name:'Agregar comentario',exact:true}).click();
+  assert.equal(await dialog.locator('textarea').inputValue(),'');
+  assert.equal(await dialog.locator('.wd-comment-form input').inputValue(),'');
+  await dialog.locator('textarea').fill('Prueba ficticia de escritura');
+  await dialog.locator('.wd-comment-form input').fill('Operador de prueba');
+  await dialog.getByRole('button',{name:'Guardar comentario',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.wd-activity-status')?.textContent==='Comentario guardado.');
+  assert.equal(commentReads,0);
+  assert.ok(posted.includes('POZO:PCP-DEMO-001')&&posted.includes('demo-event')&&posted.includes('telemetria_pcp'));
+  assert.equal(await dialog.locator('.wd-comment-preview').textContent(),'Comentario guardado. Sin permiso para ver el contenido.');
+  assert.equal(await page.locator('#tgTable [data-comment-preview]').textContent(),'Sin permiso');
+  assert.ok(!(await dialog.textContent()).includes('Texto privado de prueba'));
+  assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });

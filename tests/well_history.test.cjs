@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {chromium}=require('playwright');
+const browserOptions={headless:true,...(process.env.PLAYWRIGHT_CHANNEL?{channel:process.env.PLAYWRIGHT_CHANNEL}:{}),...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})};
 const root=path.join(__dirname,'..');
 const fields={POZO:'YPF.SC.BB-130',BATERIA:'BB 03','QT:RPM':'750',FP:'0,85',ECO:'NORMAL',Fecha:'2026-10-22 12:00','PT:LINEA':'0',ESTADO_RPM:'EN MARCHA','PT:CABEZA':'10.45'};
 const config={key:'monitoreo_pozos',title:'Monitoreo Pozos',batteryColumn:'BATERIA',wellHistory:true,wellHistoryReport:true};
@@ -16,7 +17,7 @@ function response(columns,intervalSeconds=3600){return {ok:true,well:fields.POZO
 // Leer los miembros ZIP almacenados para verificar que la descarga sea XLSX real.
 function zipEntries(bytes){const entries={};let at=0;while(bytes.readUInt32LE(at)===0x04034b50){const length=bytes.readUInt32LE(at+18),nameLength=bytes.readUInt16LE(at+26),extra=bytes.readUInt16LE(at+28),name=bytes.subarray(at+30,at+30+nameLength).toString(),start=at+30+nameLength+extra;entries[name]=bytes.subarray(start,start+length).toString();at=start+length;}return entries;}
 for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y reporte '+(mobile?'móvil':'escritorio'),async()=>{
-  const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'msedge'});
+  const browser=await chromium.launch(browserOptions);
   try{
     const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},acceptDownloads:true});
     const errors=[],requests=[],reports=[];page.on('pageerror',error=>errors.push(error.message));
@@ -194,7 +195,7 @@ for(const mobile of [false,true])test('selección, gráficos, escalas, Excel y r
   }finally{await browser.close();}
 });
 test('PCP integra ficha, históricos y alarmas con su fuente y sólo variables verificadas',async()=>{
-  const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'msedge'});
+  const browser=await chromium.launch(browserOptions);
   try{
     for(const communicationVerified of [true,false]){
       const page=await browser.newPage();
@@ -244,6 +245,6 @@ test('PCP integra ficha, históricos y alarmas con su fuente y sólo variables v
   }finally{await browser.close();}
 });
 test('el permiso de histórico desactiva la función',async()=>{
-  const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'msedge'});
+  const browser=await chromium.launch(browserOptions);
   try{const page=await browser.newPage();await page.setContent('<script>window.CLEAR_TELEMETRY_GRID={key:"monitoreo_pozos",wellHistory:false}</script>');await page.addScriptTag({path:path.join(root,'assets/js/well_history.js')});assert.equal(await page.locator('.wh-dialog').count(),0);}finally{await browser.close();}
 });

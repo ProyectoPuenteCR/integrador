@@ -3,6 +3,7 @@ require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/permissions.php';
 require_once __DIR__ . '/includes/zones.php';
+require_once __DIR__ . '/includes/pozos_alarmas_exact.php';
 $historyMode=defined('POZOS_ALARMAS_HISTORY_MODE')&&POZOS_ALARMAS_HISTORY_MODE===true;
 $screenKey=$historyMode?'pozos_todas_alarmas':'pozos_alarmas24';
 auth_require(); permissions_require_menu($screenKey); audit_log('EXPORTACION',$screenKey,$historyMode?'Exportación Excel histórico de alarmas de pozos':'Exportación Excel alarmas de pozos');
@@ -42,14 +43,15 @@ if($fromSql!==''&&$toSql!==''&&strtotime($fromSql)>strtotime($toSql)){[$fromSql,
 $hasExplicitDateInputs=isset($_GET['desde'])||isset($_GET['hasta'])||isset($_GET['hora_desde'])||isset($_GET['hora_hasta']);
 $prefix=trim((string)($_GET['prefijo_pozo'] ?? 'YPF.SC'));
 $wellSearch=trim((string)($_GET['pozo'] ?? ''));
+$wellExact=pa_well_exact_requested($_GET);
 $descSearch=trim((string)($_GET['descripcion'] ?? ''));
 $statusFilter=trim((string)($_GET['f_estado'] ?? ''));
 $priorityFilter=trim((string)($_GET['f_prioridad'] ?? ''));
 $valueBucketFilter=trim((string)($_GET['f_valorcat'] ?? ''));
 $columnFilterInput=isset($_GET['cf'])&&is_array($_GET['cf'])?$_GET['cf']:[];
 
-$metaRows=$db->all("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='FIXALARMS' ORDER BY ORDINAL_POSITION");
-$all=[];foreach($metaRows as $r){$c=trim((string)($r['COLUMN_NAME']??$r['column_name']??reset($r)));if($c!=='')$all[]=$c;}
+$metaRows=$db->all("SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='FIXALARMS' ORDER BY ORDINAL_POSITION");
+$all=[];$wellMetadata=[];foreach($metaRows as $r){$c=trim((string)($r['COLUMN_NAME']??$r['column_name']??reset($r)));if($c!=='')$all[]=$c;if(strtoupper($c)==='ALM_ALMEXTFLD2')$wellMetadata=$r;}
 if(!$all){$sample=$db->all("SELECT TOP 1 * FROM $table");if($sample)$all=array_keys($sample[0]);}
 $lookup=[];foreach($all as $c)$lookup[strtoupper($c)]=$c;
 $well=$lookup['ALM_ALMEXTFLD2']??'ALM_ALMEXTFLD2';
@@ -69,12 +71,13 @@ $requested=isset($_GET['columns'])?explode(',',(string)$_GET['columns']):[];
 $columns=array_values(array_filter($requested,function($c)use($all){return in_array($c,$all,true);}));
 if(!$columns)$columns=$ordered;
 
-$baseConditions=["[$well] IS NOT NULL","LTRIM(RTRIM(CONVERT(nvarchar(4000),[$well])))<>''"];
+$baseConditions=$wellExact?[]:["[$well] IS NOT NULL","LTRIM(RTRIM(CONVERT(nvarchar(4000),[$well])))<>''"];
 $params=[];
 $zones=clear_zones_all($db);$zoneFilter=clear_zone_valid((string)($_GET['zona']??''),$zones);
 if($zoneFilter!==''){$tagNorm="LTRIM(RTRIM(CONVERT(nvarchar(255),[$tag])))";$tagInst="LEFT($tagNorm,CHARINDEX('_',$tagNorm+'_')-1)";$baseConditions[]="EXISTS (SELECT 1 FROM [CLEAR].[ZONAS] Z WHERE LTRIM(RTRIM(Z.ZONA)) COLLATE DATABASE_DEFAULT = ? COLLATE DATABASE_DEFAULT AND LTRIM(RTRIM(Z.BATERIA)) COLLATE DATABASE_DEFAULT = $tagInst COLLATE DATABASE_DEFAULT)";$params[]=$zoneFilter;}
 if($prefix!==''){$baseConditions[]="UPPER(LTRIM(RTRIM(CONVERT(nvarchar(4000),[$well])))) LIKE ?";$params[]=strtoupper($prefix).'%';}
-foreach(pex_terms($wellSearch) as $term){$baseConditions[]="(CONVERT(nvarchar(4000),[$well]) LIKE ? OR REPLACE(REPLACE(REPLACE(CONVERT(nvarchar(4000),[$well]),'_',''),'-',''),' ','') LIKE ?)";$params[]='%'.$term.'%';$params[]='%'.str_replace(['_','-',' '],'',$term).'%';}
+if($wellExact){$exactFilter=pa_well_exact_filter($well,$wellSearch,$wellMetadata);$baseConditions[]=$exactFilter['sql'];$params=array_merge($params,$exactFilter['params']);}
+else foreach(pex_terms($wellSearch) as $term){$baseConditions[]="(CONVERT(nvarchar(4000),[$well]) LIKE ? OR REPLACE(REPLACE(REPLACE(CONVERT(nvarchar(4000),[$well]),'_',''),'-',''),' ','') LIKE ?)";$params[]='%'.$term.'%';$params[]='%'.str_replace(['_','-',' '],'',$term).'%';}
 foreach(pex_terms($descSearch) as $term){$baseConditions[]="CONVERT(nvarchar(4000),[$desc]) LIKE ?";$params[]='%'.$term.'%';}
 $rangeConditions=[];$rangeParams=[];
 if($fromSql!==''){$rangeConditions[]="[$date]>=CONVERT(datetime2, ?, 126)";$rangeParams[]=$fromSql;}
