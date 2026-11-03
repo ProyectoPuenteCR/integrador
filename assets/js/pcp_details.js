@@ -79,6 +79,13 @@
     target.append(link);
   }
 
+
+  function zafiro(well){
+    if(!window.CLEAR_ZAFIRO_READY)window.CLEAR_ZAFIRO_READY=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='assets/js/well_zafiro.js?v=20261103-1';s.onload=resolve;s.onerror=()=>{delete window.CLEAR_ZAFIRO_READY;reject(Error('No se pudo cargar Producción Zafiro.'));};document.head.append(s);});
+    const host=document.createElement('section');host.className='well-details__section wz-production';host.textContent='Consultando producción Zafiro…';body.prepend(host);
+    window.CLEAR_ZAFIRO_READY.then(()=>{if(host.isConnected)window.CLEAR_WELL_ZAFIRO.decorate({host,well,source:cfg.key});}).catch(e=>{if(host.isConnected)host.textContent=e.message;});
+  }
+
   function open(row){
     if(dialog.open)return;
     opener=row;
@@ -129,7 +136,7 @@
     groups.forEach((fields,name)=>{
       if(!fields.length)return;
       const section=document.createElement('section');section.className='well-details__section';
-      const heading=document.createElement('h3');heading.textContent=name;
+      const heading=document.createElement('h3');heading.textContent=name==='Producción'?'Producción de la grilla · INFOIL Q164':name;
       const list=document.createElement('dl');list.append(...fields);section.append(heading,list);details.append(section);
     });
     addAction(row.querySelector('.tg-alarm-link'),'Ver alarmas ('+(value('ALM')||'0')+')');
@@ -138,6 +145,7 @@
     if(window.CLEAR_PCP_HISTORY)window.CLEAR_PCP_HISTORY.decorate({well:value('POZO'),body,actions,historyHost});
     if(!window.CLEAR_PCP_HISTORY){historyHost.textContent='Históricos no disponibles para este usuario.';cardsHost.textContent='Cartas PI no disponibles para este usuario.';}
     window.CLEAR_PCP_ACTIVITY?.decorate({row,body,activityHost,well:value('POZO'),close});
+    zafiro(value('POZO'));
     resize(true);dialog.showModal();body.scrollTop=0;document.body.classList.add('well-details-open');
   }
 

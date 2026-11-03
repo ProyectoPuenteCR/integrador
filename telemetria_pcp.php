@@ -133,6 +133,6 @@ ob_start();
 require __DIR__ . '/includes/telemetry_grid.php';
 $pcpHtml=ob_get_clean();
 $pcpConfig=json_encode(['wellHistory'=>permissions_can_menu('pi_historico'),'wellHistoryReport'=>$reportEnabled,'wellCommentView'=>permissions_can('comments.view'),'wellAlarms'=>(permissions_can_menu('pozos_alarmas24')||permissions_can_menu('pozos_todas_alarmas')),'wellAlarmsHistory'=>permissions_can_menu('pozos_todas_alarmas')],JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT);
-$pcpHead='<link rel="stylesheet" href="assets/css/pcp_details.css?v=20261030-1"><link rel="stylesheet" href="assets/css/pcp_history.css?v=20261030-1">';
-$pcpScripts='<script>Object.assign(window.CLEAR_TELEMETRY_GRID,'.$pcpConfig.');</script><script src="assets/js/chart.umd.js"></script><script src="assets/js/chartjs-plugin-zoom.min.js?v=2.0.1"></script><script src="assets/js/pcp_history.js?v=20261030-1"></script><script src="assets/js/pcp_activity.js?v=20261030-1"></script><script src="assets/js/pcp_details.js?v=20261030-1"></script>';
+$pcpHead='<link rel="stylesheet" href="assets/css/pcp_details.css?v=20261103-1"><link rel="stylesheet" href="assets/css/pcp_history.css?v=20261103-1">';
+$pcpScripts='<script>Object.assign(window.CLEAR_TELEMETRY_GRID,'.$pcpConfig.');</script><script src="assets/js/chart.umd.js"></script><script src="assets/js/chartjs-plugin-zoom.min.js?v=2.0.1"></script><script src="assets/js/pcp_history.js?v=20261103-1"></script><script src="assets/js/pcp_activity.js?v=20261103-1"></script><script src="assets/js/pcp_details.js?v=20261103-1"></script>';
 echo str_replace(['</head>','</body>'],[$pcpHead.'</head>',$pcpScripts.'</body>'],$pcpHtml);

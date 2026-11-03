@@ -45,4 +45,12 @@ $TELEMETRY = [
         'POZO','BATERIA','PANTALLA','FEHA','ESTADO','YT:SISTEMA','YAT:COM','RUN:BQ','AF:RUN:BQ','YT:MOD-CONTROL'
     ]
 ];
+// La extensión se carga sólo en BES, sobre la grilla instalada.
+ob_start();
 require __DIR__ . '/includes/telemetry_grid.php';
+$besHtml=ob_get_clean();
+$besConfig=json_encode(['wellHistory'=>permissions_can_menu('pi_historico'),'wellHistoryReport'=>$reportEnabled,'wellCommentView'=>permissions_can('comments.view'),'wellAlarms'=>(permissions_can_menu('pozos_alarmas24')||permissions_can_menu('pozos_todas_alarmas')),'wellAlarmsHistory'=>permissions_can_menu('pozos_todas_alarmas')],JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT);
+$besHead='<link rel="stylesheet" href="assets/css/bes_details.css?v=20261103-1"><link rel="stylesheet" href="assets/css/bes_history.css?v=20261103-1">';
+$besScripts='<script>Object.assign(window.CLEAR_TELEMETRY_GRID,'.$besConfig.');</script><script src="assets/js/chart.umd.js"></script><script src="assets/js/chartjs-plugin-zoom.min.js?v=2.0.1"></script><script src="assets/js/bes_history.js?v=20261103-1"></script><script src="assets/js/bes_activity.js?v=20261103-1"></script><script src="assets/js/bes_details.js?v=20261103-1"></script>';
+echo str_replace(['</head>','</body>'],[$besHead.'</head>',$besScripts.'</body>'],$besHtml);
+

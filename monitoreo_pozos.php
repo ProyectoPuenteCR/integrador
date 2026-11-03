@@ -21,5 +21,8 @@ $TELEMETRY = [
 if (isset($_GET['modo']) && (string)$_GET['modo']==='historico') {
     require __DIR__.'/includes/monitoreo_pozos_historial.php';
 } else {
+    ob_start();
     require __DIR__.'/includes/telemetry_grid.php';
+    $monitorHtml=ob_get_clean();
+    echo preg_replace('~assets/js/well_details\.js\?v=[^"\s<]+~','assets/js/well_details.js?v=20261103-1',$monitorHtml);
 }
