@@ -1,0 +1,40 @@
+CLEAR · Ficha de telemetría TECSS · 03/11/2026
+
+Copiar los archivos a la carpeta raíz de CLEAR conservando assets e includes.
+Se incluye únicamente la pantalla modificada y los recursos nuevos o modificados.
+No hay instalador ni cambios SQL. No se ejecutó commit, push ni despliegue.
+
+FUNCIONES
+- Doble clic o Enter en la fila abre la ficha maximizada del pozo.
+- Estado, presión de línea, vibración, consigna SPM y golpes por minuto.
+- Valores actuales desde PI, selección de variables e históricos con exportación Excel.
+- Comentarios y alarmas a través de los componentes existentes y sus permisos.
+- Producción Zafiro del mismo pozo; se habilita TECSS en well_zafiro_api.php.
+- Se conserva la consulta original TECSS_RTQP y el complemento de la caché de pozos.
+
+CARTAS DINAMOMÉTRICAS
+Superficie y fondo se verifican por separado para cada pozo.
+Se requieren tags numéricos unívocos de posición y carga de la misma familia/controlador.
+Superficie: ZT:SUP-POS / WT:SUP-LOAD. Fondo: ZT:FONDO-POS / WT:FONDO-LOAD.
+La consulta Última carta usa TIME:SUP o TIME:FONDO del mismo controlador.
+Sin fecha de referencia se permite seleccionar una fecha manual.
+Si no hay un par verificado, no se solicita ni dibuja una carta para ese tipo.
+Se muestran valores y fechas reales de PI; no se sintetizan cartas.
+Las curvas representan la ventana temporal consultada, sin identificar automáticamente un ciclo.
+Tags de cartas codificadas como texto o BLOB requieren una adaptación específica de su formato.
+
+DEPENDENCIAS
+Componentes de fichas ya instalados: includes/well_history.php, well_cards.php,
+well_activity.php, pi_transport.php, well_zafiro.php y assets/js/well_zafiro.js.
+PI_Points_Stage con WebId vigente, permisos de PI e históricos y PI Web API disponible.
+El catálogo admite nombres POZO(PLANTILLA)_VARIABLE[.PV] o POZO_VARIABLE[.PV].
+VIBRACION permite el tag VI-001-V; si hay más de una correspondencia, se rechaza la selección.
+Se conservan las unidades originales informadas por PI, sin conversiones implícitas.
+
+VALIDACIÓN
+Sintaxis PHP y JavaScript comprobada.
+Pruebas PHP: identidad exacta, ambigüedad, cartas parciales, cero válido,
+fecha manual y rechazo de pares de controladores diferentes o de texto codificado.
+Prueba Chrome con datos simulados: tendencias y carta de superficie disponibles;
+al cambiar a otro pozo sin pares verificados no se muestra la carta del anterior.
+Pendiente validar nombres de tags y datos de cartas reales en el servidor CLEAR.

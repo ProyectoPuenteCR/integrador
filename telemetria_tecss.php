@@ -17,8 +17,8 @@ $tecssCacheReady = $tecssDb->ok()
 $TELEMETRY = [
     'key' => 'telemetria_tecss',
     'collapsible_toolbar' => true,
-    'title' => 'Telemetría TECCS',
-    'subtitle' => 'Monitoreo de pozos TECCS',
+    'title' => 'Telemetría TECSS',
+    'subtitle' => 'Monitoreo de pozos TECSS',
     'table' => 'TECSS_RTQP',
     'order' => 'POZO',
     'columns' => [
@@ -102,4 +102,13 @@ if ($tecssCacheReady) {
     ";
 }
 
+// La extensión se carga sólo en TECSS, sobre la grilla instalada.
+ob_start();
 require __DIR__ . '/includes/telemetry_grid.php';
+$tecssHtml=ob_get_clean();
+$tecssConfig=json_encode(['wellHistory'=>permissions_can_menu('pi_historico'),'wellHistoryReport'=>$reportEnabled,'wellCommentView'=>permissions_can('comments.view'),'wellAlarms'=>(permissions_can_menu('pozos_alarmas24')||permissions_can_menu('pozos_todas_alarmas')),'wellAlarmsHistory'=>permissions_can_menu('pozos_todas_alarmas')],JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT);
+$tecssHead='<link rel="stylesheet" href="assets/css/tecss_details.css?v=20261103-tecss-1"><link rel="stylesheet" href="assets/css/tecss_history.css?v=20261103-tecss-1">';
+$tecssScripts='<script>Object.assign(window.CLEAR_TELEMETRY_GRID,'.$tecssConfig.');</script><script src="assets/js/chart.umd.js"></script><script src="assets/js/chartjs-plugin-zoom.min.js?v=2.0.1"></script><script src="assets/js/tecss_history.js?v=20261103-tecss-1"></script><script src="assets/js/tecss_activity.js?v=20261103-tecss-1"></script><script src="assets/js/tecss_details.js?v=20261103-tecss-1"></script>';
+echo str_replace(['</head>','</body>'],[$tecssHead.'</head>',$tecssScripts.'</body>'],$tecssHtml);
+
+
