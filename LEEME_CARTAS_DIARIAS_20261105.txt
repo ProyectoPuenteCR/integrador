@@ -1,0 +1,31 @@
+CLEAR — CARTAS DINAMOMÉTRICAS DE MONITOREO DE POZOS
+Corrección de fuente — 05/11/2026
+
+Fuente única del listado: dbo.BM_RTQP, igual que monitoreo_pozos.php.
+Agrupa por su BATERIA y conserva todos sus pozos, incluso sin tags de cartas.
+Los pozos sin carta válida se muestran como Sin datos y con su advertencia.
+No consulta TECSS_RTQP ni CLEAR_TECSS_POZOS_CACHE para formar el listado.
+
+Reemplazar en C:\inetpub\wwwroot\clear manteniendo estas rutas:
+  tools/cartas_diarias_sync.php
+  cartas_dinamometricas.php
+  includes/sidebar.php
+Las tablas SQL y los includes auxiliares del módulo ya instalado se mantienen.
+El reporte y el acceso del menú usan ahora el permiso Monitoreo de Pozos.
+
+Detener con Ctrl+C cualquier diagnóstico anterior antes de reemplazar.
+Diagnóstico rápido (sólo SQL, no modifica datos):
+  & "C:\php\php.exe" "C:\inetpub\wwwroot\clear\tools\cartas_diarias_sync.php" --check
+Revisión opcional de tags locales, con progreso por pozo:
+  & "C:\php\php.exe" "C:\inetpub\wwwroot\clear\tools\cartas_diarias_sync.php" --check-tags
+Carga real de cartas (consulta PI y escribe sólo la caché del reporte):
+  & "C:\php\php.exe" "C:\inetpub\wwwroot\clear\tools\cartas_diarias_sync.php"
+
+Se mantiene el corte diario de las 06:00 Argentina y el aviso de más de 24 horas.
+Una carga con la fuente anterior no se muestra como reporte de Monitoreo ni impide
+la nueva carga del mismo día. Primero se debe completar una carga BM_RTQP.
+Tarea Windows a las 06:00: php.exe como programa y el script como argumento,
+sin --check ni --check-tags. Configurar después de validar la primera carga real.
+
+Pruebas locales: sintaxis PHP y diagnóstico con datos simulados correctos.
+Pendiente: prueba de conexión, tiempos y carga de cartas contra el servidor CLEAR.

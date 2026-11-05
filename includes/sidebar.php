@@ -63,6 +63,7 @@ $alarmasInstalaciones = [
 
 /* Módulo aditivo. Las rutas operativas existentes no se reemplazan. */
 $reportesMenu = [
+    ['key'=>'monitoreo_pozos','label'=>'Cartas dinamométricas por batería','icon'=>'chart','url'=>'cartas_dinamometricas.php'],
     ['key'=>'pozos_parados','label'=>'Reporte Pozos Parados','icon'=>'oil','url'=>'pozos_parados.php'],
     ['key'=>'reportes_guardados','label'=>'REPORTES','icon'=>'file','url'=>'reportes_guardados.php'],
     ['key'=>'mis_reportes','label'=>'Mis Reportes','icon'=>'file','url'=>'mis_reportes.php'],
