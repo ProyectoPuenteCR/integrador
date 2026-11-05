@@ -14,6 +14,31 @@
     base.forEach(function (item) { if (Object.prototype.hasOwnProperty.call(counts,item.status) && item.status !== 'all') counts[item.status]++; });
     return {counts:counts,visible:base.filter(function (item) { return state.status === 'all' || item.status === state.status; })};
   }
+  function preparePrint(doc) {
+    var previous=doc.getElementById('cdPrintPages');if(previous)previous.remove();
+    var wells=Array.prototype.filter.call(doc.querySelectorAll('article.cd-well'),function(node){return !node.hidden&&!node.closest('.cd-battery').hidden;});
+    var container=doc.createElement('div');container.id='cdPrintPages';container.className='cd-print-pages';
+    var total=Math.max(1,Math.ceil(wells.length/4));
+    for(var start=0;start<wells.length||start===0;start+=4){
+      var page=doc.createElement('section');page.className='cd-print-page';
+      var header=doc.createElement('header');header.className='cd-print-heading';
+      var title=doc.createElement('strong');title.textContent='CLEAR · Cartas dinamométricas';
+      var subtitle=doc.createElement('span');subtitle.textContent='Corte: '+doc.body.dataset.cdCut+' · '+(doc.getElementById('cdFilterCaption').textContent||'Todos los pozos');
+      header.appendChild(title);header.appendChild(subtitle);page.appendChild(header);
+      var grid=doc.createElement('div');grid.className='cd-print-grid';
+      wells.slice(start,start+4).forEach(function(well){
+        var copy=well.cloneNode(true);copy.removeAttribute('hidden');
+        copy.querySelectorAll('.cd-pick').forEach(function(node){node.remove();});
+        var battery=doc.createElement('span');battery.className='cd-print-battery';battery.textContent='Batería: '+well.dataset.cdBattery;
+        copy.querySelector('h3').appendChild(battery);grid.appendChild(copy);
+      });
+      if(!wells.length){var empty=doc.createElement('p');empty.textContent='No hay pozos para los filtros seleccionados.';grid.appendChild(empty);}
+      page.appendChild(grid);
+      var footer=doc.createElement('footer');footer.textContent='Superficie y fondo · Estado de cartas al corte · Página '+(Math.floor(start/4)+1)+' de '+total;
+      page.appendChild(footer);container.appendChild(page);
+    }
+    doc.body.appendChild(container);return container;
+  }
   function mount(doc, win) {
     var form=doc.getElementById('cdFilters');if(!form)return;
     var wellInput=doc.getElementById('cdWellFilter'),batteryInput=doc.getElementById('cdBatteryFilter');
@@ -41,6 +66,8 @@
     buttons.forEach(function(button){button.addEventListener('click',function(){state.status=button.dataset.cdState;apply();});});
     doc.getElementById('cdClearFilters').addEventListener('click',function(){wellInput.value='';batteryInput.value='';state.status='all';apply();});
     apply();
+    win.addEventListener('beforeprint',function(){preparePrint(doc);});
+    win.addEventListener('afterprint',function(){var pages=doc.getElementById('cdPrintPages');if(pages)pages.remove();});
     function say(message,error){statusLine.textContent=message;statusLine.classList.toggle('is-error',!!error);}
     function updateCount(count){countNode.textContent=String(count||0);countNode.hidden=!(count>0);}
     function selected(input,active){input.checked=active;input.closest('.cd-well').classList.toggle('cd-selected',active);input.parentNode.querySelector('span').textContent=active?'Incluido en reporte':'Agregar al reporte';}
@@ -91,5 +118,5 @@
     });
     if(enabled){json('novedades_semanales_report_api.php?action=list').then(function(result){var keys=new Set(result.keys||[]);checks.forEach(function(input){selected(input,keys.has(input.closest('.cd-well').dataset.cdReportKey));input.disabled=false;});updateCount(result.count);say('Marcá el check de un pozo para incluir sus cartas de superficie y fondo en el reporte.');}).catch(function(error){checks.forEach(function(input){input.disabled=false;});say(error.message+' Podés reintentar marcando el check del pozo.',true);});}
   }
-  return {fold:fold,evaluate:evaluate,mount:mount};
+  return {fold:fold,evaluate:evaluate,preparePrint:preparePrint,mount:mount};
 });

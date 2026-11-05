@@ -106,7 +106,7 @@ $expected=cd_cutoff(new DateTimeImmutable('now',cd_tz()));
 $reportAllowed=permissions_can_menu('novedades_semanales_reporte')||permissions_can_menu('novedades_semanales_panel');
 $cartasTrace('Generando HTML del reporte');
 ?><!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CLEAR · Cartas por batería</title><link rel="stylesheet" href="assets/css/cartas_diarias.css?v=20261105-resaltado-rojo"></head><body data-cd-report-enabled="<?=$reportAllowed?'1':'0'?>" data-cd-cut="<?=cd_escape($cut?$cut->format('d/m/Y H:i'):'Sin corte')?>">
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CLEAR · Cartas por batería</title><link rel="stylesheet" href="assets/css/cartas_diarias.css?v=20261105-pdf4-horizontal"></head><body data-cd-report-enabled="<?=$reportAllowed?'1':'0'?>" data-cd-cut="<?=cd_escape($cut?$cut->format('d/m/Y H:i'):'Sin corte')?>">
 <div class="cd-tools"><a href="monitoreo_pozos.php">Volver a Monitoreo de Pozos</a><div class="cd-tool-actions"><a class="cd-report-link" href="novedades_semanales_reporte.php" id="cdOpenReport">Ver reporte <span id="cdReportCount" hidden>0</span></a><button type="button" onclick="window.print()">Imprimir / Guardar PDF</button></div></div>
 <header class="cd-report-head"><strong class="cd-brand">CLEAR</strong><h1>Reporte de cartas dinamométricas</h1><p>Monitoreo de Pozos · Agrupado por batería · Carga diaria a las 03:00 h (Argentina)</p>
 <?php if($cut): ?><p>Corte: <?=cd_escape($cut->format('d/m/Y H:i'))?> · Carga finalizada: <?=cd_escape($load['FIN'])?></p><?php endif; ?></header>
@@ -158,7 +158,7 @@ $cartasTrace('Generando HTML del reporte');
 </div><?php endforeach; ?></div></div></article>
 <?php endforeach; ?></section><?php endforeach; ?>
 <footer>Las fechas corresponden a la carta, no a la consulta. Estado evaluado al corte de las 03:00 h.</footer>
-<script src="assets/js/cartas_diarias.js?v=20261105-resaltado-rojo" defer></script>
+<script src="assets/js/cartas_diarias.js?v=20261105-pdf4-horizontal" defer></script>
 </body></html>
 
 <?php $cartasTrace('HTML completo'); ?>

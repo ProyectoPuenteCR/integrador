@@ -10,3 +10,31 @@
 
 /* Borde de alerta: comunicacion en falla o alguna carta con mas de 24 h al corte. */
 .cd-well-content.cd-needs-attention{border:4px solid #a00024}.cd-needs-attention>.cd-well-actions{background:#fff7f8}@media print{.cd-well-content.cd-needs-attention{border:3px solid #a00024}}
+
+/* PDF A4 horizontal: cuatro pozos por pagina, dos columnas por dos filas. */
+.cd-print-pages{display:none}
+@media print{
+ @page{size:A4 landscape;margin:7mm}
+ body> :not(.cd-print-pages){display:none!important}
+ .cd-print-pages{display:block!important}
+ .cd-print-page{height:194mm;display:flex;flex-direction:column;break-after:page;page-break-after:always;overflow:visible}
+ .cd-print-page:last-child{break-after:auto;page-break-after:auto}
+ .cd-print-heading{height:14mm;flex:0 0 14mm;border-bottom:1px solid #16445d;margin-bottom:2mm;display:flex;flex-direction:column;justify-content:center;gap:1mm}
+ .cd-print-heading strong{font-size:12pt}.cd-print-heading span{font-size:7pt}
+ .cd-print-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:3mm;flex:1;min-height:0}
+ .cd-print-grid .cd-well{margin:0;width:100%;height:100%;min-height:0;border-radius:2mm;break-inside:avoid;display:flex;flex-direction:column;overflow:hidden}
+ .cd-print-grid h3{font-size:9pt;line-height:1.2;padding:1.5mm 2mm;gap:1mm 2mm;flex-shrink:0}
+ .cd-print-battery{display:block;flex-basis:100%;font-size:7pt;font-weight:500}
+ .cd-print-grid .cd-status{font-size:6.5pt;line-height:1.2;padding:.6mm 1mm}
+ .cd-print-grid .cd-well-content{flex:1;min-height:0;display:flex;flex-direction:column}
+ .cd-print-grid .cd-needs-attention{border:2px solid #a00024}
+ .cd-print-grid .cd-well-actions{padding:1mm 2mm;flex-shrink:0}
+ .cd-print-grid .cd-plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1;min-height:0}
+ .cd-print-grid .cd-plot{padding:1.5mm;min-height:0;display:flex;flex-direction:column}
+ .cd-print-grid h4{font-size:7pt;line-height:1.2;margin:0 0 1mm}
+ .cd-print-grid .cd-stamp,.cd-print-grid .cd-note{font-size:6.5pt;line-height:1.2;margin:0 0 1mm;overflow-wrap:anywhere}
+ .cd-print-grid .cd-plot svg{width:100%;height:auto;max-height:100%;min-height:0;flex:1}
+ .cd-print-grid .cd-plot svg text{font-size:16px}
+ .cd-print-grid .cd-empty{min-height:0;flex:1;font-size:8pt;padding:2mm;text-align:center}
+ .cd-print-page>footer{height:5mm;flex:0 0 5mm;padding:1mm 0 0;margin:1mm 0 0;font-size:6.5pt;line-height:1.2}
+}
