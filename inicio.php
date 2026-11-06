@@ -77,6 +77,22 @@ if (!$favoriteCards) {
     .welcome-card--violet{--icon-bg:#f0ebff;--icon-color:#6c42c5}
     .welcome-card--cyan{--icon-bg:#e8f7fa;--icon-color:#1da2b8}
     .welcome-card--rose{--icon-bg:#fdeaf0;--icon-color:#e8446d}
+    .welcome-home .topbar [hidden]{display:none!important}
+    .welcome-card--feedback{grid-column:span 2;position:relative;overflow:hidden;align-items:center;background:linear-gradient(115deg,#effcf9,#e7f8f6);border-color:#389295;border-top:8px solid var(--petrol);padding-top:18px;box-shadow:0 6px 22px rgba(26,77,92,.10);--icon-bg:#f0eaff;--icon-color:#7942d5}
+    .welcome-card--feedback .welcome-card__icon{width:60px;height:76px;flex-basis:60px;border-radius:19px}
+    .welcome-card--feedback .welcome-card__body{min-width:0;min-height:130px;justify-content:center}
+    .welcome-card--feedback h2{font-size:28px;line-height:1.15;color:#103e4c;margin:0 0 10px}
+    .welcome-card--feedback p{font-size:14px;line-height:1.55;color:#244f5a;margin:0 0 16px}
+    .welcome-feedback__actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+    .welcome-card--feedback .welcome-card__btn{margin-top:0;padding:12px 20px;font-size:14px;border-radius:11px;gap:14px}
+    .welcome-feedback__tag{display:inline-block;border:1px solid #c6e8e4;border-radius:999px;padding:8px 11px;background:#f3fdfa;color:#24545e;font-size:11px;font-weight:600}
+    .welcome-feedback__art{width:100px;height:100px;flex:0 0 100px;border-radius:50%;background:#cef1ed;color:#104b58;display:flex;align-items:center;justify-content:center}
+    .welcome-feedback__art svg{width:68px;height:68px}
+    html[data-theme="dark"] .welcome-card--feedback{background:linear-gradient(115deg,#163d40,#123239);border-color:#408b88}
+    html[data-theme="dark"] .welcome-card--feedback h2{color:#e5fcf6}
+    html[data-theme="dark"] .welcome-card--feedback p{color:#c1e4df}
+    html[data-theme="dark"] .welcome-feedback__tag{background:#173f42;border-color:#3b6d6b;color:#d0f1e9}
+    html[data-theme="dark"] .welcome-feedback__art{background:#245456;color:#b4eae0}
     .welcome__lower{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:16px;margin-top:18px}
     .welcome-panel{background:var(--bg-card);border:1px solid var(--line-mid);border-radius:15px;padding:18px 20px;min-height:242px;box-shadow:0 6px 22px rgba(15,45,58,.04)}
     .welcome-panel__title{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;margin-bottom:14px;color:var(--text)}
@@ -96,9 +112,11 @@ if (!$favoriteCards) {
     .welcome-empty{padding:18px;border:1px dashed var(--line-strong);border-radius:9px;text-align:center;color:var(--text-mut);font-size:12px}
     @media(max-width:1180px){.welcome__grid,.welcome__lower{grid-template-columns:repeat(2,1fr)}.welcome__lower .welcome-panel:last-child{grid-column:1/-1}}
     @media(max-width:760px){.welcome{padding:0 4px 20px}.welcome__grid,.welcome__lower{grid-template-columns:1fr}.welcome__lower .welcome-panel:last-child{grid-column:auto}.welcome__title{font-size:34px}.welcome-card{min-height:160px}}
+    @media(max-width:1180px){.welcome-card--feedback{grid-column:1/-1}.welcome-home .topbar{flex-wrap:wrap;gap:8px}.welcome-home .topbar__spacer{display:none}}
+    @media(max-width:760px){.welcome-card--feedback{gap:14px;align-items:flex-start;padding:20px 18px}.welcome-card--feedback h2{font-size:25px}.welcome-card--feedback .welcome-card__icon{width:48px;height:56px;flex-basis:48px;border-radius:14px}.welcome-card--feedback .welcome-card__icon svg{width:29px;height:29px}.welcome-feedback__art{display:none}.welcome-card--feedback .welcome-card__body{min-height:0}.welcome-feedback__actions{gap:8px}.welcome-feedback__tag{font-size:10px;padding:7px 9px}}
   </style>
 </head>
-<body>
+<body class="welcome-home">
 <div class="app">
   <?php include __DIR__ . '/includes/sidebar.php'; ?>
   <main class="main">
@@ -111,6 +129,19 @@ if (!$favoriteCards) {
       </div>
 
       <div class="welcome__grid">
+        <article class="welcome-card welcome-card--feedback">
+          <div class="welcome-card__icon"><?php echo icon('message'); ?></div>
+          <div class="welcome-card__body">
+            <h2>Recomendaciones y fallas</h2>
+            <p>Compartí propuestas de mejora o informá problemas de la plataforma.</p>
+            <div class="welcome-feedback__actions">
+              <a class="welcome-card__btn" href="recomendaciones_fallas.php">Ingresar <?php echo icon('chevron-r'); ?></a>
+              <span class="welcome-feedback__tag">Propuestas de mejora</span>
+              <span class="welcome-feedback__tag">Problemas de la plataforma</span>
+            </div>
+          </div>
+          <div class="welcome-feedback__art" aria-hidden="true"><svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13h46a7 7 0 0 1 7 7v34a7 7 0 0 1-7 7H36L19 75V61h-2a7 7 0 0 1-7-7V20a7 7 0 0 1 7-7Z"/><path d="m27 37 9 9 19-20"/></svg></div>
+        </article>
         <article class="welcome-card">
           <div class="welcome-card__icon"><?php echo icon('chart'); ?></div>
           <div class="welcome-card__body"><h2>Dashboard de Pozos</h2><p>Resumen general de telemetría, comunicación y estado operativo de los pozos.</p><a class="welcome-card__btn" href="dashboard_pozos.php">Ir al Dashboard <?php echo icon('chevron-r'); ?></a></div>

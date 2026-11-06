@@ -1,0 +1,106 @@
+CLEAR - RECOMENDACIONES Y FALLAS
+Entrega: 06/11/2026
+Repositorio de referencia: ProyectoPuenteCR/integrador, rama main.
+PHP objetivo: 7.4. Servidor: IIS. Base: SQL Server 2012 o posterior.
+
+CONTENIDO (solo archivos nuevos o modificados)
+  inicio.php                                  MODIFICADO: panel destacado de acceso
+  recomendaciones_fallas.php                   NUEVO: pantalla y controlador
+  includes/recomendaciones_fallas.php          NUEVO: validación, SQL y correo
+  assets/css/recomendaciones_fallas.css        NUEVO: estilo adaptable
+  assets/js/recomendaciones_fallas.js          NUEVO: confirmación de borrado
+  SQL/CLEAR_RECOMENDACIONES_FALLAS.sql          NUEVO: instalación reejecutable
+  LEEME_DESPLIEGUE.txt                         NUEVO: estas instrucciones
+
+REQUISITOS
+La aplicación CLEAR debe estar instalada y funcionar con autenticación, roles,
+includes/db.php, includes/reporting.php y sus dependencias actuales.
+El módulo reutiliza report_smtp_config(), report_split_emails() y
+ClearSmtpClient de Reportes por correo. No reemplaza reporting.php, no cambia
+credenciales SMTP, no genera PDF ni necesita un nuevo job o tarea programada.
+Las tablas CLEAR_REPORT_SETTINGS y el esquema de reportes existentes deben estar
+instalados y su SMTP debe funcionar. No se incluyen configuraciones ni secretos.
+
+INSTALACIÓN
+1. Guardar copia del inicio.php desplegado y realizar el respaldo habitual de la
+   base. Este inicio.php parte de main consultado el 06/11/2026. Si el servidor
+   contiene cambios propios posteriores, incorporar el panel welcome-card--feedback
+   dentro de welcome__grid, sus estilos welcome-feedback, welcome-card--feedback y
+   welcome-home, y la clase welcome-home del body en lugar de reemplazarlo.
+2. Ejecutar SQL/CLEAR_RECOMENDACIONES_FALLAS.sql en la MISMA base usada por CLEAR,
+   desde SSMS con una cuenta autorizada a instalar objetos. Se puede repetir sin
+   borrar publicaciones ni destinatarios. IIS no ejecuta CREATE/ALTER.
+3. La identidad SQL configurada en CLEAR necesita SELECT, INSERT y UPDATE sobre
+   dbo.CLEAR_RECOMENDACIONES_FALLAS y dbo.CLEAR_RF_CONFIG. No necesita DELETE.
+   Aplicar estos permisos con el procedimiento habitual de administración SQL.
+4. Copiar los cinco archivos PHP/CSS/JS del paquete a la raíz de CLEAR, respetando
+   las carpetas includes y assets. El SQL y este LEEME son para administración;
+   no es necesario publicarlos en IIS. No copiar una carpeta contenedora adicional.
+5. Entrar como administrador: Inicio > Recomendaciones y fallas > Ingresar.
+   Abrir Emails receptores. Guardar uno o varios emails válidos separados por
+   punto y coma, coma o salto de línea. El primer acceso no trae destinatarios.
+6. Publicar una prueba y comprobar recepción. Verificar también con un usuario
+   operador o consulta que puede leer y publicar, y que no puede editar, borrar
+   ni modificar destinatarios. La pantalla no depende del permiso Comentarios.
+
+FUNCIONAMIENTO
+Inicio destaca el acceso con la opción visual aprobada: panel verde suave de dos
+columnas, borde superior petróleo, título grande, botón Ingresar e icono de diálogo.
+En pantallas medianas y móviles ocupa una fila completa y reorganiza su contenido.
+Incluye adaptación al tema oscuro. Las etiquetas son descriptivas y el botón
+Ingresar abre el formulario de Recomendaciones y fallas.
+
+Nombre, fecha, email, título y comentario son obligatorios. Se distingue entre
+Recomendación y Falla. Límites: nombre 150, email 254, título 200, comentario
+10000 unidades UTF-16; se validan en servidor además del navegador.
+El nombre se propone con el usuario conectado y la fecha con el día del servidor;
+ambos pueden corregirse. La fecha/hora de publicación es automática en SQL Server.
+El listado muestra 20 publicaciones por página, ordenadas por FECHA_CARGA DESC,
+ID DESC. Cambiar la fecha declarada o editar no mueve una publicación al inicio.
+Todos los usuarios autenticados pueden leer las publicaciones y sus datos de
+contacto. La interfaz lo informa antes de publicar.
+
+Solo administradores pueden editar, borrar y guardar destinatarios. Estos permisos
+también se comprueban en servidor ante POST directos. Los formularios usan CSRF,
+consultas parametrizadas y escape HTML. La restricción UNIQUE de TOKEN y la
+redirección posterior a guardar previenen duplicados por doble clic o recarga.
+Las sesiones efímeras del generador de reportes no pueden modificar información.
+El borrado es lógico; conserva usuario y fecha de modificación en la base.
+Editar o borrar no envía un nuevo aviso ni altera un correo ya recibido.
+
+CORREO Y ERRORES
+El aviso se envía al publicar y contiene tipo, nombre, fecha, email, título,
+comentario y usuario. Se utiliza el remitente SMTP de los reportes existentes.
+Si SMTP falla o faltan destinatarios, la publicación permanece guardada.
+El administrador ve el estado del correo y puede usar Reintentar correo después
+de corregir SMTP o destinatarios. El reintento usa los receptores actuales.
+ENVIADO no vuelve a enviarse. ENVIANDO bloquea envíos simultáneos.
+No hay reintentos automáticos ni se envían correos al instalar el paquete.
+Los errores técnicos se registran en el log PHP configurado en IIS.
+
+Si un proceso IIS se interrumpe durante el envío, puede quedar ENVIANDO. Verificar
+primero el log SMTP y la recepción para evitar duplicar un aviso ya aceptado.
+Solo después de esa comprobación, el administrador de SQL puede cambiar el
+EMAIL_ESTADO de ESA publicación a ERROR y dejar EMAIL_ERROR vacío para habilitar
+el reintento. No reiniciar masivamente estados ENVIANDO. SMTP y SQL no comparten
+una transacción; una desconexión tras aceptar el correo puede producir un resultado
+incierto que requiere esta revisión manual.
+
+PRUEBAS REALIZADAS
+Validación sintáctica de los PHP con PHP CLI 8.3.36 y del JS con Node.
+Se usó sintaxis compatible con PHP 7.4, sin dependencias de PHP 8.
+Pruebas de servicio: campos obligatorios, fechas inválidas, límites Unicode,
+email inválido, CSRF, cuatro acciones administrativas rechazadas para operador,
+alta, doble envío del mismo formulario, edición, borrado lógico, múltiples
+receptores, fallo de SMTP, falta de destinatarios, reintento y fallo de escritura.
+Pruebas HTTP del controlador con sesiones y almacenamiento SQL simulado, usando
+sidebar/topbar reales del proyecto. Prueba del ClearSmtpClient original contra
+un servidor SMTP local, sin enviar correos reales.
+Revisión en Chrome a 1440 y 390 píxeles, sin desborde horizontal del documento.
+No se ejecutó el script contra un SQL Server real ni se desplegó en IIS.
+La prueba final en PHP 7.4/IIS/SQL Server debe hacerse en el servidor de destino.
+
+REVERSIÓN
+Restaurar inicio.php y retirar los cuatro archivos nuevos de la aplicación
+(pantalla, include, CSS y JS). Las dos tablas pueden conservarse para no perder
+publicaciones ni auditoría. No se requiere modificar las tablas de reportes.
